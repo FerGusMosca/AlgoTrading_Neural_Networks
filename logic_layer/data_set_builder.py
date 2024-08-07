@@ -87,7 +87,8 @@ class DataSetBuilder():
                     curr_date_dict[DataSetBuilder._CLASSIFICATION_COL]=self.assign_classification(curr_date)
 
                 self.logger.do_log("Adding dataframe row for date {}".format(curr_date.date()),MessageType.INFO)
-                series_df=series_df.append(curr_date_dict, ignore_index=True)
+                #series_df=series_df.append(curr_date_dict, ignore_index=True)
+                series_df = pd.concat([series_df, pd.DataFrame([curr_date_dict])], ignore_index=True)
 
             curr_date = curr_date + timedelta(days=1)
 
