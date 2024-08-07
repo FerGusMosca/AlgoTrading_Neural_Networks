@@ -14,7 +14,7 @@ def show_commands():
 
     print("#1-TrainDeepNeuralNetwork [true_path] [false_path] [true_lavel] [learning_rate] [iterations] [arch_file] [activ_file] [output file] [step size]")
     print("#2-TrainDeepNeuralNetworkReg [true_path] [false_path] [true_lavel] [learning_rate] [iterations] [arch_file] [activ_file] [output file] [step size] [lambd] [useHeInit]")
-    print("#3-TestDeepNeuralNetworkModel [true_path] [false_path] [true_lavel] [output file]")
+    print("#3-TestDeepNeuralNetworkModel [true_path] [false_path] [true_lavel] [model file]")
     print("#4-TrainConvolutionalNeuralNetwork [train_true_path] [train_false_path] [test_true_path] [test_false_path] [true_lavel] [arch_file] [padding] [stride] [iterations]")
 
     print("#n-Exit")

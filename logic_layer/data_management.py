@@ -17,6 +17,9 @@ from logic_layer.ml_models_analyzer import MLModelAnalyzer
 import pandas as pd
 import numpy as np
 
+from logic_layer.neural_network_models_trainer import NeuralNetworkModelTrainer
+
+
 class DataManagement:
 
     def __init__(self,hist_data_conn_str,ml_reports_conn_str,p_classification_map_key,logger):
@@ -39,6 +42,35 @@ class DataManagement:
         except Exception as e:
             msg="CRITICAL ERROR processing model @train_algos:{}".format(str(e))
             self.logger.do_log(msg,MessageType.ERROR)
+            raise Exception(msg)
+
+
+    def backtest_neural_network_algo(self,symbol, variables_csv,d_from,d_to,model_to_use):
+        try:
+
+            symbol_df = self.data_set_builder.build_series(symbol, d_from, d_to)
+            test_series_df = self.data_set_builder.build_series(variables_csv, d_from, d_to)
+            nn_trainer = NeuralNetworkModelTrainer(self.logger)
+
+            nn_trainer.run_predictions(test_series_df,DataSetBuilder._CLASSIFICATION_COL,model_to_use)
+
+            return None
+
+        except Exception as e:
+            msg = "CRITICAL ERROR processing model @backtest_neural_network_algo:{}".format(str(e))
+            self.logger.do_log(msg, MessageType.ERROR)
+            raise Exception(msg)
+
+    def train_neural_network(self,symbol, variables_csv,d_from,d_to,depth,learning_rate,epochs,model_output):
+        try:
+            series_df = self.data_set_builder.build_series(variables_csv, d_from, d_to)
+            nn_trainer = NeuralNetworkModelTrainer(self.logger)
+            nn_trainer.train_neural_network(series_df,DataSetBuilder._CLASSIFICATION_COL,depth,learning_rate,epochs,model_output)
+            return None
+
+        except Exception as e:
+            msg = "CRITICAL ERROR processing model @train_neural_network:{}".format(str(e))
+            self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
 
     def evaluate_trading_performance(self,symbol,series_csv,d_from,d_to,bias,last_trading_dict=None):

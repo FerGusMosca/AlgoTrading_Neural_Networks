@@ -460,73 +460,88 @@ class MLModelAnalyzer():
 
         return predictions_dict
 
-    def evaluate_trading_performance_last_model(self,symbol_df,symbol, series_df,bias,last_trading_dict=None):
-        predictions_dic = self.run_predictions_last_model(series_df)
-
-        portf_pos_dict={}
+    def backtest_predictions(self,predictions_dic,symbol,symbol_df,bias,last_trading_dict=None):
+        portf_pos_dict = {}
 
         for algo in predictions_dic.keys():
-            curr_portf_pos=None
-            last_side=None
+            curr_portf_pos = None
+            last_side = None
             portf_pos = []
-            predictions_df=predictions_dic[algo]
+            predictions_df = predictions_dic[algo]
             LightLogger.do_log("----Processing algo {}".format(algo))
 
-
-            for index,day in predictions_df.iterrows():
+            for index, day in predictions_df.iterrows():
 
                 if not self.__eval_exists_value_on_df__(symbol_df, "date", day["date"], symbol):
-                    continue#We ignore days when we have no prices
+                    continue  # We ignore days when we have no prices
 
                 try:
 
                     if curr_portf_pos is None and last_side is None:
-                        if self.__validate_bias__(day["Prediction"],bias):
-
-                            ref_price= self.__extract_value_from_df__(symbol_df, "date", day["date"], symbol)
-                            ref_price=self.__eval_reuse_reference_price__(algo, last_trading_dict, day["Prediction"], day["date"],ref_price)
-                            LightLogger.do_log("-Opening {} pos for ref_price= {} on {}".format(day["Prediction"],float(ref_price),day["date"].strftime("%Y-%m-%d")))
+                        if self.__validate_bias__(day["Prediction"], bias):
+                            ref_price = self.__extract_value_from_df__(symbol_df, "date", day["date"], symbol)
+                            ref_price = self.__eval_reuse_reference_price__(algo, last_trading_dict, day["Prediction"],
+                                                                            day["date"], ref_price)
+                            LightLogger.do_log(
+                                "-Opening {} pos for ref_price= {} on {}".format(day["Prediction"], float(ref_price),
+                                                                                 day["date"].strftime("%Y-%m-%d")))
                             curr_portf_pos = PortfolioPosition(symbol)
 
-                            curr_portf_pos.open_pos(day["Prediction"],day["date"],ref_price)
-                            last_side=day["Prediction"]
-                    elif last_side != day["Prediction"]:#chage the side
+                            curr_portf_pos.open_pos(day["Prediction"], day["date"], ref_price)
+                            last_side = day["Prediction"]
+                    elif last_side != day["Prediction"]:  # chage the side
 
                         # 1- Close the old position
                         ref_price = self.__extract_value_from_df__(symbol_df, "date", day["date"], symbol)
                         curr_portf_pos.close_pos(day["date"], ref_price)
-                        LightLogger.do_log("-Closing {} pos for ref_price= {} on {} for pct profit={}% (nom. profit={})".format(curr_portf_pos.side, float(ref_price),day["date"].strftime("%Y-%m-%d"),curr_portf_pos.calculate_pct_profit(),curr_portf_pos.calculate_th_nom_profit()))
+                        LightLogger.do_log(
+                            "-Closing {} pos for ref_price= {} on {} for pct profit={}% (nom. profit={})".format(
+                                curr_portf_pos.side, float(ref_price), day["date"].strftime("%Y-%m-%d"),
+                                curr_portf_pos.calculate_pct_profit(), curr_portf_pos.calculate_th_nom_profit()))
                         portf_pos.append(curr_portf_pos)
 
-                        #2- Open the new one?
+                        # 2- Open the new one?
                         if self.__validate_bias__(day["Prediction"], bias):
 
                             if curr_portf_pos is not None:
-
-                                #2- Open the new one
-                                curr_portf_pos=PortfolioPosition(symbol)
+                                # 2- Open the new one
+                                curr_portf_pos = PortfolioPosition(symbol)
                                 ref_price = self.__extract_value_from_df__(symbol_df, "date", day["date"], symbol)
-                                LightLogger.do_log("-Opening new {} pos for ref_price= {} on {}".format(day["Prediction"], float(ref_price),day["date"].strftime("%Y-%m-%d")))
-                                curr_portf_pos.open_pos(day["Prediction"],day["date"],ref_price)
-                                last_side=day["Prediction"]
-                        else:#3-We go flat
-                            curr_portf_pos=None
-                            last_side=None
+                                LightLogger.do_log(
+                                    "-Opening new {} pos for ref_price= {} on {}".format(day["Prediction"],
+                                                                                         float(ref_price),
+                                                                                         day["date"].strftime(
+                                                                                             "%Y-%m-%d")))
+                                curr_portf_pos.open_pos(day["Prediction"], day["date"], ref_price)
+                                last_side = day["Prediction"]
+                        else:  # 3-We go flat
+                            curr_portf_pos = None
+                            last_side = None
                 except Exception as e:
-                    raise Exception("Error processing day {} for algo {}".format(day["date"].strftime("%Y-%m-%d"), algo))
+                    raise Exception(
+                        "Error processing day {} for algo {}".format(day["date"].strftime("%Y-%m-%d"), algo))
 
-            #We add the last position
+            # We add the last position
             if curr_portf_pos is not None:
-                last_day=predictions_dic[algo].iloc[-1]
+                last_day = predictions_dic[algo].iloc[-1]
                 ref_price = self.__extract_value_from_df__(symbol_df, "date", last_day["date"], symbol)
                 curr_portf_pos.close_pos(last_day["date"], ref_price)
-                LightLogger.do_log("-Closing last {} pos for ref_price= {} on {}  for pct profit={}% (nom. profit={})".format(curr_portf_pos.side, float(ref_price),last_day["date"].strftime("%Y-%m-%d"),curr_portf_pos.calculate_pct_profit(),curr_portf_pos.calculate_th_nom_profit()))
+                LightLogger.do_log(
+                    "-Closing last {} pos for ref_price= {} on {}  for pct profit={}% (nom. profit={})".format(
+                        curr_portf_pos.side, float(ref_price), last_day["date"].strftime("%Y-%m-%d"),
+                        curr_portf_pos.calculate_pct_profit(), curr_portf_pos.calculate_th_nom_profit()))
                 portf_pos.append(curr_portf_pos)
 
-            portf_pos_dict[algo]=portf_pos
+            portf_pos_dict[algo] = portf_pos
+
+        return portf_pos_dict
 
 
-        return  portf_pos_dict
+    def evaluate_trading_performance_last_model(self,symbol_df,symbol, series_df,bias,last_trading_dict=None):
+        predictions_dic = self.run_predictions_last_model(series_df)
+        return  self.backtest_predictions(predictions_dic,symbol,symbol_df,bias,last_trading_dict)
+
+
 
 
 

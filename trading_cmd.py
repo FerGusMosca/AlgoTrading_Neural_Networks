@@ -19,6 +19,10 @@ def show_commands():
     print("#5-PredictARIMA [Symbol] [p] [d] [q] [from] [to] [Period] [Step]")
     print("#6-EvalSingleIndicatorAlgo` [Symbol] [indicator] [from] [to] [inverted]")
     print("#7-EvalMLBiasedAlgo [Symbol] [indicator] [SeriesCSV] [from] [to] [inverted]")
+    print("#8-TrainNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [depth] [learning_rate] [iterations] [model_output]")
+    print("#8-BacktestNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [model_to_use]")
+
+    #TrainNeuralNetworkAlgo
     print("#n-Exit")
 
 def params_validation(cmd,param_list,exp_len):
@@ -193,6 +197,49 @@ def process_predict_ARIMA(symbol, p,d,q, str_from,str_to,period,step):
 
     except Exception as e:
         logger.print("CRITICAL ERROR bootstrapping the system:{}".format(str(e)), MessageType.ERROR)
+
+def process_backtest_neural_network_algo(symbol, variables_csv,str_from,str_to,model_to_use):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print("Initializing dataframe creation for series : {}".format(variables_csv), MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        dataMgm = DataManagement(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                 config_settings["classification_map_key"], logger)
+
+        dataMgm.backtest_neural_network_algo(symbol, variables_csv, DateHandler.convert_str_date(str_from, _DATE_FORMAT),
+                                     DateHandler.convert_str_date(str_to, _DATE_FORMAT), model_to_use)
+
+
+        #TODO ---> print backtesting output
+        logger.print("Model successfully trained for symbol {} and variables {}".format(symbol, variables_csv),
+                     MessageType.INFO)
+
+    except Exception as e:
+        logger.print("CRITICAL ERROR running proces_train_neural_network_algo:{}".format(str(e)), MessageType.ERROR)
+def process_train_neural_network_algo(symbol, variables_csv,str_from,str_to,depth,learning_rate,epochs,model_output):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print("Initializing dataframe creation for series : {}".format(variables_csv), MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        dataMgm = DataManagement(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                 config_settings["classification_map_key"], logger)
+
+        dataMgm.train_neural_network(symbol,variables_csv,DateHandler.convert_str_date(str_from, _DATE_FORMAT),
+                                     DateHandler.convert_str_date(str_to, _DATE_FORMAT),depth,learning_rate,
+                                     epochs,model_output)
+
+        logger.print("Model successfully trained for symbol {} and variables {}".format(symbol,variables_csv), MessageType.INFO)
+
+    except Exception as e:
+        logger.print("CRITICAL ERROR running proces_train_neural_network_algo:{}".format(str(e)), MessageType.ERROR)
 def process_commands(cmd):
 
     cmd_param_list=cmd.split(" ")
@@ -223,6 +270,20 @@ def process_commands(cmd):
         params_validation("EvalMLBiasedAlgo", cmd_param_list, 7)
         process_eval_ml_biased_algo(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
                                             cmd_param_list[5],cmd_param_list[6])
+    elif cmd_param_list[0] == "TrainNeuralNetworkAlgo":
+        params_validation("TrainNeuralNetworkAlgo", cmd_param_list, 9)
+        process_train_neural_network_algo(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                                          int(cmd_param_list[5]), float(cmd_param_list[6]), int(cmd_param_list[7]),
+                                          cmd_param_list[8])
+    elif cmd_param_list[0] == "BacktestNeuralNetworkAlgo":
+        params_validation("BacktestNeuralNetworkAlgo", cmd_param_list, 6)
+        process_backtest_neural_network_algo(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                                            cmd_param_list[5])
+
+
+    #
+
+    #TrainNeuralNetworkAlgo
 
 
 
