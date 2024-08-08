@@ -65,7 +65,7 @@ class DataManagement:
         try:
             series_df = self.data_set_builder.build_series(variables_csv, d_from, d_to)
             nn_trainer = NeuralNetworkModelTrainer(self.logger)
-            nn_trainer.train_neural_network(series_df,DataSetBuilder._CLASSIFICATION_COL,depth,learning_rate,epochs,model_output)
+            nn_trainer.train_neural_network(series_df,variables_csv,DataSetBuilder._CLASSIFICATION_COL,depth,learning_rate,epochs,model_output)
             return None
 
         except Exception as e:

@@ -6,6 +6,8 @@ from tensorflow.keras import regularizers
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 
+from framework.common.logger.message_type import MessageType
+
 
 class NeuralNetworkModelTrainer():
     def __init__(self,p_logger):
@@ -36,7 +38,8 @@ class NeuralNetworkModelTrainer():
 
     def __get_model_variables(self,series_df,classification_col):
 
-        series_df = series_df.dropna(thresh=len(series_df.columns) - 3)
+        #series_df = series_df.dropna(thresh=len(series_df.columns) - 3)
+
         # Separate independent and dependent variables
         X = series_df.drop(columns=[classification_col])  # Independent variables
 
@@ -48,7 +51,172 @@ class NeuralNetworkModelTrainer():
 
         return  X,y
 
-    def train_neural_network(self, series_df, classification_col, depth, learning_rate, epochs, model_output,
+    def __fill_missing_values(self,series_df):
+        """
+        Fill missing values in the DataFrame by carrying forward the last available value.
+        If no previous value is available, fill with the next available value if it's within 60 days.
+
+        If a NaN value is found with no previous or next value to fill (within 60 days),
+        an exception is raised.
+
+        Parameters:
+        - series_df: DataFrame containing the time series data with a 'date' column.
+
+        Returns:
+        - DataFrame with missing values filled.
+
+        Raises:
+        - ValueError: If there is a NaN value with no previous data and the next available data is more than 60 days ahead.
+        """
+
+        # Ensure the DataFrame is sorted by date
+        series_df = series_df.sort_values(by='date')
+
+        # Loop through each column to handle NaN values
+        for column in series_df.columns:
+            if column == 'date':
+                continue
+
+            # Fill forward with the last available value
+            series_df[column] = series_df[column].fillna(method='ffill')
+
+            # Find any remaining NaN values
+            nan_indices = series_df[series_df[column].isnull()].index
+
+            for idx in nan_indices:
+                # Get the date of the NaN value
+                nan_date = series_df.loc[idx, 'date']
+
+                # Find the next available value's index
+                next_valid_idx = series_df[column].loc[idx:].first_valid_index()
+
+                if next_valid_idx is not None:
+                    next_valid_date = series_df.loc[next_valid_idx, 'date']
+                    days_diff = (next_valid_date - nan_date).days
+
+                    if days_diff <= 60:
+                        # Fill NaN with the next valid value if within 60 days
+                        series_df.at[idx, column] = series_df.at[next_valid_idx, column]
+                    else:
+                        # Raise an error if the next value is more than 60 days away
+                        raise ValueError(
+                            f"Feature '{column}' has NaN values until the first data which is on date {next_valid_date}")
+                else:
+                    raise ValueError(
+                        f"Feature '{column}' has NaN values with no future data to fill after date {nan_date}")
+
+        return series_df
+
+    def __normalize(self, series_df, variables_csv):
+        # Convert the comma-separated string of column names to a list
+        variables_list = variables_csv.split(',')
+
+        # Separate numeric and non-numeric columns
+        numeric_columns = [col for col in variables_list if col in series_df.columns]
+        non_numeric_columns = [col for col in series_df.columns if col not in variables_list]
+
+        # Filter the numeric columns to be normalized
+        series_df_filtered = series_df[numeric_columns]
+
+        # Convert the filtered DataFrame to a TensorFlow tensor
+        tensor_df = tf.convert_to_tensor(series_df_filtered, dtype=tf.float32)
+
+        # Create the normalizer and adapt it to the data
+        normalizer = tf.keras.layers.Normalization(axis=-1)
+        normalizer.adapt(tensor_df)
+
+        # Normalize the data
+        tensor_normalized = normalizer(tensor_df)
+
+        # Convert the normalized tensor back to a DataFrame
+        df_normalized_numeric = pd.DataFrame(tensor_normalized.numpy(), columns=numeric_columns)
+
+        # Add back the non-numeric columns to the normalized DataFrame
+        df_normalized = pd.concat(
+            [series_df[non_numeric_columns].reset_index(drop=True), df_normalized_numeric.reset_index(drop=True)],
+            axis=1)
+
+        return df_normalized
+
+    def __training_set_analysis(self, series_df, classification_col, prefix="Pre depuration balance:"):
+        """
+        Analyzes the dataset and calculates the percentage distribution of each category in the specified column.
+
+        Args:
+        - series_df (pd.DataFrame): DataFrame containing the classification column.
+        - classification_col (str): Name of the classification column in the DataFrame.
+
+        Logs:
+        - Percentage distribution of each category in the specified column.
+        """
+        # Check if the classification column exists in the DataFrame
+        if classification_col not in series_df.columns:
+            raise ValueError(f"The column '{classification_col}' does not exist in the DataFrame.")
+
+        # Count occurrences of each category
+        counts = series_df[classification_col].value_counts()
+
+        # Calculate percentage distribution
+        percentages = counts / len(series_df) * 100
+
+        # Log results
+        self.logger.do_log(f"{prefix} Category distribution in '{classification_col}':", MessageType.INFO)
+        for category, percentage in percentages.items():
+            self.logger.do_log(f"{category}: {percentage:.2f}%", MessageType.INFO)
+
+    def __training_set_depuration(self, series_df, classification_col, target_distribution=0.5):
+        """
+        Balances the dataset by depurating (removing) records from the majority class to achieve a target distribution.
+
+        Args:
+        - series_df (pd.DataFrame): DataFrame containing the classification column.
+        - classification_col (str): Name of the classification column in the DataFrame.
+        - target_distribution (float): Desired proportion of the minority class (default is 0.5 for 50%/50%).
+
+        Returns:
+        - pd.DataFrame: The depurated DataFrame with balanced class distribution.
+
+        Raises:
+        - ValueError: If the classification column does not exist or if the target distribution is not between 0 and 1.
+        """
+        # Validate target distribution
+        if not (0 < target_distribution < 1):
+            raise ValueError("Target distribution must be between 0 and 1.")
+
+        # Check if the classification column exists in the DataFrame
+        if classification_col not in series_df.columns:
+            raise ValueError(f"The column '{classification_col}' does not exist in the DataFrame.")
+
+        # Count occurrences of each category
+        counts = series_df[classification_col].value_counts()
+
+        if len(counts) < 2:
+            raise ValueError("There must be at least two classes in the classification column.")
+
+        # Determine the majority and minority classes
+        majority_class = counts.idxmax()
+        minority_class = counts.idxmin()
+
+        # Create separate DataFrames for each class
+        majority_df = series_df[series_df[classification_col] == majority_class]
+        minority_df = series_df[series_df[classification_col] == minority_class]
+
+        # Determine the number of records to keep for the majority class to match the minority class
+        minority_count = len(minority_df)
+
+        # Sample the majority class to match the minority class count
+        if len(majority_df) > minority_count:
+            majority_df = majority_df.sample(minority_count, random_state=42)
+
+        # Concatenate the balanced DataFrames
+        balanced_df = pd.concat([majority_df, minority_df])
+
+        # Shuffle the DataFrame to mix the samples
+        balanced_df = balanced_df.sample(frac=1, random_state=42).reset_index(drop=True)
+
+        return balanced_df
+
+    def train_neural_network(self, series_df,variables_csv, classification_col, depth, learning_rate, epochs, model_output,
                              dropout_rate=0.5, l2_reg=0.0):
         """
             Train a neural network model on the provided data.
@@ -66,8 +234,15 @@ class NeuralNetworkModelTrainer():
             Returns:
             - Trained Keras model.
             """
+        series_df = self.__fill_missing_values(series_df)
 
-        X,y = self.__get_model_variables(series_df, classification_col)
+        self.__training_set_analysis(series_df,classification_col)
+        series_df=self.__training_set_depuration(series_df,classification_col)
+        self.__training_set_analysis(series_df, classification_col,"Post depuration balance")
+
+        series_df_norm=self.__normalize(series_df,variables_csv)
+
+        X,y = self.__get_model_variables(series_df_norm, classification_col)
 
         # Create a Sequential model
         model = Sequential()
