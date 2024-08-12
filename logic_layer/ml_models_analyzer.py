@@ -488,20 +488,21 @@ class MLModelAnalyzer():
                             ref_price = self.__eval_reuse_reference_price__(algo, last_trading_dict, day["Prediction"],
                                                                             day["date"], ref_price)
                             LightLogger.do_log(
-                                "-Opening {} pos for ref_price= {} on {}".format(day["Prediction"], float(ref_price),
-                                                                                 day["date"].strftime("%Y-%m-%d")))
+                                "-Opening {} pos for ref_price= {} on {}".format(day["Prediction"],
+                                  float(ref_price.iloc[0]) if isinstance(ref_price, pd.Series) else float(ref_price),
+                                  day["date"].strftime("%Y-%m-%d")))
                             curr_portf_pos = PortfolioPosition(symbol)
 
                             curr_portf_pos.open_pos(day["Prediction"], day["date"], ref_price)
                             last_side = day["Prediction"]
-                    elif last_side != day["Prediction"]:  # chage the side
+                    elif last_side != day["Prediction"]:  # change the side
 
                         # 1- Close the old position
                         ref_price = self.__extract_value_from_df__(symbol_df, "date", day["date"], symbol)
                         curr_portf_pos.close_pos(day["date"], ref_price)
                         LightLogger.do_log(
                             "-Closing {} pos for ref_price= {} on {} for pct profit={}% (nom. profit={})".format(
-                                curr_portf_pos.side, float(ref_price), day["date"].strftime("%Y-%m-%d"),
+                                curr_portf_pos.side, float(ref_price.iloc[0]), day["date"].strftime("%Y-%m-%d"),
                                 curr_portf_pos.calculate_pct_profit(), curr_portf_pos.calculate_th_nom_profit()))
                         portf_pos.append(curr_portf_pos)
 
@@ -524,7 +525,7 @@ class MLModelAnalyzer():
                             last_side = None
                 except Exception as e:
                     raise Exception(
-                        "Error processing day {} for algo {}".format(day["date"].strftime("%Y-%m-%d"), algo))
+                        "Error processing day {} for algo {}:{}".format(day["date"].strftime("%Y-%m-%d"), algo,str(e)))
 
             # We add the last position
             if curr_portf_pos is not None:

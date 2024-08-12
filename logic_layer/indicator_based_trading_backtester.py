@@ -55,6 +55,32 @@ class IndicatorBasedTradingBacktester:
         except Exception as e:
             raise Exception("Could not find a price for symbol {} and date {}  on series_df!!!".format(symbol,date))
 
+
+    def __calculate_max_drawdown__(self,position_list):
+        # Init vars
+        cumulative_return = 0.0
+        max_return = 0.0
+        max_drawdown = 0.0
+
+        for position in position_list:
+            pct_profit = position.calculate_pct_profit() / 100  # Convertir porcentaje a decimal
+            cumulative_return += pct_profit
+
+            # Actualizar el máximo retorno acumulado
+            if cumulative_return > max_return:
+                max_return = cumulative_return
+
+            # Calcular el drawdown
+            drawdown = cumulative_return - max_return
+
+            # Actualizar el max drawdown
+            if drawdown < max_drawdown:
+                max_drawdown = drawdown
+
+        # Convertir el max drawdown a porcentaje
+        return round(max_drawdown * 100, 2)
+
+
     def calculate_portfolio_performance(self,symbol,portf_positions_arr):
 
         summary=PortfSummary(symbol,PortfolioPosition._DEF_PORTF_AMT)
@@ -65,6 +91,9 @@ class IndicatorBasedTradingBacktester:
 
             portf_pos_summary=PortfPositionSummary(pos,pct_profit,th_nom_profit,PortfolioPosition._DEF_PORTF_AMT)
             summary.append_position_summary(portf_pos_summary)
+
+
+        summary.max_drawdown=self.__calculate_max_drawdown__(portf_positions_arr)
 
         return summary
 

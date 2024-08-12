@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from common.util.dataframe_concat import DataframeConcat
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
 from data_access_layer.economic_series_manager import EconomicSeriesManager
 import pandas as pd
@@ -88,8 +89,9 @@ class DataSetBuilder():
 
                 self.logger.do_log("Adding dataframe row for date {}".format(curr_date.date()),MessageType.INFO)
                 #series_df=series_df.append(curr_date_dict, ignore_index=True)
-                series_df = pd.concat([series_df, pd.DataFrame([curr_date_dict])], ignore_index=True)
-
+                #series_df = pd.concat([series_df, pd.DataFrame([curr_date_dict])], ignore_index=True)
+                #series_df=DataframeConcat.concat_df(series_df,pd.DataFrame([curr_date_dict]))
+                series_df=DataframeConcat.add_row(series_df,pd.DataFrame([curr_date_dict]))
             curr_date = curr_date + timedelta(days=1)
 
         self.logger.do_log("Input dataframe from {} to {} successfully created: {} rows".format(min_date, max_date,len(series_df)), MessageType.INFO)

@@ -19,13 +19,21 @@ class PortfolioPosition():
     def open_pos(self,side,date,price):
         self.side=side
         self.date_open=date
-        self.price_open=float(price)
+
+        if len(price) == 1:
+            self.price_open = float(price.iloc[0])
+        else:
+            self.price_open=float(price)
 
 
     def close_pos(self,date,price):
 
         self.date_close=date
-        self.price_close=float(price)
+
+        if len(price) == 1:
+            self.price_close = float(price.iloc[0])
+        else:
+            self.price_close=float(price)
 
     def is_open(self):
         return self.date_close is None

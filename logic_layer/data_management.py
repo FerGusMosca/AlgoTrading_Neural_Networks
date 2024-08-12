@@ -48,7 +48,7 @@ class AlgosOrchestationLogic:
     def backtest_neural_network_algo(self,symbol, variables_csv,d_from,d_to,model_to_use):
         try:
 
-            symbol_df = self.data_set_builder.build_series(symbol, d_from, d_to)
+            #symbol_df = self.data_set_builder.build_series(symbol, d_from, d_to)
             test_series_df = self.data_set_builder.build_series(variables_csv, d_from, d_to)
             nn_trainer = NeuralNetworkModelTrainer(self.logger)
 

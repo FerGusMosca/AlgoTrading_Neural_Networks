@@ -4,6 +4,7 @@ class PortfSummary:
         self.symbol=symbol
         self.portf_pos_summary=[]
         self.portf_pos_size=p_portf_position_size
+        self.max_drawdown=0
 
 
     def append_position_summary(self,pos_summary):

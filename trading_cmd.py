@@ -71,6 +71,7 @@ def process_biased_trading_algo(symbol, cmd_series_csv,str_from,str_to,bias, cla
             print("From={} To={}".format(str_from, str_to))
             print("Nom. Profit={}".format(summary.calculate_th_nom_profit()))
             print("Pos. Size={}".format(summary.portf_pos_size))
+            print("Est. Max Drawdown={}".format(summary.max_drawdown))
 
 
     except Exception as e:
