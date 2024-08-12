@@ -1,4 +1,4 @@
-
+import pandas as pd
 
 
 class PortfolioPosition():
@@ -20,7 +20,7 @@ class PortfolioPosition():
         self.side=side
         self.date_open=date
 
-        if len(price) == 1:
+        if isinstance(price, pd.Series):
             self.price_open = float(price.iloc[0])
         else:
             self.price_open=float(price)
@@ -30,7 +30,7 @@ class PortfolioPosition():
 
         self.date_close=date
 
-        if len(price) == 1:
+        if isinstance(price, pd.Series):
             self.price_close = float(price.iloc[0])
         else:
             self.price_close=float(price)

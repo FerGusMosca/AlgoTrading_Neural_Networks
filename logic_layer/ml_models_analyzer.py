@@ -382,8 +382,8 @@ class MLModelAnalyzer():
         comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
         # SUPPORT VECTOR MACHINE
-        #resp_row = self.run_support_vector_machine_eval(X_train, y_train, X_test, y_test,y_mapping)
-        #comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
+        resp_row = self.run_support_vector_machine_eval(X_train, y_train, X_test, y_test,y_mapping)
+        comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
         # DECISSION TREE
         resp_row = self.run_decision_tree_eval(X_train, y_train, X_test, y_test,y_mapping)
@@ -451,8 +451,8 @@ class MLModelAnalyzer():
         predictions_dict["Logistic Regression"]=y_hat_lr_df
 
         # SUPPORT VECTOR MACHINE
-        #y_hat_svm_df= self.run_predictions(X,"date",_SVM_MODEL_NAME  )
-        #predictions_dict["Support Vector Machine"] = y_hat_svm_df
+        y_hat_svm_df= self.run_predictions(X,"date",_SVM_MODEL_NAME  )
+        predictions_dict["Support Vector Machine"] = y_hat_svm_df
 
         # DECISION TREE
         y_hat_dec_tree_df= self.run_predictions(X,"date",_DECISSION_TREE_MODEL_NAME  )
@@ -534,7 +534,7 @@ class MLModelAnalyzer():
                 curr_portf_pos.close_pos(last_day["date"], ref_price)
                 LightLogger.do_log(
                     "-Closing last {} pos for ref_price= {} on {}  for pct profit={}% (nom. profit={})".format(
-                        curr_portf_pos.side, float(ref_price), last_day["date"].strftime("%Y-%m-%d"),
+                        curr_portf_pos.side,ref_price.iloc[0] if isinstance(ref_price, pd.Series) else float(ref_price), last_day["date"].strftime("%Y-%m-%d"),
                         curr_portf_pos.calculate_pct_profit(), curr_portf_pos.calculate_th_nom_profit()))
                 portf_pos.append(curr_portf_pos)
 

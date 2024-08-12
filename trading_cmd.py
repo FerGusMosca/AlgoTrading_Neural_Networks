@@ -76,7 +76,7 @@ def process_biased_trading_algo(symbol, cmd_series_csv,str_from,str_to,bias, cla
 
     except Exception as e:
         logger.print("CRITICAL ERROR bootstrapping the system:{}".format(str(e)), MessageType.ERROR)
-def process_run_preductions_last_model(cmd_param_list,str_from,str_to, classification_key=None):
+def process_run_predictions_last_model(cmd_param_list,str_from,str_to, classification_key=None):
     loader = MLSettingsLoader()
     logger = Logger()
     try:
@@ -257,8 +257,7 @@ def process_commands(cmd):
 
     elif cmd_param_list[0]=="RunPredictionsLastModel":
         params_validation("RunPredictionsLastModel", cmd_param_list, 5)
-        process_run_preductions_last_model( cmd_param_list[1], cmd_param_list[2],
-                                            cmd_param_list[3], cmd_param_list[4])
+        process_run_predictions_last_model(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4])
     elif cmd_param_list[0]=="EvalBiasedTradingAlgo":
         params_validation("EvalBiasedTradingAlgo", cmd_param_list, 7)
         process_biased_trading_algo(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
