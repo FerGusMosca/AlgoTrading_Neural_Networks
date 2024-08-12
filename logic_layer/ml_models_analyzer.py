@@ -12,6 +12,7 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 from business_entities.portf_position import PortfolioPosition
+from common.util.dataframe_filler import DataframeFiller
 from common.util.light_logger import LightLogger
 from framework.common.logger.message_type import MessageType
 # K Nearest Neighbors classification algorithm
@@ -353,6 +354,8 @@ class MLModelAnalyzer():
     def fit_and_evaluate(self,series_df,classification_col):
         comparisson_df = pd.DataFrame(columns=['Model','Train Accuracy','Test Accuracy'])
 
+        series_df = DataframeFiller.fill_missing_values(series_df)
+
         # STEP 1 - Split the dataframe inot X (indep. variable) and Y (dep variable)
         features=series_df.columns.to_list()
         features.remove(classification_col)
@@ -430,6 +433,8 @@ class MLModelAnalyzer():
 
     def run_predictions_last_model(self,series_df):
         predictions_dict={}
+
+        series_df=DataframeFiller.fill_missing_values(series_df)
 
         # STEP 1 - Prepare the X to be normalized
         features=series_df.columns.to_list()

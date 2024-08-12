@@ -95,6 +95,10 @@ class DataSetBuilder():
         self.logger.do_log("Input dataframe from {} to {} successfully created: {} rows".format(min_date, max_date,len(series_df)), MessageType.INFO)
         return series_df
 
+
+    def build_series_from_candles(self,series_csv,d_from,d_to):
+        pass
+
     def build_series(self,series_csv,d_from,d_to,add_classif_col=True):
         series_list = series_csv.split(",")
 

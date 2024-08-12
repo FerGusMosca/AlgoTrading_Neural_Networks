@@ -20,7 +20,7 @@ import numpy as np
 from logic_layer.neural_network_models_trainer import NeuralNetworkModelTrainer
 
 
-class DataManagement:
+class AlgosOrchestationLogic:
 
     def __init__(self,hist_data_conn_str,ml_reports_conn_str,p_classification_map_key,logger):
 

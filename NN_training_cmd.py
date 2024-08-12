@@ -2,7 +2,7 @@ from common.util.date_handler import DateHandler
 from common.util.logger import Logger
 from common.util.ml_settings_loader import MLSettingsLoader
 from framework.common.logger.message_type import MessageType
-from logic_layer.data_management import DataManagement
+from logic_layer.data_management import AlgosOrchestationLogic
 from IPython.display import display
 import pandas as pd
 _DATE_FORMAT="%m/%d/%Y"
@@ -32,8 +32,8 @@ def process_train_deep_neural_network(true_path,false_path,true_label,learning_r
 
         config_settings = loader.load_settings("./configs/commands_mgr.ini")
 
-        dataMgm = DataManagement(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
-                                 config_settings["classification_map_key"], logger)
+        dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                         config_settings["classification_map_key"], logger)
         dataMgm.train_deep_neural_network(true_path, false_path, true_label,learning_rate,iterations,arch_file, activ_file,
                                         output_file,step_size,lambd=lambd,use_He_init=use_He_init)
 
@@ -48,10 +48,10 @@ def process_train_convolutional_neural_network(train_true_path,train_false_path,
 
         config_settings = loader.load_settings("./configs/commands_mgr.ini")
 
-        dataMgm = DataManagement(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
-                                 config_settings["classification_map_key"], logger)
-        dataMgm.train_convolutional_neural_network(train_true_path, train_false_path,test_true_path, test_false_path, true_label, arch_file, padding, stride,
-                                                   iterations)
+        orch_algos_logic = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                                  config_settings["classification_map_key"], logger)
+        orch_algos_logic.train_convolutional_neural_network(train_true_path, train_false_path, test_true_path, test_false_path, true_label, arch_file, padding, stride,
+                                                            iterations)
 
     except Exception as e:
         logger.print("CRITICAL ERROR bootstrapping the system:{}".format(str(e)), MessageType.ERROR)
@@ -65,8 +65,8 @@ def test_deep_neural_network_model(true_path,false_path,true_label,output_file):
 
         config_settings = loader.load_settings("./configs/commands_mgr.ini")
 
-        dataMgm = DataManagement(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
-                                 config_settings["classification_map_key"], logger)
+        dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                         config_settings["classification_map_key"], logger)
         dataMgm.test_deep_neural_network_model(true_path,false_path,true_label,output_file)
 
     except Exception as e:

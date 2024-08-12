@@ -6,6 +6,7 @@ from tensorflow.keras import regularizers
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 
+from common.util.dataframe_filler import DataframeFiller
 from framework.common.logger.message_type import MessageType
 
 
@@ -50,62 +51,6 @@ class NeuralNetworkModelTrainer():
         y = y.astype('int')  # Ensure 'y' is of integer type
 
         return  X,y
-
-    def __fill_missing_values(self,series_df):
-        """
-        Fill missing values in the DataFrame by carrying forward the last available value.
-        If no previous value is available, fill with the next available value if it's within 60 days.
-
-        If a NaN value is found with no previous or next value to fill (within 60 days),
-        an exception is raised.
-
-        Parameters:
-        - series_df: DataFrame containing the time series data with a 'date' column.
-
-        Returns:
-        - DataFrame with missing values filled.
-
-        Raises:
-        - ValueError: If there is a NaN value with no previous data and the next available data is more than 60 days ahead.
-        """
-
-        # Ensure the DataFrame is sorted by date
-        series_df = series_df.sort_values(by='date')
-
-        # Loop through each column to handle NaN values
-        for column in series_df.columns:
-            if column == 'date':
-                continue
-
-            # Fill forward with the last available value
-            series_df[column] = series_df[column].fillna(method='ffill')
-
-            # Find any remaining NaN values
-            nan_indices = series_df[series_df[column].isnull()].index
-
-            for idx in nan_indices:
-                # Get the date of the NaN value
-                nan_date = series_df.loc[idx, 'date']
-
-                # Find the next available value's index
-                next_valid_idx = series_df[column].loc[idx:].first_valid_index()
-
-                if next_valid_idx is not None:
-                    next_valid_date = series_df.loc[next_valid_idx, 'date']
-                    days_diff = (next_valid_date - nan_date).days
-
-                    if days_diff <= 60:
-                        # Fill NaN with the next valid value if within 60 days
-                        series_df.at[idx, column] = series_df.at[next_valid_idx, column]
-                    else:
-                        # Raise an error if the next value is more than 60 days away
-                        raise ValueError(
-                            f"Feature '{column}' has NaN values until the first data which is on date {next_valid_date}")
-                else:
-                    raise ValueError(
-                        f"Feature '{column}' has NaN values with no future data to fill after date {nan_date}")
-
-        return series_df
 
     def __normalize(self, series_df, variables_csv):
         # Convert the comma-separated string of column names to a list
@@ -216,6 +161,27 @@ class NeuralNetworkModelTrainer():
 
         return balanced_df
 
+    def train_logistic_regression(self,X, y, learning_rate=0.01, epochs=100, model_output="logistic_regression_model.h5"):
+        # Create a Sequential model
+        model = Sequential()
+
+        # Add a single dense layer with a sigmoid activation
+        model.add(Dense(1, input_dim=X.shape[1], activation='sigmoid'))
+
+        # Define the optimizer
+        optimizer = Adam(learning_rate=learning_rate)
+
+        # Compile the model
+        model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['accuracy'])
+
+        # Train the model
+        model.fit(X, y, epochs=epochs, batch_size=32, validation_split=0.2)
+
+        # Save the trained model
+        model.save(model_output)
+
+        return model
+
     def train_neural_network(self, series_df,variables_csv, classification_col, depth, learning_rate, epochs, model_output,
                              dropout_rate=0.5, l2_reg=0.0):
         """
@@ -234,15 +200,19 @@ class NeuralNetworkModelTrainer():
             Returns:
             - Trained Keras model.
             """
-        series_df = self.__fill_missing_values(series_df)
+
+        series_df=DataframeFiller.fill_missing_values(series_df)
 
         self.__training_set_analysis(series_df,classification_col)
-        series_df=self.__training_set_depuration(series_df,classification_col)
-        self.__training_set_analysis(series_df, classification_col,"Post depuration balance")
+        #series_df=self.__training_set_depuration(series_df,classification_col)
+        #self.__training_set_analysis(series_df, classification_col,"Post depuration balance")
 
         series_df_norm=self.__normalize(series_df,variables_csv)
 
         X,y = self.__get_model_variables(series_df_norm, classification_col)
+
+        if depth==1: #We use a simple Log Reggr.
+            return self.train_logistic_regression(X,y,learning_rate,epochs,model_output)
 
         # Create a Sequential model
         model = Sequential()
