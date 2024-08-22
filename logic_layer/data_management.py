@@ -6,6 +6,7 @@ from common.util.image_handler import ImageHandler
 from common.util.light_logger import LightLogger
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
 from data_access_layer.economic_series_manager import EconomicSeriesManager
+from data_access_layer.timestamp_classification_manager import TimestampClassificationManager
 
 from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
@@ -30,11 +31,13 @@ class AlgosOrchestationLogic:
 
         self.date_range_classif_mgr = DateRangeClassificationManager(ml_reports_conn_str)
 
+        self.timestamp_range_classif_mgr=TimestampClassificationManager(ml_reports_conn_str)
+
 
     def train_algos(self,series_csv,d_from,d_to):
 
         try:
-            series_df=self.data_set_builder.build_series(series_csv,d_from,d_to)
+            series_df= self.data_set_builder.build_daily_series(series_csv, d_from, d_to)
             mlAnalyzer=MLModelAnalyzer(self.logger)
             comp_df= mlAnalyzer.fit_and_evaluate(series_df, DataSetBuilder._CLASSIFICATION_COL)
             return comp_df
@@ -49,7 +52,7 @@ class AlgosOrchestationLogic:
         try:
 
             #symbol_df = self.data_set_builder.build_series(symbol, d_from, d_to)
-            test_series_df = self.data_set_builder.build_series(variables_csv, d_from, d_to)
+            test_series_df = self.data_set_builder.build_daily_series(variables_csv, d_from, d_to)
             nn_trainer = NeuralNetworkModelTrainer(self.logger)
 
             nn_trainer.run_predictions(test_series_df,DataSetBuilder._CLASSIFICATION_COL,model_to_use)
@@ -63,7 +66,7 @@ class AlgosOrchestationLogic:
 
     def train_neural_network(self,symbol, variables_csv,d_from,d_to,depth,learning_rate,epochs,model_output):
         try:
-            series_df = self.data_set_builder.build_series(variables_csv, d_from, d_to)
+            series_df = self.data_set_builder.build_daily_series(variables_csv, d_from, d_to)
             nn_trainer = NeuralNetworkModelTrainer(self.logger)
             nn_trainer.train_neural_network(series_df,variables_csv,DataSetBuilder._CLASSIFICATION_COL,depth,learning_rate,epochs,model_output)
             return None
@@ -76,8 +79,8 @@ class AlgosOrchestationLogic:
     def evaluate_trading_performance(self,symbol,series_csv,d_from,d_to,bias,last_trading_dict=None):
 
         try:
-            symbol_df = self.data_set_builder.build_series(symbol,d_from,d_to)
-            series_df = self.data_set_builder.build_series(series_csv, d_from, d_to)
+            symbol_df = self.data_set_builder.build_daily_series(symbol, d_from, d_to)
+            series_df = self.data_set_builder.build_daily_series(series_csv, d_from, d_to)
             mlAnalyzer = MLModelAnalyzer(self.logger)
             portf_pos_dict = mlAnalyzer.evaluate_trading_performance_last_model(symbol_df,symbol,series_df, bias,last_trading_dict)
 
@@ -99,7 +102,7 @@ class AlgosOrchestationLogic:
     def run_predictions_last_model(self,series_csv,d_from,d_to):
 
         try:
-            series_df = self.data_set_builder.build_series(series_csv, d_from, d_to,add_classif_col=False)
+            series_df = self.data_set_builder.build_daily_series(series_csv, d_from, d_to, add_classif_col=False)
             mlAnalyzer = MLModelAnalyzer(self.logger)
             pred_dict = mlAnalyzer.run_predictions_last_model(series_df)
             return pred_dict
@@ -111,7 +114,7 @@ class AlgosOrchestationLogic:
 
     def build_ARIMA(self,symbol, period, d_from, d_to):
         try:
-            series_df = self.data_set_builder.build_series(symbol, d_from, d_to, add_classif_col=False)
+            series_df = self.data_set_builder.build_daily_series(symbol, d_from, d_to, add_classif_col=False)
             arima_Analyzer = ARIMAModelsAnalyzer(self.logger)
             dickey_fuller_test_dict=arima_Analyzer.build_ARIMA_model(series_df,symbol,period,True)
             return dickey_fuller_test_dict
@@ -123,7 +126,7 @@ class AlgosOrchestationLogic:
 
     def eval_singe_indicator_algo(self,symbol,indicator, inv, d_from, d_to):
         try:
-            series_df = self.data_set_builder.build_series(symbol, d_from, d_to, add_classif_col=False)
+            series_df = self.data_set_builder.build_daily_series(symbol, d_from, d_to, add_classif_col=False)
 
             indic_classif_list = self.date_range_classif_mgr.get_date_range_classification_values(indicator,d_from,d_to)
             indic_classif_df = pd.DataFrame([vars(classif) for classif in indic_classif_list])
@@ -143,7 +146,7 @@ class AlgosOrchestationLogic:
 
     def eval_ml_biased_algo(self,symbol, indicator,seriesCSV,d_from,d_to,inverted):
         try:
-            series_df = self.data_set_builder.build_series(seriesCSV, d_from, d_to, add_classif_col=False)
+            series_df = self.data_set_builder.build_daily_series(seriesCSV, d_from, d_to, add_classif_col=False)
 
             indic_classif_list = self.date_range_classif_mgr.get_date_range_classification_values(indicator, d_from,
                                                                                                   d_to)
@@ -168,7 +171,7 @@ class AlgosOrchestationLogic:
 
     def predict_ARIMA(self,symbol, p,d,q,d_from,d_to,period, steps):
         try:
-            series_df = self.data_set_builder.build_series(symbol, d_from, d_to, add_classif_col=False)
+            series_df = self.data_set_builder.build_daily_series(symbol, d_from, d_to, add_classif_col=False)
             arima_Analyzer = ARIMAModelsAnalyzer(self.logger)
             preds=arima_Analyzer.build_and__predict_ARIMA_model(series_df,symbol,p,d,q,period,steps)
             return preds
@@ -300,6 +303,22 @@ class AlgosOrchestationLogic:
             # Obtiene la última línea de la pila de llamadas
             file_name, line_number, func_name, line_code = tb[-1]
             msg = "CRITICAL ERROR @test_deep_neural_network_model:{}".format(str(e))
+            self.logger.do_log(msg, MessageType.ERROR)
+            raise Exception(msg)
+
+
+    def process_train_LSTM(self,symbol,variables_csv,d_from,d_to,model_output,classif_key):
+        try:
+            date_range_values=self.timestamp_range_classif_mgr.get_timestamp_range_classification_values(classif_key,d_from,d_to)
+
+            min_series_df= self.data_set_builder.build_minute_series(variables_csv,d_from,d_to,add_classif_col=False)
+            #TODO--> Recuperar las timestamp_classif en el perioodo especificado
+            #TODO --> Convertiras en clasificaciones minuto a minuto
+            #TODO --> Los mismos con las series de datos y los precios de SPY
+            return None
+
+        except Exception as e:
+            msg = "CRITICAL ERROR processing model @train_neural_network:{}".format(str(e))
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
 

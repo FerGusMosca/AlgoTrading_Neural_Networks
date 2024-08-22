@@ -12,6 +12,7 @@ class DataSetBuilder():
 
 
     _1_DAY_INTERVAL="1 day"
+    _1_MIN_INTERVAL = "1 min"
     _CLASSIFICATION_COL="classification"
 
     def __init__(self,hist_data_conn_str,ml_reports_conn_str,p_classification_map_key,logger):
@@ -101,7 +102,29 @@ class DataSetBuilder():
     def build_series_from_candles(self,series_csv,d_from,d_to):
         pass
 
-    def build_series(self,series_csv,d_from,d_to,add_classif_col=True):
+
+    def build_minute_series(self,series_csv,d_from,d_to,add_classif_col=True):
+        series_list = series_csv.split(",")
+
+        series_data_dict = {}
+
+        for serieID in series_list:
+            economic_values = self.economic_series_mgr.get_economic_values(serieID, DataSetBuilder._1_MIN_INTERVAL,
+                                                                           d_from, d_to)
+            if len(economic_values) == 0:
+                raise Exception("No data found for SeriesID {}".format(serieID))
+
+            series_data_dict[serieID] = economic_values
+
+        min_date, max_date = self.get_extreme_dates(series_data_dict)
+
+        min_series_df = self.build_empty_dataframe(series_data_dict)
+
+        min_series_df = self.fill_dataframe(min_series_df, min_date, max_date, series_data_dict,add_classif_col=add_classif_col)
+
+        return  min_series_df
+
+    def build_daily_series(self,series_csv,d_from,d_to,add_classif_col=True):
         series_list = series_csv.split(",")
 
         series_data_dict = {}

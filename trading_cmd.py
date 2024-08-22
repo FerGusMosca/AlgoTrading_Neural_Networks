@@ -20,7 +20,8 @@ def show_commands():
     print("#6-EvalSingleIndicatorAlgo [Symbol] [indicator] [from] [to] [inverted] [classif_key]")
     print("#7-EvalMLBiasedAlgo [Symbol] [indicator] [SeriesCSV] [from] [to] [inverted] [classif_key]")
     print("#8-TrainNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [depth] [learning_rate] [iterations] [model_output] [classif_key]")
-    print("#8-BacktestNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [model_to_use] [classif_key]")
+    print("#9-BacktestNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [model_to_use] [classif_key]")
+    print("#10-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key]")
 
     #TrainNeuralNetworkAlgo
     print("#n-Exit")
@@ -247,6 +248,33 @@ def process_train_neural_network_algo(symbol, variables_csv,str_from,str_to,dept
 
     except Exception as e:
         logger.print("CRITICAL ERROR running proces_train_neural_network_algo:{}".format(str(e)), MessageType.ERROR)
+
+
+def process_train_LSTM(symbol, variables_csv,str_from,str_to,model_output,classification_key):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print("Initializing dataframe creation for series : {}".format(variables_csv), MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                         config_settings[
+                                             "classification_map_key"] if classification_key is None else classification_key,
+                                         logger)
+
+        dataMgm.process_train_LSTM(symbol, variables_csv,
+                                    DateHandler.convert_str_date(str_from, _DATE_FORMAT),
+                                    DateHandler.convert_str_date(str_to, _DATE_FORMAT),
+                                   model_output,classification_key)
+
+        # TODO ---> print backtesting output
+        logger.print("Model successfully trained for symbol {} and variables {}".format(symbol, variables_csv),
+                     MessageType.INFO)
+
+    except Exception as e:
+        logger.print("CRITICAL ERROR running process_train_LSTM:{}".format(str(e)), MessageType.ERROR)
 def process_commands(cmd):
 
     cmd_param_list=cmd.split(" ")
@@ -285,6 +313,11 @@ def process_commands(cmd):
     elif cmd_param_list[0] == "BacktestNeuralNetworkAlgo":
         params_validation("BacktestNeuralNetworkAlgo", cmd_param_list, 7)
         process_backtest_neural_network_algo(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                                            cmd_param_list[5],cmd_param_list[6])
+
+    elif cmd_param_list[0] == "TrainLSTM":
+        params_validation("TrainLSTM", cmd_param_list, 7)
+        process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
                                             cmd_param_list[5],cmd_param_list[6])
 
 
