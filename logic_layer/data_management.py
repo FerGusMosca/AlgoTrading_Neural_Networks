@@ -317,10 +317,14 @@ class AlgosOrchestationLogic:
         try:
             timestamp_range_clasifs=self.timestamp_range_classif_mgr.get_timestamp_range_classification_values(classif_key,d_from,d_to)
 
-            min_series_df= self.data_set_builder.build_minute_series(symbol,d_from,d_to)
-            min_series_df= self.data_set_builder.build_minute_series_classification(timestamp_range_clasifs,min_series_df,not_found_clasif="FLAT")
+            symbol_min_series_df= self.data_set_builder.build_minute_series(symbol, d_from, d_to, output_col=["symbol", "date", "open", "high", "low", "close"])
+            symbol_min_series_df = self.data_set_builder.build_minute_series_classification(timestamp_range_clasifs,
+                                                                                            symbol_min_series_df,
+                                                                                            not_found_clasif="FLAT")
 
+            variables_min_series_df=self.data_set_builder.build_minute_series(variables_csv, d_from, d_to, output_col=["symbol", "date", "open", "high", "low", "close"])
 
+            training_series_df= self.data_set_builder.merge_minute_series(symbol_min_series_df,variables_min_series_df,"symbol","date",symbol)
             #TODo--> Aca tenemos nuestros registros para la RNN LSTM
 
             return None

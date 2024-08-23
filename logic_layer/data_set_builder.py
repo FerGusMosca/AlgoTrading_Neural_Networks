@@ -130,7 +130,30 @@ class DataSetBuilder():
 
         return  df
 
-    def build_minute_series(self,series_csv,d_from,d_to):
+
+    def merge_minute_series(sel,symbol_min_series_df,variables_min_series_df,symbol_col,date_col, symbol):
+        # Step 1: Pivot the variables_min_series_df to turn 'symbol_col' values into columns
+        variables_pivot_df = variables_min_series_df.pivot(index=date_col, columns=symbol_col, values='open')
+
+        # Step 2: Rename the pivoted columns to avoid confusion
+        variables_pivot_df = variables_pivot_df.rename_axis(None, axis=1).reset_index()
+
+        # Step 3: Merge symbol_min_series_df with variables_pivot_df using 'date_col' as the key
+        merged_df = pd.merge(symbol_min_series_df, variables_pivot_df, on=date_col, how='left')
+
+        # Step 4: Rename columns of symbol_min_series_df in the merged dataframe
+        merged_df = merged_df.rename(columns={
+            symbol_col: 'trading_{}'.format(symbol_col),
+            'open': 'open_{}'.format(symbol),
+            'high': 'high_{}'.format(symbol),
+            'low': 'low_{}'.format(symbol),
+            'close': 'close_{}'.format(symbol)
+        })
+
+        # Return the final merged dataframe
+        return merged_df
+
+    def build_minute_series(self,series_csv,d_from,d_to, output_col=None):
         series_list = series_csv.split(",")
 
         series_data_dict = {}
@@ -150,6 +173,9 @@ class DataSetBuilder():
 
             if seriesID in min_series_df.columns:
                 min_series_df = min_series_df.drop(columns=[seriesID])
+
+        if output_col is not None:
+            min_series_df = min_series_df[output_col]
 
 
         return  min_series_df
