@@ -22,6 +22,17 @@ class DataSetBuilder():
         self.classification_map_key = p_classification_map_key
         self.logger = logger
 
+
+    #region Private Methods
+
+    def get_classification_for_date(self,date, timestamp_range_clasifs,not_found_clasif):
+        for date_range in timestamp_range_clasifs:
+            if date_range.date_start <= date <= date_range.date_end:
+                return date_range.classification
+        return not_found_clasif
+
+    #endregion
+
     def get_extreme_dates(self,series_data_dict):
         min_date=None
         max_date=None
@@ -143,7 +154,15 @@ class DataSetBuilder():
 
         return  min_series_df
 
-    def build_daily_series(self,series_csv,d_from,d_to,add_classif_col=True):
+
+    def build_minute_series_classification(self,timestamp_range_clasifs,min_series_df,not_found_clasif="None"):
+        # For every row in the dataframe
+        min_series_df['classification_col'] = min_series_df['date'].apply(
+            lambda x: self.get_classification_for_date(x, timestamp_range_clasifs,not_found_clasif))
+
+        return min_series_df
+
+    def build_daily_series_classification(self,series_csv,d_from,d_to,add_classif_col=True):
         series_list = series_csv.split(",")
 
         series_data_dict = {}
