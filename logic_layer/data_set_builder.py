@@ -98,12 +98,28 @@ class DataSetBuilder():
         self.logger.do_log("Input dataframe from {} to {} successfully created: {} rows".format(min_date, max_date,len(series_df)), MessageType.INFO)
         return series_df
 
+    def fill_dataframe_from_economic_value_dict(self,series_data_dict,index):
 
-    def build_series_from_candles(self,series_csv,d_from,d_to):
-        pass
+        economic_values=series_data_dict[index]
 
+        data = {
+            'symbol': [ev.symbol for ev in economic_values],
+            'interval': [ev.interval for ev in economic_values],
+            'date': [ev.date for ev in economic_values],
+            'open': [ev.open for ev in economic_values],
+            'high': [ev.high for ev in economic_values],
+            'low': [ev.low for ev in economic_values],
+            'close': [ev.close for ev in economic_values],
+            'trade': [ev.trade for ev in economic_values],
+            'cash_volume': [ev.cash_volume for ev in economic_values],
+            'nominal_volume': [ev.nominal_volume for ev in economic_values],
+        }
 
-    def build_minute_series(self,series_csv,d_from,d_to,add_classif_col=True):
+        df = pd.DataFrame(data)
+
+        return  df
+
+    def build_minute_series(self,series_csv,d_from,d_to):
         series_list = series_csv.split(",")
 
         series_data_dict = {}
@@ -116,11 +132,14 @@ class DataSetBuilder():
 
             series_data_dict[serieID] = economic_values
 
-        min_date, max_date = self.get_extreme_dates(series_data_dict)
-
         min_series_df = self.build_empty_dataframe(series_data_dict)
+        for seriesID in series_data_dict.keys():
+            series_df = self.fill_dataframe_from_economic_value_dict(series_data_dict,seriesID)
+            min_series_df = pd.concat([min_series_df, series_df], ignore_index=True)
 
-        min_series_df = self.fill_dataframe(min_series_df, min_date, max_date, series_data_dict,add_classif_col=add_classif_col)
+            if seriesID in min_series_df.columns:
+                min_series_df = min_series_df.drop(columns=[seriesID])
+
 
         return  min_series_df
 

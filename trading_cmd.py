@@ -11,7 +11,7 @@ _DATE_FORMAT="%m/%d/%Y"
 last_trading_dict=None
 
 def show_commands():
-
+    print("#0-DailyCandlesGraph  [Symbol] [date] [interval]")
     print("#1-TrainMLAlgos  [SeriesCSV] [from] [to] [classif_key]")
     print("#2-RunPredictionsLastModel [SeriesCSV] [from] [to] [classif_key]")
     print("#3-EvalBiasedTradingAlgo [Symbol] [SeriesCSV] [from] [to] [Bias] [classif_key]")
@@ -275,6 +275,26 @@ def process_train_LSTM(symbol, variables_csv,str_from,str_to,model_output,classi
 
     except Exception as e:
         logger.print("CRITICAL ERROR running process_train_LSTM:{}".format(str(e)), MessageType.ERROR)
+
+def process_daily_candles_graph(symbol, date, interval):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print("Initializing daily candle graph creation for symbol {} on date {}".format(symbol,date), MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                         None,logger)
+
+        dataMgm.process_daily_candles_graph(symbol,DateHandler.convert_str_date(date, _DATE_FORMAT),interval.replace('_',""))
+
+        logger.print("Daily Graph successfully shown for symbol {} on date {}".format(symbol, date),
+                     MessageType.INFO)
+
+    except Exception as e:
+        logger.print("CRITICAL ERROR running process_daily_candles_graph:{}".format(str(e)), MessageType.ERROR)
 def process_commands(cmd):
 
     cmd_param_list=cmd.split(" ")
@@ -319,6 +339,9 @@ def process_commands(cmd):
         params_validation("TrainLSTM", cmd_param_list, 7)
         process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
                                             cmd_param_list[5],cmd_param_list[6])
+    elif cmd_param_list[0] == "DailyCandlesGraph":
+        params_validation("DailyCandlesGraph", cmd_param_list, 4)
+        process_daily_candles_graph(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3])
 
 
     #

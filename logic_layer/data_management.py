@@ -1,7 +1,8 @@
 import sys
 import traceback
-from datetime import timedelta
+from datetime import timedelta, datetime
 
+from common.util.graph_builder import GraphBuilder
 from common.util.image_handler import ImageHandler
 from common.util.light_logger import LightLogger
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
@@ -321,5 +322,16 @@ class AlgosOrchestationLogic:
             msg = "CRITICAL ERROR processing model @train_neural_network:{}".format(str(e))
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
+
+
+    def process_daily_candles_graph(self,symbol, date, interval):
+        start_of_day = datetime(date.year, date.month, date.day)
+        end_of_day = start_of_day + timedelta(hours=23, minutes=59, seconds=59)
+
+        prices_df= self.data_set_builder.build_minute_series(symbol,start_of_day,end_of_day)
+
+        GraphBuilder.build_candles_graph(prices_df)
+
+        return  None
 
 
