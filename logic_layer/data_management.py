@@ -20,6 +20,7 @@ import pandas as pd
 import numpy as np
 
 from logic_layer.neural_network_models_trainer import NeuralNetworkModelTrainer
+from logic_layer.rnn_models_analyzer import RNNModelsAnalyzer
 
 
 class AlgosOrchestationLogic:
@@ -320,12 +321,20 @@ class AlgosOrchestationLogic:
             symbol_min_series_df= self.data_set_builder.build_minute_series(symbol, d_from, d_to, output_col=["symbol", "date", "open", "high", "low", "close"])
             symbol_min_series_df = self.data_set_builder.build_minute_series_classification(timestamp_range_clasifs,
                                                                                             symbol_min_series_df,
+                                                                                            classif_col_name=classif_key,
                                                                                             not_found_clasif="FLAT")
 
             variables_min_series_df=self.data_set_builder.build_minute_series(variables_csv, d_from, d_to, output_col=["symbol", "date", "open", "high", "low", "close"])
 
             training_series_df= self.data_set_builder.merge_minute_series(symbol_min_series_df,variables_min_series_df,"symbol","date",symbol)
-            #TODo--> Aca tenemos nuestros registros para la RNN LSTM
+
+            rnn_model_trainer= RNNModelsAnalyzer()
+
+            rnn_model_trainer.build_LSTM(training_series_df,model_output,symbol_min_series_df,classif_key,30)
+
+            #pd.set_option('display.max_columns', None)
+            #print(training_series_df.head())
+            #pd.reset_option('display.max_columns')
 
             return None
 

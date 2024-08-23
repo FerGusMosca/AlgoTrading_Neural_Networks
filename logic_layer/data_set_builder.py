@@ -181,9 +181,9 @@ class DataSetBuilder():
         return  min_series_df
 
 
-    def build_minute_series_classification(self,timestamp_range_clasifs,min_series_df,not_found_clasif="None"):
+    def build_minute_series_classification(self,timestamp_range_clasifs,min_series_df,classif_col_name="classif_col",not_found_clasif="None"):
         # For every row in the dataframe
-        min_series_df['classification_col'] = min_series_df['date'].apply(
+        min_series_df[classif_col_name] = min_series_df['date'].apply(
             lambda x: self.get_classification_for_date(x, timestamp_range_clasifs,not_found_clasif))
 
         return min_series_df
