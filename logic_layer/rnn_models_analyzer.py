@@ -1,11 +1,16 @@
 import pandas as pd
 import numpy as np
 import tensorflow
+from keras.src.layers import TimeDistributed
+from keras.src.optimizers import Adam
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.layers import LSTM, Dense, Dropout
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+
+
+
 class RNNModelsAnalyzer:
 
     def __init__(self):
@@ -13,6 +18,12 @@ class RNNModelsAnalyzer:
 
 
     #region Private Methods
+
+
+    def __preformat_training_set__(self,training_series_df):
+
+        training_series_df.dropna(inplace=True)
+
 
 
     def __get_training_sets__(self,training_series_df,symbol_col='trading_symbol',date_col='date',
@@ -67,7 +78,8 @@ class RNNModelsAnalyzer:
 
     #region Public Methods
 
-    def build_LSTM(self, training_series_df, model_output,symbol, classif_key, safety_minutes):
+    def build_LSTM(self, training_series_df, model_output,symbol, classif_key, epochs,
+                   timestamps,n_neurons,learning_rate):
         """
         Build and train an LSTM model on the given training data and save the model.
 
@@ -78,14 +90,19 @@ class RNNModelsAnalyzer:
         safety_minutes (int): Number of time steps to look back in the time series.
         """
         try:
+
+
+            self.__preformat_training_set__(training_series_df)
             # Get training and test sets
             X_train, X_test, y_train, y_test = self.__get_training_sets__(training_series_df,
                                                                           "trading_symbol","date",
                                                                           classif_key
                                                                           )
 
-            # Número de timesteps que usaremos
-            timesteps = 1
+            print("X_Train: NaN={} Inf={}".format(np.isnan(X_train).sum(), np.isinf(X_train).sum()))
+
+            # number of timestamps to use
+            timesteps = timestamps
 
             # Generador de series temporales para datos de entrenamiento y prueba
             train_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(X_train, y_train, length=timesteps, batch_size=1)
@@ -93,14 +110,22 @@ class RNNModelsAnalyzer:
 
             # Define the LSTM model
             model = tensorflow.keras.models.Sequential()
-            model.add(LSTM(50, activation='relu', input_shape=(timesteps, X_train.shape[1])))
-            model.add(Dense(3, activation='softmax'))  # Three classes: LONG, SHORT, FLAT
+            model.add(LSTM(n_neurons, activation='relu', return_sequences=True, input_shape=(timesteps, X_train.shape[1])))
+            model.add(Dropout(0.3))  # Dropout layer with 20% dropout rate
+            model.add(LSTM(n_neurons, activation='relu'))  # Another LSTM layer without return_sequences
+            model.add(Dropout(0.3))  # Dropout layer with 20% dropout rate
+            model.add(Dense(3, activation='softmax',
+                            kernel_regularizer=tensorflow.keras.regularizers.l2(0.01)))  # Three classes: LONG, SHORT, FLAT
+
+            # Adjust the learning rate here
+            learning_rate = learning_rate # You can experiment with this value
+            optimizer = Adam(learning_rate=learning_rate)
 
             # Compile the model
-            model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+            model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
             # Train the model
-            model.fit(train_generator, epochs=10, validation_data=test_generator, verbose=1)
+            model.fit(train_generator, epochs=epochs, validation_data=test_generator, verbose=1)
 
             # Save the model to the specified path
             model.save(model_output)
