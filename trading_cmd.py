@@ -22,7 +22,7 @@ def show_commands():
     print("#8-TrainNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [depth] [learning_rate] [iterations] [model_output] [classif_key]")
     print("#9-BacktestNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [model_to_use] [classif_key]")
     print("#10-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate]")
-    print("#11-TestDailyLSTM [symbol] [model_to_use] [day]")
+    print("#11-TestDailyLSTM [symbol] [variables_csv] [day] [timestemps] [model_to_use]")
 
     #TrainNeuralNetworkAlgo
     print("#n-Exit")
@@ -281,6 +281,29 @@ def process_train_LSTM(symbol, variables_csv,str_from,str_to,model_output,classi
     except Exception as e:
         logger.print("CRITICAL ERROR running process_train_LSTM:{}".format(str(e)), MessageType.ERROR)
 
+def process_test_daily_LSTM(symbol,variables_csv,day, timesteps,model_to_use):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print("Initializing model testing for symbol {} and model {} on {}".format(symbol, model_to_use,day), MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                         None,
+                                         logger)
+
+        dataMgm.process_test_daily_LSTM(symbol,variables_csv,
+                                        model_to_use.replace('"',""),
+                                        DateHandler.convert_str_date(day, _DATE_FORMAT),
+                                        int(timesteps))
+
+        logger.print("Displaying predictions for LSTM model: symbol {} and model {} on {}".format(symbol, model_to_use,day),
+                     MessageType.INFO)
+    except Exception as e:
+        logger.print("CRITICAL ERROR running process_test_daily_LSTM:{}".format(str(e)), MessageType.ERROR)
+
 def process_daily_candles_graph(symbol, date, interval):
     loader = MLSettingsLoader()
     logger = Logger()
@@ -349,9 +372,13 @@ def process_commands(cmd):
     elif cmd_param_list[0] == "DailyCandlesGraph":
         params_validation("DailyCandlesGraph", cmd_param_list, 4)
         process_daily_candles_graph(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3])
+    elif cmd_param_list[0] == "TestDailyLSTM":
+        params_validation("TestDailyLSTM", cmd_param_list, 6)
+        process_test_daily_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                                cmd_param_list[5])
 
 
-    #
+    #TestDailyLSTM
 
     #TrainNeuralNetworkAlgo
 

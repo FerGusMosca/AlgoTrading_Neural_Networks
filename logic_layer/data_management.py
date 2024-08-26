@@ -314,6 +314,37 @@ class AlgosOrchestationLogic:
             raise Exception(msg)
 
 
+
+    def process_test_daily_LSTM(self,symbol,variables_csv, model_to_use, day,timesteps):
+        try:
+
+            start_date=day
+            end_date=  start_date + timedelta(hours=23, minutes=59, seconds=59)
+
+            symbol_min_series_df = self.data_set_builder.build_minute_series(symbol,
+                                                                             start_date,end_date,
+                                                                             output_col=["symbol", "date", "open",
+                                                                                         "high", "low", "close"])
+
+
+            variables_min_series_df = self.data_set_builder.build_minute_series(variables_csv, start_date, end_date,
+                                                                                output_col=["symbol", "date", "open",
+                                                                                            "high", "low", "close"])
+
+            test_series_df = self.data_set_builder.merge_minute_series(symbol_min_series_df,
+                                                                       variables_min_series_df, "symbol", "date",
+                                                                       symbol)
+
+            rnn_model_processer= RNNModelsAnalyzer()
+
+            rnn_model_processer.test_LSTM(symbol,test_series_df, model_to_use, timesteps)
+
+
+        except Exception as e:
+            msg = "CRITICAL ERROR processing model @process_test_daily_LSTM:{}".format(str(e))
+            self.logger.do_log(msg, MessageType.ERROR)
+            raise Exception(msg)
+
     def process_train_LSTM(self,symbol,variables_csv,d_from,d_to,model_output,classif_key,
                            epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate):
         try:
