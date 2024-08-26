@@ -21,7 +21,8 @@ def show_commands():
     print("#7-EvalMLBiasedAlgo [Symbol] [indicator] [SeriesCSV] [from] [to] [inverted] [classif_key]")
     print("#8-TrainNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [depth] [learning_rate] [iterations] [model_output] [classif_key]")
     print("#9-BacktestNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [model_to_use] [classif_key]")
-    print("#10-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate]")
+    print("#10-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate]")
+    print("#11-TestDailyLSTM [symbol] [model_to_use] [day]")
 
     #TrainNeuralNetworkAlgo
     print("#n-Exit")
@@ -251,7 +252,7 @@ def process_train_neural_network_algo(symbol, variables_csv,str_from,str_to,dept
 
 
 def process_train_LSTM(symbol, variables_csv,str_from,str_to,model_output,classification_key,
-                        epochs,timestamps,n_neurons,learning_rate):
+                        epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -268,8 +269,10 @@ def process_train_LSTM(symbol, variables_csv,str_from,str_to,model_output,classi
         dataMgm.process_train_LSTM(symbol, variables_csv,
                                     DateHandler.convert_str_date(str_from, _DATE_FORMAT),
                                     DateHandler.convert_str_date(str_to, _DATE_FORMAT),
-                                   model_output,classification_key,int(epochs),int(timestamps),
-                                   int(n_neurons),float(learning_rate))
+                                   model_output.replace('"',""),
+                                   classification_key,int(epochs),int(timestamps),
+                                   int(n_neurons),float(learning_rate),
+                                   float(reg_rate),float(dropout_rate))
 
         # TODO ---> print backtesting output
         logger.print("Model successfully trained for symbol {} and variables {}".format(symbol, variables_csv),
@@ -338,10 +341,11 @@ def process_commands(cmd):
                                             cmd_param_list[5],cmd_param_list[6])
 
     elif cmd_param_list[0] == "TrainLSTM":
-        params_validation("TrainLSTM", cmd_param_list, 11)
+        params_validation("TrainLSTM", cmd_param_list, 13)
         process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
                                             cmd_param_list[5],cmd_param_list[6],cmd_param_list[7],
-                                            cmd_param_list[8],cmd_param_list[9],cmd_param_list[10])
+                                            cmd_param_list[8],cmd_param_list[9],cmd_param_list[10]
+                                            ,cmd_param_list[11],cmd_param_list[12])
     elif cmd_param_list[0] == "DailyCandlesGraph":
         params_validation("DailyCandlesGraph", cmd_param_list, 4)
         process_daily_candles_graph(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3])

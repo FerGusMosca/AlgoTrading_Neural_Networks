@@ -315,7 +315,7 @@ class AlgosOrchestationLogic:
 
 
     def process_train_LSTM(self,symbol,variables_csv,d_from,d_to,model_output,classif_key,
-                           epochs,timestamps,n_neurons,learning_rate):
+                           epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate):
         try:
             timestamp_range_clasifs=self.timestamp_range_classif_mgr.get_timestamp_range_classification_values(classif_key,d_from,d_to)
 
@@ -332,7 +332,7 @@ class AlgosOrchestationLogic:
             rnn_model_trainer= RNNModelsAnalyzer()
 
             rnn_model_trainer.build_LSTM(training_series_df,model_output,symbol_min_series_df,classif_key,
-                                         epochs,timestamps,n_neurons,learning_rate)
+                                         epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate)
 
             #pd.set_option('display.max_columns', None)
             #print(training_series_df.head())

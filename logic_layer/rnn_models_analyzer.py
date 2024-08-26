@@ -79,7 +79,7 @@ class RNNModelsAnalyzer:
     #region Public Methods
 
     def build_LSTM(self, training_series_df, model_output,symbol, classif_key, epochs,
-                   timestamps,n_neurons,learning_rate):
+                   timestamps,n_neurons,learning_rate,reg_rate, dropout_rate):
         """
         Build and train an LSTM model on the given training data and save the model.
 
@@ -111,11 +111,11 @@ class RNNModelsAnalyzer:
             # Define the LSTM model
             model = tensorflow.keras.models.Sequential()
             model.add(LSTM(n_neurons, activation='relu', return_sequences=True, input_shape=(timesteps, X_train.shape[1])))
-            model.add(Dropout(0.3))  # Dropout layer with 20% dropout rate
+            model.add(Dropout(dropout_rate))  # Dropout layer with 20% dropout rate
             model.add(LSTM(n_neurons, activation='relu'))  # Another LSTM layer without return_sequences
-            model.add(Dropout(0.3))  # Dropout layer with 20% dropout rate
+            model.add(Dropout(dropout_rate))  # Dropout layer with 20% dropout rate
             model.add(Dense(3, activation='softmax',
-                            kernel_regularizer=tensorflow.keras.regularizers.l2(0.01)))  # Three classes: LONG, SHORT, FLAT
+                            kernel_regularizer=tensorflow.keras.regularizers.l2(reg_rate)))  # Three classes: LONG, SHORT, FLAT
 
             # Adjust the learning rate here
             learning_rate = learning_rate # You can experiment with this value
