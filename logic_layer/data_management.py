@@ -12,6 +12,7 @@ from data_access_layer.timestamp_classification_manager import TimestampClassifi
 from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
 from logic_layer.convolutional_neural_netowrk import ConvolutionalNeuralNetwork
+from logic_layer.daily_trading_backtester import DailyTradingBacktester
 from logic_layer.data_set_builder import DataSetBuilder
 from logic_layer.deep_neural_network import DeepNeuralNetwork
 from logic_layer.indicator_based_trading_backtester import IndicatorBasedTradingBacktester
@@ -20,7 +21,7 @@ import pandas as pd
 import numpy as np
 
 from logic_layer.neural_network_models_trainer import NeuralNetworkModelTrainer
-from logic_layer.rnn_models_analyzer import RNNModelsAnalyzer
+from logic_layer.daytrading_RNN_model_creator import DayTradingRNNModelCreator
 
 
 class AlgosOrchestationLogic:
@@ -315,30 +316,64 @@ class AlgosOrchestationLogic:
 
 
 
-    def process_test_daily_LSTM(self,symbol,variables_csv, model_to_use, day,timesteps):
+    def process_test_daily_LSTM(self,symbol,variables_csv, model_to_use, d_from,d_to,timesteps,portf_size, trade_comm):
         try:
 
-            start_date=day
-            end_date=  start_date + timedelta(hours=23, minutes=59, seconds=59)
+            self.logger.do_log(f"Initializing backest for symbol {symbol} from {d_from} to {d_to} (porft_size={portf_size} comm={trade_comm} )", MessageType.INFO)
+            # Generate a date range between d_from and d_to
+            all_days = pd.date_range(start=d_from, end=d_to)
 
-            symbol_min_series_df = self.data_set_builder.build_minute_series(symbol,
-                                                                             start_date,end_date,
-                                                                             output_col=["symbol", "date", "open",
-                                                                                         "high", "low", "close"])
+            # Filter out weekends (Saturday = 5, Sunday = 6)
+            business_days = [day for day in all_days if day.weekday() < 5]
+            rnn_model_processer = DayTradingRNNModelCreator()
+            daily_trading_backtester = DailyTradingBacktester()
+            max_cum_drawdowns=[]
+            daily_profits=[]
+            total_net_profit=0
+            accum_positions=0
+
+            for day in business_days:
+                self.logger.do_log(
+                    f"Processing day {day}  )",
+                    MessageType.INFO)
+
+                start_timestamp=day
+                end_timestamp= start_timestamp + timedelta(hours=23, minutes=59, seconds=59)
+
+                symbol_min_series_df = self.data_set_builder.build_minute_series(symbol,
+                                                                                 start_timestamp, end_timestamp,
+                                                                                 output_col=["symbol", "date", "open",
+                                                                                             "high", "low", "close"])
 
 
-            variables_min_series_df = self.data_set_builder.build_minute_series(variables_csv, start_date, end_date,
-                                                                                output_col=["symbol", "date", "open",
-                                                                                            "high", "low", "close"])
+                variables_min_series_df = self.data_set_builder.build_minute_series(variables_csv, start_timestamp, end_timestamp,
+                                                                                    output_col=["symbol", "date", "open",
+                                                                                                "high", "low", "close"])
 
-            test_series_df = self.data_set_builder.merge_minute_series(symbol_min_series_df,
-                                                                       variables_min_series_df, "symbol", "date",
-                                                                       symbol)
+                test_series_df = self.data_set_builder.merge_minute_series(symbol_min_series_df,
+                                                                           variables_min_series_df, "symbol", "date",
+                                                                           symbol)
 
-            rnn_model_processer= RNNModelsAnalyzer()
 
-            rnn_model_processer.test_LSTM(symbol,test_series_df, model_to_use, timesteps)
+                rnn_predictions_df=rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df, model_to_use, timesteps)
 
+                daily_net_profit, total_positions, max_daily_cum_drawdown,trading_summary_df= daily_trading_backtester.backtest_daily_predictions(rnn_predictions_df, portf_size, trade_comm)
+                max_cum_drawdowns.append(max_daily_cum_drawdown)
+                daily_profits.append(daily_net_profit)
+                total_net_profit+=daily_net_profit
+                accum_positions+=total_positions
+
+                self.logger.do_log(f"Results for day {day}: Net_Profit=${daily_net_profit:.2f} (total positions={total_positions})", MessageType.INFO)
+                self.logger.do_log("---Summarizing trades---",MessageType.INFO)
+                for index, row in trading_summary_df.iterrows():
+                    self.logger.do_log(f" Pos: {row['side']} --> open_time={row['open']} close_time={row['close']} open_price=${row['price_open']:.2f} close_price=${row['price_close']:.2f} --> net_profit=${row['total_net_profit']}",MessageType.INFO)
+                self.logger.do_log("--------------------",MessageType.INFO)
+
+
+            max_daily_drawdown=min(max_cum_drawdowns)
+            max_total_drawdown= daily_trading_backtester.calculate_max_total_drawdown(daily_profits)
+            self.logger.do_log(f"---Summarizing PORTFOLIO PERFORMANCE---",MessageType.INFO)
+            self.logger.do_log(f" Total Net_Profit=${total_net_profit:.2f} Accum. Positions={accum_positions} Max. Daily Drawdown=${max_daily_drawdown:.2f} Max. Period Drawdown=${max_total_drawdown:.2f}", MessageType.INFO)
 
         except Exception as e:
             msg = "CRITICAL ERROR processing model @process_test_daily_LSTM:{}".format(str(e))
@@ -360,10 +395,11 @@ class AlgosOrchestationLogic:
 
             training_series_df= self.data_set_builder.merge_minute_series(symbol_min_series_df,variables_min_series_df,"symbol","date",symbol)
 
-            rnn_model_trainer= RNNModelsAnalyzer()
+            rnn_model_trainer= DayTradingRNNModelCreator()
 
-            rnn_model_trainer.build_LSTM(training_series_df,model_output,symbol_min_series_df,classif_key,
-                                         epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate)
+            rnn_model_trainer.train_daytrading_LSTM(training_series_df, model_output, symbol_min_series_df, classif_key,
+                                                    epochs, timestamps, n_neurons, learning_rate, reg_rate,
+                                                    dropout_rate)
 
             #pd.set_option('display.max_columns', None)
             #print(training_series_df.head())

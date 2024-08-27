@@ -13,6 +13,8 @@ class IndicatorBasedTradingBacktester:
         pass
 
 
+    #region private Methods
+
     def __get_side__(self,indic_cassif_row,inv ):
 
         if inv  :
@@ -22,7 +24,6 @@ class IndicatorBasedTradingBacktester:
                 return PortfolioPosition._SIDE_LONG
         else:
             return indic_cassif_row[IndicatorBasedTradingBacktester._INDIC_CLASSIF_COL] #Nothing to switch
-
 
     def __switch_side__(self,side ):
 
@@ -39,8 +40,6 @@ class IndicatorBasedTradingBacktester:
             return  self.__switch_side__(side)
         else:
             return side
-
-
     def __get_date_price__(self,series_df,symbol,date):
 
 
@@ -54,8 +53,6 @@ class IndicatorBasedTradingBacktester:
 
         except Exception as e:
             raise Exception("Could not find a price for symbol {} and date {}  on series_df!!!".format(symbol,date))
-
-
     def __calculate_max_drawdown__(self,position_list):
         # Init vars
         cumulative_return = 0.0
@@ -80,7 +77,6 @@ class IndicatorBasedTradingBacktester:
         # Convertir el max drawdown a porcentaje
         return round(max_drawdown * 100, 2)
 
-
     def calculate_portfolio_performance(self,symbol,portf_positions_arr):
 
         summary=PortfSummary(symbol,PortfolioPosition._DEF_PORTF_AMT)
@@ -96,7 +92,6 @@ class IndicatorBasedTradingBacktester:
         summary.max_drawdown=self.__calculate_max_drawdown__(portf_positions_arr)
 
         return summary
-
 
     def __same_side_pred__(self, pred,bias):
         return  pred==bias
@@ -128,6 +123,10 @@ class IndicatorBasedTradingBacktester:
             raise Exception("Could not find a valid price for symbol {} on date {}".format(curr_portf_pos.symbol,date))
 
         curr_portf_pos.close_pos(date, close_price)
+
+    #endregion
+    
+    #region Public Methods
 
     #NOTE:   Indicator based strategies consdier that the same price is used to close and open the next pos
     #This means. If closing a LONG position at 300.21, the system assumes that closing at 300.21 and goes SHORT at the same price
@@ -206,6 +205,8 @@ class IndicatorBasedTradingBacktester:
 
         return  portf_positions_arr
 
+
+    #endregion
 
 
 

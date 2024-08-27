@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 import numpy as np
 import tensorflow
@@ -9,8 +11,8 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
-
-class RNNModelsAnalyzer:
+_OUTPUT_DATE_FORMAT='%m/%d/%Y %H:%M:%S'
+class DayTradingRNNModelCreator:
 
     def __init__(self):
         pass
@@ -143,7 +145,7 @@ class RNNModelsAnalyzer:
 
     #region Public Methods
 
-    def build_LSTM(self, training_series_df, model_output, symbol, classif_key, epochs,
+    def train_daytrading_LSTM(self, training_series_df, model_output, symbol, classif_key, epochs,
                    timestamps, n_neurons, learning_rate, reg_rate, dropout_rate):
         """
         Build and train an LSTM model on the given training data and save the model.
@@ -206,7 +208,7 @@ class RNNModelsAnalyzer:
 
 
 
-    def test_LSTM(self,symbol,test_series_df, model_to_use,timestamps):
+    def test_daytrading_LSTM(self,symbol,test_series_df, model_to_use,timestamps):
 
         self.__preformat_test_sets__(test_series_df)
 
@@ -231,12 +233,12 @@ class RNNModelsAnalyzer:
 
         # Adjust the DataFrame to match the length of the predictions
         dates = pd.to_datetime(test_series_df['date'].iloc[timestamps:].reset_index(drop=True), unit='s')
-        formatted_dates = dates.dt.strftime('%m/%d/%Y %H:%M:%S')
+        formatted_dates = dates.dt.strftime(_OUTPUT_DATE_FORMAT)
         symbols = test_series_df['trading_symbol'].iloc[timestamps:].reset_index(drop=True)
 
         # Create the final output DataFrame
         result_df = pd.DataFrame({
-            'trading_symbol': symbols,
+            'trading_symbol': symbol,
             'date': dates,
             'formatted_date': formatted_dates,
             'action': action_series
@@ -244,6 +246,7 @@ class RNNModelsAnalyzer:
 
 
         result_df=self.__add_trading_prices__(test_series_df,result_df,symbol,dates,"trading_symbol_price")
+
 
         return result_df
 
