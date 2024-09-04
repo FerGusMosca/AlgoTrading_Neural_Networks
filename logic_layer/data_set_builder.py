@@ -28,7 +28,10 @@ class DataSetBuilder():
     def get_classification_for_date(self,date, timestamp_range_clasifs,not_found_clasif):
         for date_range in timestamp_range_clasifs:
             if date_range.date_start <= date <= date_range.date_end:
+                #print(f"Date {date} falls within {date_range.date_start} and {date_range.date_end}, classified as {date_range.classification}")
                 return date_range.classification
+
+        #print(f"Date {date} classified as {not_found_clasif}")
         return not_found_clasif
 
     #endregion

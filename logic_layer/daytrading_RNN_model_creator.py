@@ -101,8 +101,6 @@ class DayTradingRNNModelCreator:
             Parameters:
             training_series_df (pd.DataFrame): DataFrame containing the time series data.
             classif_key (str): The column name of the classification target.
-            safety_minutes (int): Number of time steps to look back in the time series.
-
             Returns:
             tuple: X_train, X_test, y_train, y_test
             """

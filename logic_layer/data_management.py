@@ -23,6 +23,10 @@ import numpy as np
 from logic_layer.neural_network_models_trainer import NeuralNetworkModelTrainer
 from logic_layer.daytrading_RNN_model_creator import DayTradingRNNModelCreator
 
+# Global variables
+GO_FIRST = "GO_FIRST"
+GO_HIGHEST_COUNT = "GO_HIGHEST_COUNT"
+GO_FLAT_ON_DIFF = "GO_FLAT_ON_DIFF"
 
 class AlgosOrchestationLogic:
 
@@ -35,6 +39,64 @@ class AlgosOrchestationLogic:
         self.date_range_classif_mgr = DateRangeClassificationManager(ml_reports_conn_str)
 
         self.timestamp_range_classif_mgr=TimestampClassificationManager(ml_reports_conn_str)
+
+    def __classify_group__(self,classifications, grouping_classif_criteria):
+        unique_classes = classifications.unique()
+
+        # If there's only one unique classification in the group, return it
+        if len(unique_classes) == 1:
+            return unique_classes[0]
+
+        # Apply different criteria for multiple classifications
+        if grouping_classif_criteria == GO_FIRST:
+            # Return the first classification in the group
+            return classifications.iloc[0]
+        elif grouping_classif_criteria == GO_HIGHEST_COUNT:
+            # Return the most frequent classification
+            return classifications.mode().iloc[0]
+        elif grouping_classif_criteria == GO_FLAT_ON_DIFF:
+            # Mark the entire group as "FLAT"
+            return "FLAT"
+        else:
+            raise ValueError("Unknown grouping_classif_criteria")
+
+    def __group_training_df__(self, training_series_df, grouping_unit, grouping_classif_criteria, variables_csv, classif_key):
+        # Convert 'date' to datetime and set it as index
+        training_series_df['date'] = pd.to_datetime(training_series_df['date'])
+        training_series_df = training_series_df.set_index('date')
+
+        # Dictionary to store the aggregated dataframes for each variable
+        grouped_data = []
+
+        for var in variables_csv.split(','):
+            # Create a temporary aggregation dictionary for the current variable
+            agg_dict = {
+                var: ['first', 'max', 'min', 'last']
+            }
+
+            # Resample and aggregate for the current variable
+            grouped_var_df = training_series_df.resample(f'{grouping_unit}min').agg(agg_dict)
+
+            # Flatten the MultiIndex in columns (created by the aggregation)
+            grouped_var_df.columns = [f'open_{var}', f'high_{var}', f'low_{var}', f'close_{var}']
+
+            # Append the result to the list of grouped data
+            grouped_data.append(grouped_var_df)
+
+        # Concatenate all the grouped data along columns
+        final_grouped_df = pd.concat(grouped_data, axis=1)
+
+        # Add the classification column to the final dataframe
+        final_grouped_df[classif_key] = training_series_df.resample(f'{grouping_unit}min')[classif_key].apply(
+            lambda x: self.__classify_group__(x, grouping_classif_criteria)
+        )
+
+        # Reset index to bring 'date' back as a column
+        final_grouped_df = final_grouped_df.reset_index()
+
+        final_grouped_df = final_grouped_df.dropna()
+
+        return final_grouped_df
 
 
     def train_algos(self,series_csv,d_from,d_to):
@@ -381,7 +443,8 @@ class AlgosOrchestationLogic:
             raise Exception(msg)
 
     def process_train_LSTM(self,symbol,variables_csv,d_from,d_to,model_output,classif_key,
-                           epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate):
+                           epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate,
+                           grouping_unit=None,grouping_classif_criteria=None):
         try:
             timestamp_range_clasifs=self.timestamp_range_classif_mgr.get_timestamp_range_classification_values(classif_key,d_from,d_to)
 
@@ -394,6 +457,13 @@ class AlgosOrchestationLogic:
             variables_min_series_df=self.data_set_builder.build_minute_series(variables_csv, d_from, d_to, output_col=["symbol", "date", "open", "high", "low", "close"])
 
             training_series_df= self.data_set_builder.merge_minute_series(symbol_min_series_df,variables_min_series_df,"symbol","date",symbol)
+
+            if grouping_unit is not None:
+
+                training_series_df=self.__group_training_df__(training_series_df,grouping_unit,grouping_classif_criteria,variables_csv,classif_key)
+                print((training_series_df.head()))
+
+
 
             rnn_model_trainer= DayTradingRNNModelCreator()
 
