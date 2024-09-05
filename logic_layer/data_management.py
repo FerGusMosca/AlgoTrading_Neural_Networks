@@ -2,6 +2,7 @@ import sys
 import traceback
 from datetime import timedelta, datetime
 
+from common.util.dataframe_printer import DataframePrinter
 from common.util.graph_builder import GraphBuilder
 from common.util.image_handler import ImageHandler
 from common.util.light_logger import LightLogger
@@ -60,44 +61,62 @@ class AlgosOrchestationLogic:
         else:
             raise ValueError("Unknown grouping_classif_criteria")
 
-    def __group_training_df__(self, training_series_df, grouping_unit, grouping_classif_criteria, variables_csv, classif_key):
-        # Convert 'date' to datetime and set it as index
+    def __group_dataframe__(self, training_series_df, grouping_unit, variables_csv, grouping_classif_criteria=None,
+                            classif_key=None):
+        """
+        Groups the DataFrame by a specified time unit, applies OHLC (open, high, low, close) calculations
+        on the specified variables, and optionally adds a classification column based on a criterion.
+
+        :param training_series_df: The input DataFrame containing time series data.
+        :param grouping_unit: The time unit to group by (e.g., '10min', '30min').
+        :param variables_csv: Comma-separated string of variable names (e.g., 'SPY,VIX').
+        :param grouping_classif_criteria: Criteria for adding a classification column (optional).
+        :param classif_key: Column to be classified based on the grouping criteria (optional).
+        :return: DataFrame with grouped OHLC data for the specified variables.
+        """
+        # Convert the 'date' column to datetime and set it as the DataFrame index
         training_series_df['date'] = pd.to_datetime(training_series_df['date'])
         training_series_df = training_series_df.set_index('date')
 
-        # Dictionary to store the aggregated dataframes for each variable
+        # List to store grouped data for each variable
         grouped_data = []
 
+        # Iterate over the variables (symbols) listed in variables_csv
         for var in variables_csv.split(','):
-            # Create a temporary aggregation dictionary for the current variable
-            agg_dict = {
+            # Ensure the column for the variable exists in the DataFrame
+            if var not in training_series_df.columns:
+                continue
+
+            # Resample the data based on the grouping unit and calculate OHLC (open, high, low, close)
+            resampled_df = training_series_df[[var]].resample(f'{grouping_unit}min').agg({
                 var: ['first', 'max', 'min', 'last']
-            }
+            })
 
-            # Resample and aggregate for the current variable
-            grouped_var_df = training_series_df.resample(f'{grouping_unit}min').agg(agg_dict)
+            # Rename the columns to reflect 'open', 'high', 'low', 'close' for the current variable
+            resampled_df.columns = [f'open_{var}', f'high_{var}', f'low_{var}', f'close_{var}']
 
-            # Flatten the MultiIndex in columns (created by the aggregation)
-            grouped_var_df.columns = [f'open_{var}', f'high_{var}', f'low_{var}', f'close_{var}']
+            # Append the resampled and renamed DataFrame to the grouped data list
+            grouped_data.append(resampled_df)
 
-            # Append the result to the list of grouped data
-            grouped_data.append(grouped_var_df)
-
-        # Concatenate all the grouped data along columns
+        # Concatenate all grouped DataFrames along the columns
         final_grouped_df = pd.concat(grouped_data, axis=1)
 
-        # Add the classification column to the final dataframe
-        final_grouped_df[classif_key] = training_series_df.resample(f'{grouping_unit}min')[classif_key].apply(
-            lambda x: self.__classify_group__(x, grouping_classif_criteria)
-        )
+        # Optionally add a classification column based on the specified criteria
+        if grouping_classif_criteria is not None and classif_key is not None:
+            # Resample the classification key and apply the classification criteria
+            classification_df = training_series_df.resample(f'{grouping_unit}min')[classif_key].apply(
+                lambda x: self.__classify_group__(x, grouping_classif_criteria)
+            )
+            # Add the classification data to the final grouped DataFrame
+            final_grouped_df[classif_key] = classification_df
 
-        # Reset index to bring 'date' back as a column
+        # Reset the index to bring 'date' back as a column
         final_grouped_df = final_grouped_df.reset_index()
 
+        # Drop any rows with NaN values that might have been generated during resampling
         final_grouped_df = final_grouped_df.dropna()
 
         return final_grouped_df
-
 
     def train_algos(self,series_csv,d_from,d_to):
 
@@ -378,7 +397,8 @@ class AlgosOrchestationLogic:
 
 
 
-    def process_test_daily_LSTM(self,symbol,variables_csv, model_to_use, d_from,d_to,timesteps,portf_size, trade_comm):
+    def process_test_daily_LSTM(self,symbol,variables_csv, model_to_use, d_from,d_to,timesteps,portf_size, trade_comm,
+                                grouping_unit=None):
         try:
 
             self.logger.do_log(f"Initializing backest for symbol {symbol} from {d_from} to {d_to} (porft_size={portf_size} comm={trade_comm} )", MessageType.INFO)
@@ -415,6 +435,10 @@ class AlgosOrchestationLogic:
                 test_series_df = self.data_set_builder.merge_minute_series(symbol_min_series_df,
                                                                            variables_min_series_df, "symbol", "date",
                                                                            symbol)
+
+                if grouping_unit is not None:
+                    test_series_df = self.__group_dataframe__(test_series_df, grouping_unit,variables_csv)
+                    print((test_series_df.head()))
 
 
                 rnn_predictions_df=rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df, model_to_use, timesteps)
@@ -458,10 +482,12 @@ class AlgosOrchestationLogic:
 
             training_series_df= self.data_set_builder.merge_minute_series(symbol_min_series_df,variables_min_series_df,"symbol","date",symbol)
 
+            DataframePrinter.print_dataframe_head_values_w_time(variables_min_series_df, "symbol", variables_csv, 10,"date","10:30:00")
             if grouping_unit is not None:
 
-                training_series_df=self.__group_training_df__(training_series_df,grouping_unit,grouping_classif_criteria,variables_csv,classif_key)
-                print((training_series_df.head()))
+                training_series_df= self.__group_dataframe__(training_series_df, grouping_unit,
+                                                             variables_csv,grouping_classif_criteria, classif_key)
+                DataframePrinter.print_data_farme_head(training_series_df,10)
 
 
 

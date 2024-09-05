@@ -232,7 +232,7 @@ class DayTradingRNNModelCreator:
         # Adjust the DataFrame to match the length of the predictions
         dates = pd.to_datetime(test_series_df['date'].iloc[timestamps:].reset_index(drop=True), unit='s')
         formatted_dates = dates.dt.strftime(_OUTPUT_DATE_FORMAT)
-        symbols = test_series_df['trading_symbol'].iloc[timestamps:].reset_index(drop=True)
+        #symbols = test_series_df['trading_symbol'].iloc[timestamps:].reset_index(drop=True)
 
         # Create the final output DataFrame
         result_df = pd.DataFrame({
@@ -243,7 +243,7 @@ class DayTradingRNNModelCreator:
         })
 
 
-        result_df=self.__add_trading_prices__(test_series_df,result_df,symbol,dates,"trading_symbol_price")
+        result_df=self.__add_trading_prices__(test_series_df,result_df,f"open_{symbol}",dates,"trading_symbol_price")
 
 
         return result_df

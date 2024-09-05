@@ -26,6 +26,7 @@ def show_commands():
     print("#11-TrainLSTMWithGrouping [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [grouping_unit] [grouping_classif_criteria]")
 
     print("#12-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm]")
+    print("#13-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [grouping_unit]")
 
     #TrainNeuralNetworkAlgo
     print("#n-Exit")
@@ -319,7 +320,8 @@ def process_train_LSTM(symbol, variables_csv, str_from, str_to, model_output, cl
         logger.print("CRITICAL ERROR running process_train_LSTM:{}".format(str(e)), MessageType.ERROR)
 
 
-def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, model_to_use, portf_size, trade_comm):
+def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, model_to_use, portf_size, trade_comm,
+                            grouping_unit=None):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -337,7 +339,10 @@ def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, m
                                         model_to_use.replace('"', ""),
                                         DateHandler.convert_str_date(str_from, _DATE_FORMAT),
                                         DateHandler.convert_str_date(str_to, _DATE_FORMAT),
-                                        int(timesteps), float(portf_size), float(trade_comm))
+                                        int(timesteps), float(portf_size), float(trade_comm),
+                                        int(grouping_unit) if grouping_unit is not None else None
+
+                                        )
 
         logger.print(
             "Displaying predictions for LSTM model: symbol {} and model {} on {}".format(symbol, model_to_use, str_from),
@@ -430,6 +435,13 @@ def process_commands(cmd):
         params_validation("TestDailyLSTM", cmd_param_list, 9)
         process_test_daily_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
                                 cmd_param_list[5], cmd_param_list[6], cmd_param_list[7], cmd_param_list[8])
+    elif cmd_param_list[0] == "TestDailyLSTMWithGrouping":
+        params_validation("TestDailyLSTMWithGrouping", cmd_param_list, 10)
+        process_test_daily_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                                cmd_param_list[5], cmd_param_list[6], cmd_param_list[7], cmd_param_list[8],
+                                cmd_param_list[9])
+
+    #
 
 
     #TestDailyLSTM
