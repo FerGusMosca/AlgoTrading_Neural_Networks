@@ -165,7 +165,7 @@ class DataSetBuilder():
             economic_values = self.economic_series_mgr.get_economic_values(serieID, DataSetBuilder._1_MIN_INTERVAL,
                                                                            d_from, d_to)
             if len(economic_values) == 0:
-                raise Exception("No data found for SeriesID {}".format(serieID))
+                return None #maybe we are in a holiday
 
             series_data_dict[serieID] = economic_values
 

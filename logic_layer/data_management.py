@@ -427,6 +427,10 @@ class AlgosOrchestationLogic:
                                                                                  output_col=["symbol", "date", "open",
                                                                                              "high", "low", "close"])
 
+                if symbol_min_series_df is None:
+                    self.logger.do_log(f"Skipping day {day} because missing values (probable holiday!)",MessageType.WARNING)
+                    continue
+
 
                 variables_min_series_df = self.data_set_builder.build_minute_series(variables_csv, start_timestamp, end_timestamp,
                                                                                     output_col=["symbol", "date", "open",
@@ -456,7 +460,7 @@ class AlgosOrchestationLogic:
                 self.logger.do_log("--------------------",MessageType.INFO)
 
 
-            max_daily_drawdown=min(max_cum_drawdowns)
+            max_daily_drawdown=min(max_cum_drawdowns) if len(max_cum_drawdowns) is None else 0
             max_total_drawdown= daily_trading_backtester.calculate_max_total_drawdown(daily_profits)
             self.logger.do_log(f"---Summarizing PORTFOLIO PERFORMANCE---",MessageType.INFO)
             self.logger.do_log(f" Total Net_Profit=${total_net_profit:.2f} Accum. Positions={accum_positions} Max. Daily Drawdown=${max_daily_drawdown:.2f} Max. Period Drawdown=${max_total_drawdown:.2f}", MessageType.INFO)
@@ -468,7 +472,7 @@ class AlgosOrchestationLogic:
 
     def process_train_LSTM(self,symbol,variables_csv,d_from,d_to,model_output,classif_key,
                            epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate,
-                           grouping_unit=None,grouping_classif_criteria=None):
+                           clipping_rate=None,accuracy_stop=None,grouping_unit=None,grouping_classif_criteria=None):
         try:
             timestamp_range_clasifs=self.timestamp_range_classif_mgr.get_timestamp_range_classification_values(classif_key,d_from,d_to)
 
@@ -495,7 +499,7 @@ class AlgosOrchestationLogic:
 
             rnn_model_trainer.train_daytrading_LSTM(training_series_df, model_output, symbol_min_series_df, classif_key,
                                                     epochs, timestamps, n_neurons, learning_rate, reg_rate,
-                                                    dropout_rate)
+                                                    dropout_rate,clipping_rate,accuracy_stop)
 
             #pd.set_option('display.max_columns', None)
             #print(training_series_df.head())
@@ -509,13 +513,13 @@ class AlgosOrchestationLogic:
             raise Exception(msg)
 
 
-    def process_daily_candles_graph(self,symbol, date, interval):
+    def process_daily_candles_graph(self,symbol, date, interval,mov_avg_unit):
         start_of_day = datetime(date.year, date.month, date.day)
         end_of_day = start_of_day + timedelta(hours=23, minutes=59, seconds=59)
 
         prices_df= self.data_set_builder.build_minute_series(symbol,start_of_day,end_of_day)
 
-        GraphBuilder.build_candles_graph(prices_df)
+        GraphBuilder.build_candles_graph(prices_df,mov_avg_unit =mov_avg_unit)
 
         return  None
 

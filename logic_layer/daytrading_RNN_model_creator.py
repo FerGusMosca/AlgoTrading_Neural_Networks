@@ -3,6 +3,7 @@ import math
 import pandas as pd
 import numpy as np
 import tensorflow
+from keras.src.callbacks import Callback
 from keras.src.layers import TimeDistributed
 from keras.src.optimizers import Adam
 from sklearn.preprocessing import LabelEncoder, StandardScaler
@@ -12,6 +13,25 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
 _OUTPUT_DATE_FORMAT='%m/%d/%Y %H:%M:%S'
+
+
+class CustomEarlyStopping(Callback):
+    def __init__(self, monitor_train='accuracy', monitor_val='val_accuracy', threshold=0.8):
+        super(CustomEarlyStopping, self).__init__()
+        self.monitor_train = monitor_train
+        self.monitor_val = monitor_val
+        self.threshold = threshold
+
+    def on_epoch_end(self, epoch, logs=None):
+        train_acc = logs.get(self.monitor_train)
+        val_acc = logs.get(self.monitor_val)
+
+        # Check both accuracies bigger than threshold
+        if train_acc is not None and val_acc is not None:
+            if train_acc >= self.threshold and val_acc >= self.threshold:
+                print(f"\nThreshold reached: {self.monitor_train} = {train_acc:.4f}, {self.monitor_val} = {val_acc:.4f}, stopping training.")
+                self.model.stop_training = True
+
 class DayTradingRNNModelCreator:
 
     def __init__(self):
@@ -144,7 +164,8 @@ class DayTradingRNNModelCreator:
     #region Public Methods
 
     def train_daytrading_LSTM(self, training_series_df, model_output, symbol, classif_key, epochs,
-                   timestamps, n_neurons, learning_rate, reg_rate, dropout_rate):
+                   timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate=None,
+                              accuracy_stop=None):
         """
         Build and train an LSTM model on the given training data and save the model.
 
@@ -188,13 +209,17 @@ class DayTradingRNNModelCreator:
 
             # Adjust the learning rate here
             learning_rate = learning_rate  # You can experiment with this value
-            optimizer = Adam(learning_rate=learning_rate)
+            optimizer = Adam(learning_rate=learning_rate, clipvalue=clipping_rate if clipping_rate is not None else 0)
 
             # Compile the model
             model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
+            # Early Stop
+            custom_early_stopping = CustomEarlyStopping(monitor_train='accuracy', monitor_val='val_accuracy', threshold=accuracy_stop)
+
             # Train the model
-            model.fit(train_generator, epochs=epochs, validation_data=test_generator, verbose=1)
+            model.fit(train_generator, epochs=epochs, validation_data=test_generator, verbose=1,
+                      callbacks=[custom_early_stopping])
 
             # Save the model to the specified path
             model.save(model_output)
