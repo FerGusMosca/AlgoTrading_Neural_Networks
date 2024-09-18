@@ -29,6 +29,10 @@ GO_FIRST = "GO_FIRST"
 GO_HIGHEST_COUNT = "GO_HIGHEST_COUNT"
 GO_FLAT_ON_DIFF = "GO_FLAT_ON_DIFF"
 
+_TRADING_ALGO_RAW_ALGO="RAW_ALGO"
+_TRADING_ALGO_N_MIN_BUFFER_W_FLIP="N_MIN_BUFFER_W_FLIP"
+_TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG="ONLY_SIGNAL_N_MIN_+_MOV_AVG"
+
 class AlgosOrchestationLogic:
 
     def __init__(self,hist_data_conn_str,ml_reports_conn_str,p_classification_map_key,logger):
@@ -117,6 +121,29 @@ class AlgosOrchestationLogic:
         final_grouped_df = final_grouped_df.dropna()
 
         return final_grouped_df
+
+
+    def __backtest_strategy__(self,rnn_predictions_df,portf_size, trade_comm,trading_algo):
+
+        daily_trading_backtester = DailyTradingBacktester()
+
+
+        if trading_algo==_TRADING_ALGO_RAW_ALGO:
+            daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
+                                                                                            rnn_predictions_df, portf_size, trade_comm)
+
+            return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
+        elif trading_algo==_TRADING_ALGO_N_MIN_BUFFER_W_FLIP:
+            raise Exception(f"Implement trading algo: {_TRADING_ALGO_N_MIN_BUFFER_W_FLIP}")
+        elif trading_algo==_TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG:
+            raise Exception(f"Implement trading algo: {_TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG}")
+        else:
+            raise Exception(f"NOT RECOGNIZED trading algo {trading_algo}")
+
+
+    def __calculate_max_total_drawdown__(self,daily_profits):
+        daily_trading_backtester = DailyTradingBacktester()
+        return daily_trading_backtester.calculate_max_total_drawdown(daily_profits)
 
     def train_algos(self,series_csv,d_from,d_to):
 
@@ -398,7 +425,7 @@ class AlgosOrchestationLogic:
 
 
     def process_test_daily_LSTM(self,symbol,variables_csv, model_to_use, d_from,d_to,timesteps,portf_size, trade_comm,
-                                grouping_unit=None):
+                                trading_algo,grouping_unit=None):
         try:
 
             self.logger.do_log(f"Initializing backest for symbol {symbol} from {d_from} to {d_to} (porft_size={portf_size} comm={trade_comm} )", MessageType.INFO)
@@ -408,7 +435,7 @@ class AlgosOrchestationLogic:
             # Filter out weekends (Saturday = 5, Sunday = 6)
             business_days = [day for day in all_days if day.weekday() < 5]
             rnn_model_processer = DayTradingRNNModelCreator()
-            daily_trading_backtester = DailyTradingBacktester()
+
             max_cum_drawdowns=[]
             daily_profits=[]
             total_net_profit=0
@@ -447,7 +474,7 @@ class AlgosOrchestationLogic:
 
                 rnn_predictions_df=rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df, model_to_use, timesteps)
 
-                daily_net_profit, total_positions, max_daily_cum_drawdown,trading_summary_df= daily_trading_backtester.backtest_daily_predictions(rnn_predictions_df, portf_size, trade_comm)
+                daily_net_profit, total_positions, max_daily_cum_drawdown,trading_summary_df= self.__backtest_strategy__(rnn_predictions_df, portf_size, trade_comm,trading_algo)
                 max_cum_drawdowns.append(max_daily_cum_drawdown)
                 daily_profits.append(daily_net_profit)
                 total_net_profit+=daily_net_profit
@@ -461,7 +488,7 @@ class AlgosOrchestationLogic:
 
 
             max_daily_drawdown=min(max_cum_drawdowns) if len(max_cum_drawdowns) is None else 0
-            max_total_drawdown= daily_trading_backtester.calculate_max_total_drawdown(daily_profits)
+            max_total_drawdown= self.__calculate_max_total_drawdown__(daily_profits)
             self.logger.do_log(f"---Summarizing PORTFOLIO PERFORMANCE---",MessageType.INFO)
             self.logger.do_log(f" Total Net_Profit=${total_net_profit:.2f} Accum. Positions={accum_positions} Max. Daily Drawdown=${max_daily_drawdown:.2f} Max. Period Drawdown=${max_total_drawdown:.2f}", MessageType.INFO)
 

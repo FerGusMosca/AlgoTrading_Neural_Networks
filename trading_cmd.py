@@ -25,8 +25,8 @@ def show_commands():
     print("#10-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop]")
     print("#11-TrainLSTMWithGrouping [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [grouping_unit] [grouping_classif_criteria]")
 
-    print("#12-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm]")
-    print("#13-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [grouping_unit]")
+    print("#12-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo]")
+    print("#13-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [grouping_unit]")
 
     #TrainNeuralNetworkAlgo
     print("#n-Exit")
@@ -38,6 +38,34 @@ def count_params( param_list, exp_len):
 def params_validation(cmd, param_list, exp_len):
     if (len(param_list) != exp_len):
         raise Exception("Command {} expects {} parameters".format(cmd, exp_len))
+
+
+def process_traing_LSTM_cmd(cmd_param_list):
+    if count_params(cmd_param_list, 15):
+
+        params_validation("TrainLSTM", cmd_param_list, 15)
+        process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                           cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
+                           cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
+                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13], cmd_param_list[14])
+    elif count_params(cmd_param_list, 19):  # group_as_mov_avg + grouping_mov_avg_unit
+        params_validation("TrainLSTM", cmd_param_list, 19)
+        process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                           cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
+                           cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
+                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13],
+                           cmd_param_list[14],
+                           grouping_unit=cmd_param_list[15], grouping_classif_criteria=cmd_param_list[16],
+                           group_as_mov_avg=cmd_param_list[17] == "True", grouping_mov_avg_unit=cmd_param_list[18])
+
+    elif count_params(cmd_param_list, 17):  # group_as_mov_avg + grouping_mov_avg_unit
+        params_validation("TrainLSTM", cmd_param_list, 17)
+        process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                           cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
+                           cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
+                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13],
+                           cmd_param_list[14],
+                           group_as_mov_avg=cmd_param_list[15] == "True", grouping_mov_avg_unit=cmd_param_list[16])
 
 
 def process_train_ml_algos(cmd_param_list, str_from, str_to, classification_key=None):
@@ -327,7 +355,7 @@ def process_train_LSTM(symbol, variables_csv, str_from, str_to, model_output, cl
 
 
 def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, model_to_use, portf_size, trade_comm,
-                            grouping_unit=None):
+                            trading_algo,grouping_unit=None):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -346,6 +374,7 @@ def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, m
                                         DateHandler.convert_str_date(str_from, _DATE_FORMAT),
                                         DateHandler.convert_str_date(str_to, _DATE_FORMAT),
                                         int(timesteps), float(portf_size), float(trade_comm),
+                                        trading_algo,
                                         int(grouping_unit) if grouping_unit is not None else None
 
                                         )
@@ -420,32 +449,7 @@ def process_commands(cmd):
                                              cmd_param_list[5], cmd_param_list[6])
 
     elif cmd_param_list[0] == "TrainLSTM":
-
-        if count_params(cmd_param_list,15):
-
-            params_validation("TrainLSTM", cmd_param_list, 15)
-            process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                               cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
-                               cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
-                               , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13], cmd_param_list[14])
-        elif count_params(cmd_param_list,19):#group_as_mov_avg + grouping_mov_avg_unit
-            params_validation("TrainLSTM", cmd_param_list, 19)
-            process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                               cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
-                               cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
-                               , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13],
-                               cmd_param_list[14],
-                               grouping_unit=cmd_param_list[15],grouping_classif_criteria=cmd_param_list[16],
-                               group_as_mov_avg=cmd_param_list[17]=="True", grouping_mov_avg_unit=cmd_param_list[18])
-
-        elif count_params(cmd_param_list,17):#group_as_mov_avg + grouping_mov_avg_unit
-            params_validation("TrainLSTM", cmd_param_list, 17)
-            process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                               cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
-                               cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
-                               , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13],
-                               cmd_param_list[14],
-                               group_as_mov_avg=cmd_param_list[15]=="True", grouping_mov_avg_unit=cmd_param_list[16])
+        process_traing_LSTM_cmd(cmd_param_list)
 
     elif cmd_param_list[0] == "TrainLSTMWithGrouping":
         params_validation("TrainLSTMWithGrouping", cmd_param_list, 17)
@@ -454,7 +458,6 @@ def process_commands(cmd):
                            cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
                            , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13], cmd_param_list[14]
                            , cmd_param_list[15] , cmd_param_list[16])
-
     #
     elif cmd_param_list[0] == "DailyCandlesGraph":
 
@@ -462,14 +465,15 @@ def process_commands(cmd):
         process_daily_candles_graph(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3],
                                     cmd_param_list[4])
     elif cmd_param_list[0] == "TestDailyLSTM":
-        params_validation("TestDailyLSTM", cmd_param_list, 9)
+        params_validation("TestDailyLSTM", cmd_param_list, 10)
         process_test_daily_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                                cmd_param_list[5], cmd_param_list[6], cmd_param_list[7], cmd_param_list[8])
+                                cmd_param_list[5], cmd_param_list[6], cmd_param_list[7], cmd_param_list[8]
+                                , cmd_param_list[9])
     elif cmd_param_list[0] == "TestDailyLSTMWithGrouping":
-        params_validation("TestDailyLSTMWithGrouping", cmd_param_list, 10)
+        params_validation("TestDailyLSTMWithGrouping", cmd_param_list, 11)
         process_test_daily_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
                                 cmd_param_list[5], cmd_param_list[6], cmd_param_list[7], cmd_param_list[8],
-                                cmd_param_list[9])
+                                cmd_param_list[9],cmd_param_list[10])
 
     #
 
