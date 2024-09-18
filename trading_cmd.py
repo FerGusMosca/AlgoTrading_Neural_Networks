@@ -32,6 +32,9 @@ def show_commands():
     print("#n-Exit")
 
 
+def count_params( param_list, exp_len):
+    return len(param_list) == exp_len
+
 def params_validation(cmd, param_list, exp_len):
     if (len(param_list) != exp_len):
         raise Exception("Command {} expects {} parameters".format(cmd, exp_len))
@@ -288,7 +291,8 @@ def process_train_neural_network_algo(symbol, variables_csv, str_from, str_to, d
 
 def process_train_LSTM(symbol, variables_csv, str_from, str_to, model_output, classification_key,
                        epochs, timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate,
-                       accuracy_stop,grouping_unit=None,grouping_classif_criteria=None):
+                       accuracy_stop,grouping_unit=None,grouping_classif_criteria=None,
+                       group_as_mov_avg=False,grouping_mov_avg_unit=100):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -311,7 +315,8 @@ def process_train_LSTM(symbol, variables_csv, str_from, str_to, model_output, cl
                                    float(reg_rate), float(dropout_rate),float(clipping_rate),
                                    float(accuracy_stop),
                                    int(grouping_unit) if grouping_unit is not None else None,
-                                   grouping_classif_criteria)
+                                   grouping_classif_criteria,
+                                   bool(group_as_mov_avg),int(grouping_mov_avg_unit))
 
         # TODO ---> print backtesting output
         logger.print("Model successfully trained for symbol {} and variables {}".format(symbol, variables_csv),
@@ -415,11 +420,32 @@ def process_commands(cmd):
                                              cmd_param_list[5], cmd_param_list[6])
 
     elif cmd_param_list[0] == "TrainLSTM":
-        params_validation("TrainLSTM", cmd_param_list, 15)
-        process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                           cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
-                           cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
-                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13], cmd_param_list[14])
+
+        if count_params(cmd_param_list,15):
+
+            params_validation("TrainLSTM", cmd_param_list, 15)
+            process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                               cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
+                               cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
+                               , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13], cmd_param_list[14])
+        elif count_params(cmd_param_list,19):#group_as_mov_avg + grouping_mov_avg_unit
+            params_validation("TrainLSTM", cmd_param_list, 19)
+            process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                               cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
+                               cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
+                               , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13],
+                               cmd_param_list[14],
+                               grouping_unit=cmd_param_list[15],grouping_classif_criteria=cmd_param_list[16],
+                               group_as_mov_avg=cmd_param_list[17]=="True", grouping_mov_avg_unit=cmd_param_list[18])
+
+        elif count_params(cmd_param_list,17):#group_as_mov_avg + grouping_mov_avg_unit
+            params_validation("TrainLSTM", cmd_param_list, 17)
+            process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                               cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
+                               cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
+                               , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13],
+                               cmd_param_list[14],
+                               group_as_mov_avg=cmd_param_list[15]=="True", grouping_mov_avg_unit=cmd_param_list[16])
 
     elif cmd_param_list[0] == "TrainLSTMWithGrouping":
         params_validation("TrainLSTMWithGrouping", cmd_param_list, 17)

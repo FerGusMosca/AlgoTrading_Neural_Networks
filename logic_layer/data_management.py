@@ -472,7 +472,9 @@ class AlgosOrchestationLogic:
 
     def process_train_LSTM(self,symbol,variables_csv,d_from,d_to,model_output,classif_key,
                            epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate,
-                           clipping_rate=None,accuracy_stop=None,grouping_unit=None,grouping_classif_criteria=None):
+                           clipping_rate=None,accuracy_stop=None,grouping_unit=None,
+                           grouping_classif_criteria=None,
+                           group_as_mov_avg=False,grouping_mov_avg_unit=20):
         try:
             timestamp_range_clasifs=self.timestamp_range_classif_mgr.get_timestamp_range_classification_values(classif_key,d_from,d_to)
 
@@ -485,6 +487,10 @@ class AlgosOrchestationLogic:
             variables_min_series_df=self.data_set_builder.build_minute_series(variables_csv, d_from, d_to, output_col=["symbol", "date", "open", "high", "low", "close"])
 
             training_series_df= self.data_set_builder.merge_minute_series(symbol_min_series_df,variables_min_series_df,"symbol","date",symbol)
+
+            if group_as_mov_avg:
+                training_series_df=self.data_set_builder.group_as_mov_avgs(training_series_df,variables_csv,grouping_mov_avg_unit)
+
 
             DataframePrinter.print_dataframe_head_values_w_time(variables_min_series_df, "symbol", variables_csv, 10,"date","10:30:00")
             if grouping_unit is not None:

@@ -216,3 +216,21 @@ class DataSetBuilder():
                                         add_classif_col=add_classif_col)
 
         return  series_df
+
+    def group_as_mov_avgs(self,symbol_min_series_df, variables_csv, grouping_mov_avg_unit):
+        # Convert the column list from CSV to a Python list
+        columns = variables_csv.split(",")
+
+        # Create a copy of the original DataFrame to preserve non-moving-average columns
+        result_df = symbol_min_series_df.copy()
+
+        # Calculate moving averages for each column in 'variables_csv'
+        for col in columns:
+            if col in symbol_min_series_df.columns:
+                # Calculate simple moving average for the current column
+                result_df[col] = symbol_min_series_df[col].rolling(window=grouping_mov_avg_unit).mean()
+
+        # Fill the first 'grouping_mov_avg_unit - 1' rows with None
+        result_df.iloc[:grouping_mov_avg_unit - 1] = None
+
+        return result_df
