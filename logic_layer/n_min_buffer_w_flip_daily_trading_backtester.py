@@ -11,91 +11,137 @@ class NMinBufferWFlipDailyTradingBacktester(BaseClassDailyTradingBacktester):
     def __init__(self):
         pass
 
-    def __summarize_trading_positions__(self, result_df, pos_size, net_commissions, n_min):
+
+    def __append_position_row__(self,entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
+                           pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows):
+        # Add the closed LONG position
+        summary_rows.append({
+            'symbol': entry_symbol,
+            'open': entry_time,
+            'close': current_time,
+            'side': position_side,
+            'price_open': entry_price,
+            'price_close': current_price,
+            'unit_gross_profit': unit_gross_profit,
+            'total_gross_profit': total_gross_profit,
+            'total_net_profit': total_net_profit,
+            'portfolio_size': pos_size,
+            'pos_size': pos_size
+        })
+
+
+    def __close_final_position__(self,entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
+                           portf_size,net_commissions,summary_rows):
+
+        pos_size = int(portf_size / entry_price)
+        last_time = current_time
+        last_price = current_price
+
+        if position_side == self._LONG_POS:
+            unit_gross_profit = last_price - entry_price
+        else:
+            unit_gross_profit = entry_price - last_price
+        total_gross_profit = unit_gross_profit * pos_size
+        total_net_profit = total_gross_profit - net_commissions
+
+        self.__append_position_row__(entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
+                                     pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows)
+
+
+
+    def __close_position__(self,entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
+                           portf_size,net_commissions,summary_rows):
+
+        pos_size=int(portf_size/entry_price)
+        last_time = current_time
+        last_price = current_price
+        unit_gross_profit = last_price - entry_price
+        total_gross_profit = unit_gross_profit * pos_size
+        total_net_profit = total_gross_profit - net_commissions
+
+        self.__append_position_row__(entry_symbol, entry_time, position_side, current_time, current_price, entry_price,
+                                     pos_size, unit_gross_profit, total_gross_profit, total_net_profit, summary_rows)
+
+    def __summarize_trading_positions__(self, result_df, portf_size, net_commissions, n_min):
         """
         Summarizes trading positions using the N_MIN_BUFFER_W_FLIP algorithm.
 
         Parameters:
         result_df (pd.DataFrame): DataFrame containing trading data with columns ['trading_symbol', 'formatted_date', 'action', 'trading_symbol_price']
-        portfolio_size (float): The total size of the portfolio in monetary terms.
+        pos_size (float): The size of each position in monetary terms.
         net_commissions (float): The net commissions to be deducted from the profit.
         n_min (int): The number of minutes to wait before flipping positions (N-minute buffer).
 
         Returns:
         pd.DataFrame: DataFrame summarizing the trading positions with columns ['symbol', 'open', 'close', 'side', 'price_open', 'price_close', 'unit_gross_profit', 'total_gross_profit', 'total_net_profit', 'portfolio_size', 'pos_size']
         """
-        # Initialize an empty DataFrame to store the trading summary
-        trading_summary_df = pd.DataFrame(columns=[
-            'symbol', 'open', 'close', 'side', 'price_open', 'price_close', 'unit_gross_profit', 'total_gross_profit',
-            'total_net_profit', 'portfolio_size', 'pos_size'
-        ])
+        # Initialize an empty list to store the rows of the trading summary
+        summary_rows = []
 
-        # Variables to keep track of the open position
         position_open = False
         position_side = None
         entry_price = None
         entry_time = None
         entry_symbol = None
+        future_action=None
+        future_price=None
+        future_time=None
 
-        # Iterate through each row in the result_df DataFrame
         for index, row in result_df.iterrows():
             current_symbol = row['trading_symbol']
             current_time = pd.to_datetime(row['formatted_date'])
             current_action = row['action']
             current_price = row['trading_symbol_price']
 
-            # Logic to handle flat positions
-            if not position_open and current_action == self._LONG_POS:
-                # Start waiting for n_min to confirm the LONG position
-                wait_time = current_time + timedelta(minutes=n_min)
-                potential_side = self._LONG_POS
-                continue
+            # Debug print
+            print(f"Processing row {index}: time={current_time}, action={current_action}, price={current_price}")
 
-            if not position_open and current_action == self._SHORT_POS:
-                # Start waiting for n_min to confirm the SHORT position
-                wait_time = current_time + timedelta(minutes=n_min)
-                potential_side = self._SHORT_POS
-                continue
+            if not position_open:
+                if current_action in [self._LONG_POS, self._SHORT_POS]:
+                    # Wait for n_min minutes from the first signal
+                    if index + n_min < len(result_df):
+                        future_action = result_df.iloc[index + n_min]['action']
+                        future_price = result_df.iloc[index + n_min]['trading_symbol_price']
+                        future_time =  pd.to_datetime( result_df.iloc[index + n_min]['formatted_date'])
+                        if future_action == current_action:
+                            # Open position
+                            position_open = True
+                            position_side = current_action
+                            entry_price = future_price
+                            entry_time = future_time
+                            entry_symbol = current_symbol
+                            continue
 
-            # Logic for LONG positions
-            if position_open and position_side == self._LONG_POS:
-                if current_action == self._SHORT_POS:
-                    # Wait N minutes and if the signal remains SHORT, flip the position
-                    wait_time = current_time + timedelta(minutes=n_min)
-                    if wait_time >= current_time and result_df.iloc[index]['action'] == self._SHORT_POS:
-                        position_open = False  # Close LONG position
-                        # Logic to close the LONG and open SHORT
-                        pass
+            elif position_open:
 
-            # Logic for SHORT positions
-            if position_open and position_side == self._SHORT_POS:
-                if current_action == self._LONG_POS:
-                    # Wait N minutes and if the signal remains LONG, flip the position
-                    wait_time = current_time + timedelta(minutes=n_min)
-                    if wait_time >= current_time and result_df.iloc[index]['action'] == self._LONG_POS:
-                        position_open = False  # Close SHORT position
-                        # Logic to close the SHORT and open LONG
-                        pass
+                if current_time <=future_time:
+                    continue
+
+                if position_side == self._LONG_POS:
+                    if current_action == self._SHORT_POS or current_action == self._FLAT_POS:
+
+                        self.__close_position__(entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
+                                                portf_size,net_commissions,summary_rows)
+                        current_action=self._FLAT_POS
+                        position_open = False
+
+                elif position_side == self._SHORT_POS:
+                    if current_action == self._LONG_POS or current_action == self._FLAT_POS:
+                        self.__close_position__(entry_symbol, entry_time, position_side, current_time, current_price,
+                                                entry_price,
+                                                portf_size, net_commissions, summary_rows)
+                        current_action = self._FLAT_POS
+                        position_open=False
 
             # Handle closing positions at the end of the day
-            if index == len(result_df) - 1:  # Last row of the dataframe
+            if index == len(result_df) - 1:
                 if position_open:
-                    # Logic to close any open position
-                    last_time = result_df.iloc[-1]['formatted_date']
-                    last_price = result_df.iloc[-1]['trading_symbol_price']
+                    self.__close_final_position__(entry_symbol,entry_time, position_side, current_time, current_price, entry_price, portf_size, net_commissions, summary_rows)
+                    current_action = self._FLAT_POS
+                    position_open = False
+        # Convert the list of dictionaries to a DataFrame
+        trading_summary_df = pd.DataFrame(summary_rows)
 
-                    unit_gross_profit = last_price - entry_price if position_side == self._LONG_POS else entry_price - last_price
-                    total_gross_profit = unit_gross_profit * pos_size
-                    total_net_profit = total_gross_profit - net_commissions
-
-                    # Update the last position to close it
-                    trading_summary_df.at[trading_summary_df.index[-1], 'close'] = last_time
-                    trading_summary_df.at[trading_summary_df.index[-1], 'price_close'] = last_price
-                    trading_summary_df.at[trading_summary_df.index[-1], 'unit_gross_profit'] = unit_gross_profit
-                    trading_summary_df.at[trading_summary_df.index[-1], 'total_gross_profit'] = total_gross_profit
-                    trading_summary_df.at[trading_summary_df.index[-1], 'total_net_profit'] = total_net_profit
-
-        # Return the trading summary DataFrame
         return trading_summary_df
 
 

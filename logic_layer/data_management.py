@@ -136,6 +136,8 @@ class AlgosOrchestationLogic:
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
         elif trading_algo==_TRADING_ALGO_N_MIN_BUFFER_W_FLIP:
+
+            print(rnn_predictions_df.iloc[139:146])
             daily_trading_backtester = NMinBufferWFlipDailyTradingBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
                 rnn_predictions_df, portf_size, trade_comm)
