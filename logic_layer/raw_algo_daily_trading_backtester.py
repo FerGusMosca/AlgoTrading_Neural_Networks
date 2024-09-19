@@ -2,7 +2,11 @@ import math
 
 import pandas as pd
 import numpy as np
-class DailyTradingBacktester:
+
+from logic_layer.base_class_daily_trading_backtester import BaseClassDailyTradingBacktester
+
+
+class RawAlgoDailyTradingBacktester(BaseClassDailyTradingBacktester):
 
     def __init__(self):
         pass
@@ -44,7 +48,7 @@ class DailyTradingBacktester:
             current_price = row['trading_symbol_price']
 
             # If a new position is opened
-            if (not position_open) and (current_action in ['LONG', 'SHORT']):
+            if (not position_open) and (current_action in [self._LONG_POS,self._SHORT_POS]):
                 # Calculate position size
                 pos_size = math.floor(portfolio_size / current_price)
 
@@ -74,11 +78,11 @@ class DailyTradingBacktester:
 
             # If an open position is closed
             elif position_open and (
-                    (position_side == 'LONG' and current_action in ['SHORT', 'FLAT']) or
-                    (position_side == 'SHORT' and current_action in ['LONG', 'FLAT'])
+                    (position_side == self._LONG_POS and current_action in [self._SHORTw__POS, self._FLAT_POS]) or
+                    (position_side == self._SHORT_POS and current_action in [self._LONG_POS, self._FLAT_POS])
             ):
                 # Calculate unit gross profit
-                unit_gross_profit = current_price - entry_price if position_side == 'LONG' else entry_price - current_price
+                unit_gross_profit = current_price - entry_price if position_side == self._LONG_POS else entry_price - current_price
                 total_gross_profit = unit_gross_profit * pos_size
                 total_net_profit = total_gross_profit - net_commissions
 
@@ -102,7 +106,7 @@ class DailyTradingBacktester:
             last_time = result_df.iloc[-1]['formatted_date']
             last_price = result_df.iloc[-1]['trading_symbol_price']
 
-            unit_gross_profit = last_price - entry_price if position_side == 'LONG' else entry_price - last_price
+            unit_gross_profit = last_price - entry_price if position_side == self._LONG_POS else entry_price - last_price
             total_gross_profit = unit_gross_profit * pos_size
             total_net_profit = total_gross_profit - net_commissions
 
@@ -116,47 +120,12 @@ class DailyTradingBacktester:
         # Return the trading summary DataFrame
         return trading_summary_df
 
-    def __calculate_day_trading_summary__(self, trading_summary_df):
-        """
-        This method calculates the daily trading summary including:
-        - Total net profit for the day.
-        - Total number of positions.
-        - Maximum drawdown, defined as the maximum cumulative loss during the day.
 
-        Parameters:
-        trading_summary_df (pd.DataFrame): A DataFrame with trading positions containing the following columns:
-                                           'close', 'price_close', 'unit_gross_profit', 'total_gross_profit',
-                                           'total_net_profit'
-
-        Returns:
-        daily_net_profit (float): The sum of all 'total_net_profit' values for the day.
-        total_positions (int): The number of positions closed in the day.
-        max_cum_drawdown (float): The maximum drawdown defined as the maximum cumulative loss during the day.
-        """
-        # 1. Sum all values in the 'total_net_profit' column
-        daily_net_profit = trading_summary_df['total_net_profit'].sum()
-
-        # 2. Count the total number of positions (number of rows in the DataFrame)
-        total_positions = len(trading_summary_df)
-
-        # 3. Calculate the maximum drawdown as the maximum cumulative loss during the day
-        max_cum_drawdown = 0
-        current_drawdown = 0
-
-        for profit in trading_summary_df['total_net_profit']:
-            if profit < 0:
-                current_drawdown += profit
-                max_cum_drawdown = min(max_cum_drawdown, current_drawdown)
-            else:
-                current_drawdown = 0  # Reset the drawdown when there's a profit
-
-        return daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df
 
     #endregion
 
 
     #region Public Methods
-
 
     def backtest_daily_predictions(self,rnn_predictions_df,portf_size,trade_comm):
 
@@ -164,33 +133,9 @@ class DailyTradingBacktester:
 
         return self.__calculate_day_trading_summary__(trading_summary_df)
 
+
     import numpy as np
 
-    def calculate_max_total_drawdown(self, daily_profits):
-        """
-        This function calculates the maximum drawdown over a period based on daily profits.
 
-        Parameters:
-        daily_profits (list or np.array): Array containing daily profits (positive or negative).
-
-        Returns:
-        float: The maximum drawdown over the period.
-        """
-        # Convert daily profits to a numpy array if it's not already
-        daily_profits = np.array(daily_profits)
-
-        # Initialize variables to track the maximum drawdown
-        max_drawdown = 0
-        cumulative_drawdown = 0
-
-        # Loop through daily profits to calculate the maximum drawdown
-        for profit in daily_profits:
-            cumulative_drawdown += profit
-            if cumulative_drawdown > 0:
-                cumulative_drawdown = 0
-            if cumulative_drawdown < max_drawdown:
-                max_drawdown = cumulative_drawdown
-
-        return -1* abs(max_drawdown)
 
     #endregion

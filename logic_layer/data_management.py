@@ -13,7 +13,8 @@ from data_access_layer.timestamp_classification_manager import TimestampClassifi
 from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
 from logic_layer.convolutional_neural_netowrk import ConvolutionalNeuralNetwork
-from logic_layer.daily_trading_backtester import DailyTradingBacktester
+from logic_layer.n_min_buffer_w_flip_daily_trading_backtester import NMinBufferWFlipDailyTradingBacktester
+from logic_layer.raw_algo_daily_trading_backtester import RawAlgoDailyTradingBacktester
 from logic_layer.data_set_builder import DataSetBuilder
 from logic_layer.deep_neural_network import DeepNeuralNetwork
 from logic_layer.indicator_based_trading_backtester import IndicatorBasedTradingBacktester
@@ -125,16 +126,21 @@ class AlgosOrchestationLogic:
 
     def __backtest_strategy__(self,rnn_predictions_df,portf_size, trade_comm,trading_algo):
 
-        daily_trading_backtester = DailyTradingBacktester()
 
+        #print(f"{rnn_predictions_df.head()}")
 
         if trading_algo==_TRADING_ALGO_RAW_ALGO:
+            daily_trading_backtester = RawAlgoDailyTradingBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
                                                                                             rnn_predictions_df, portf_size, trade_comm)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
         elif trading_algo==_TRADING_ALGO_N_MIN_BUFFER_W_FLIP:
-            raise Exception(f"Implement trading algo: {_TRADING_ALGO_N_MIN_BUFFER_W_FLIP}")
+            daily_trading_backtester = NMinBufferWFlipDailyTradingBacktester()
+            daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
+                rnn_predictions_df, portf_size, trade_comm)
+
+            return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
         elif trading_algo==_TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG:
             raise Exception(f"Implement trading algo: {_TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG}")
         else:
@@ -142,7 +148,7 @@ class AlgosOrchestationLogic:
 
 
     def __calculate_max_total_drawdown__(self,daily_profits):
-        daily_trading_backtester = DailyTradingBacktester()
+        daily_trading_backtester = RawAlgoDailyTradingBacktester()
         return daily_trading_backtester.calculate_max_total_drawdown(daily_profits)
 
     def train_algos(self,series_csv,d_from,d_to):
