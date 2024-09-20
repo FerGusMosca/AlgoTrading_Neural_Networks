@@ -1,4 +1,3 @@
-import sys
 import traceback
 from datetime import timedelta, datetime
 
@@ -7,20 +6,18 @@ from common.util.graph_builder import GraphBuilder
 from common.util.image_handler import ImageHandler
 from common.util.light_logger import LightLogger
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
-from data_access_layer.economic_series_manager import EconomicSeriesManager
 from data_access_layer.timestamp_classification_manager import TimestampClassificationManager
 
 from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
 from logic_layer.convolutional_neural_netowrk import ConvolutionalNeuralNetwork
-from logic_layer.n_min_buffer_w_flip_daily_trading_backtester import NMinBufferWFlipDailyTradingBacktester
-from logic_layer.raw_algo_daily_trading_backtester import RawAlgoDailyTradingBacktester
+from logic_layer.trading_algos.n_min_buffer_w_flip_daily_trading_backtester import NMinBufferWFlipDailyTradingBacktester
+from logic_layer.trading_algos.raw_algo_daily_trading_backtester import RawAlgoDailyTradingBacktester
 from logic_layer.data_set_builder import DataSetBuilder
 from logic_layer.deep_neural_network import DeepNeuralNetwork
 from logic_layer.indicator_based_trading_backtester import IndicatorBasedTradingBacktester
 from logic_layer.ml_models_analyzer import MLModelAnalyzer
 import pandas as pd
-import numpy as np
 
 from logic_layer.neural_network_models_trainer import NeuralNetworkModelTrainer
 from logic_layer.daytrading_RNN_model_creator import DayTradingRNNModelCreator

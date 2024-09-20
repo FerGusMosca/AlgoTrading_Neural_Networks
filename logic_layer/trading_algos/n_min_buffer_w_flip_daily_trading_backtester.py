@@ -1,8 +1,6 @@
 import pandas as pd
-import math
-from datetime import timedelta
 
-from logic_layer.base_class_daily_trading_backtester import BaseClassDailyTradingBacktester
+from logic_layer.trading_algos.base_class_daily_trading_backtester import BaseClassDailyTradingBacktester
 
 
 class NMinBufferWFlipDailyTradingBacktester(BaseClassDailyTradingBacktester):
@@ -10,57 +8,6 @@ class NMinBufferWFlipDailyTradingBacktester(BaseClassDailyTradingBacktester):
     _N_BUFFER=10
     def __init__(self):
         pass
-
-
-    def __append_position_row__(self,entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
-                           pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows):
-        # Add the closed LONG position
-        summary_rows.append({
-            'symbol': entry_symbol,
-            'open': entry_time,
-            'close': current_time,
-            'side': position_side,
-            'price_open': entry_price,
-            'price_close': current_price,
-            'unit_gross_profit': unit_gross_profit,
-            'total_gross_profit': total_gross_profit,
-            'total_net_profit': total_net_profit,
-            'portfolio_size': pos_size,
-            'pos_size': pos_size
-        })
-
-
-    def __close_final_position__(self,entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
-                           portf_size,net_commissions,summary_rows):
-
-        pos_size = int(portf_size / entry_price)
-        last_time = current_time
-        last_price = current_price
-
-        if position_side == self._LONG_POS:
-            unit_gross_profit = last_price - entry_price
-        else:
-            unit_gross_profit = entry_price - last_price
-        total_gross_profit = unit_gross_profit * pos_size
-        total_net_profit = total_gross_profit - net_commissions
-
-        self.__append_position_row__(entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
-                                     pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows)
-
-
-
-    def __close_position__(self,entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
-                           portf_size,net_commissions,summary_rows):
-
-        pos_size=int(portf_size/entry_price)
-        last_time = current_time
-        last_price = current_price
-        unit_gross_profit = last_price - entry_price
-        total_gross_profit = unit_gross_profit * pos_size
-        total_net_profit = total_gross_profit - net_commissions
-
-        self.__append_position_row__(entry_symbol, entry_time, position_side, current_time, current_price, entry_price,
-                                     pos_size, unit_gross_profit, total_gross_profit, total_net_profit, summary_rows)
 
     def __summarize_trading_positions__(self, result_df, portf_size, net_commissions, n_min):
         """
