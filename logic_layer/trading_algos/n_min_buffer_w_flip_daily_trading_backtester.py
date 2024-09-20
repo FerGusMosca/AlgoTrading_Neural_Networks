@@ -1,5 +1,6 @@
 import pandas as pd
 
+from business_entities.portf_position import PortfolioPosition
 from logic_layer.trading_algos.base_class_daily_trading_backtester import BaseClassDailyTradingBacktester
 
 
@@ -23,15 +24,9 @@ class NMinBufferWFlipDailyTradingBacktester(BaseClassDailyTradingBacktester):
         pd.DataFrame: DataFrame summarizing the trading positions with columns ['symbol', 'open', 'close', 'side', 'price_open', 'price_close', 'unit_gross_profit', 'total_gross_profit', 'total_net_profit', 'portfolio_size', 'pos_size']
         """
         # Initialize an empty list to store the rows of the trading summary
-        summary_rows = []
+        trading_summary_df =  self.__initialize_dataframe__()
 
-        position_open = False
-        position_side = None
-        entry_price = None
-        entry_time = None
-        entry_symbol = None
-        future_action=None
-        future_price=None
+        portf_pos = None
         future_time=None
 
         for index, row in result_df.iterrows():
@@ -43,7 +38,7 @@ class NMinBufferWFlipDailyTradingBacktester(BaseClassDailyTradingBacktester):
             # Debug print
             print(f"Processing row {index}: time={current_time}, action={current_action}, price={current_price}")
 
-            if not position_open:
+            if portf_pos is None:
                 if current_action in [self._LONG_POS, self._SHORT_POS]:
                     # Wait for n_min minutes from the first signal
                     if index + n_min < len(result_df):
@@ -52,42 +47,37 @@ class NMinBufferWFlipDailyTradingBacktester(BaseClassDailyTradingBacktester):
                         future_time =  pd.to_datetime( result_df.iloc[index + n_min]['formatted_date'])
                         if future_action == current_action:
                             # Open position
-                            position_open = True
-                            position_side = current_action
-                            entry_price = future_price
-                            entry_time = future_time
-                            entry_symbol = current_symbol
+                            portf_pos = PortfolioPosition(current_symbol)
+                            portf_pos.open_pos(current_action, future_time, future_price)
+                            trading_summary_df = self.__open_portf_position__(portf_pos, portf_size, trading_summary_df)
                             continue
 
-            elif position_open:
+            else: #Position Opened in t+10
 
                 if current_time <=future_time:
                     continue
 
-                if position_side == self._LONG_POS:
+                if portf_pos.side == self._LONG_POS:
                     if current_action == self._SHORT_POS or current_action == self._FLAT_POS:
+                        trading_summary_df = self.__close_portf_position__(portf_pos, current_time, current_price,
+                                                                           portf_size, net_commissions,
+                                                                           trading_summary_df)
+                        portf_pos = None
 
-                        self.__close_position__(entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
-                                                portf_size,net_commissions,summary_rows)
-                        current_action=self._FLAT_POS
-                        position_open = False
-
-                elif position_side == self._SHORT_POS:
+                elif portf_pos.side == self._SHORT_POS:
                     if current_action == self._LONG_POS or current_action == self._FLAT_POS:
-                        self.__close_position__(entry_symbol, entry_time, position_side, current_time, current_price,
-                                                entry_price,
-                                                portf_size, net_commissions, summary_rows)
-                        current_action = self._FLAT_POS
-                        position_open=False
+                        trading_summary_df = self.__close_portf_position__(portf_pos, current_time, current_price,
+                                                                           portf_size, net_commissions,
+                                                                           trading_summary_df)
+                        portf_pos = None
 
             # Handle closing positions at the end of the day
             if index == len(result_df) - 1:
-                if position_open:
-                    self.__close_final_position__(entry_symbol,entry_time, position_side, current_time, current_price, entry_price, portf_size, net_commissions, summary_rows)
-                    current_action = self._FLAT_POS
-                    position_open = False
-        # Convert the list of dictionaries to a DataFrame
-        trading_summary_df = pd.DataFrame(summary_rows)
+                if portf_pos is not None:
+                    trading_summary_df = self.__close_portf_position__(portf_pos, current_time, current_price,
+                                                                       portf_size, net_commissions,
+                                                                       trading_summary_df)
+                    portf_pos = None
 
         return trading_summary_df
 

@@ -10,6 +10,17 @@ class BaseClassDailyTradingBacktester:
     def __init__(self):
         pass
 
+
+    def __initialize_dataframe__(self):
+
+        # Initialize an empty list to store the rows of the trading summary
+        trading_summary_df = pd.DataFrame(columns=[
+            'symbol', 'open', 'close', 'side', 'price_open', 'price_close', 'unit_gross_profit', 'total_gross_profit',
+            'total_net_profit', 'portfolio_size', 'pos_size'
+        ])
+
+        return  trading_summary_df
+
     def __append_position_row__(self,entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
                            pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows):
 

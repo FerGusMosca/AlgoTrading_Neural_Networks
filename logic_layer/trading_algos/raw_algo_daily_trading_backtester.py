@@ -26,10 +26,7 @@ class RawAlgoDailyTradingBacktester(BaseClassDailyTradingBacktester):
         """
 
         # Initialize an empty DataFrame to store the trading summary
-        trading_summary_df = pd.DataFrame(columns=[
-            'symbol', 'open', 'close', 'side', 'price_open', 'price_close', 'unit_gross_profit', 'total_gross_profit',
-            'total_net_profit', 'portfolio_size', 'pos_size'
-        ])
+        trading_summary_df = self.__initialize_dataframe__()
 
         # Variables to keep track of the open position
         portf_pos = None
