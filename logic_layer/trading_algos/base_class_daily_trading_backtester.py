@@ -92,7 +92,14 @@ class BaseClassDailyTradingBacktester:
         pos_size = int(portf_size / portf_pos.price_open)
         last_time = current_time
         last_price = current_price
-        unit_gross_profit = last_price - portf_pos.price_open
+
+        if portf_pos.side==self._LONG_POS:
+            unit_gross_profit = last_price - portf_pos.price_open
+        elif  portf_pos.side==self._SHORT_POS:
+            unit_gross_profit = portf_pos.price_open - last_price
+        else:
+            raise Exception(f"INVALID SIDE :{portf_pos.side}!! ")
+
         total_gross_profit = unit_gross_profit * pos_size
         total_net_profit = total_gross_profit - net_commissions
 

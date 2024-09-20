@@ -12,6 +12,7 @@ from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
 from logic_layer.convolutional_neural_netowrk import ConvolutionalNeuralNetwork
 from logic_layer.trading_algos.n_min_buffer_w_flip_daily_trading_backtester import NMinBufferWFlipDailyTradingBacktester
+from logic_layer.trading_algos.only_signal_n_min_plus_mov_avg import OnlySignalNMinMovAvgBacktester
 from logic_layer.trading_algos.raw_algo_daily_trading_backtester import RawAlgoDailyTradingBacktester
 from logic_layer.data_set_builder import DataSetBuilder
 from logic_layer.deep_neural_network import DeepNeuralNetwork
@@ -134,14 +135,18 @@ class AlgosOrchestationLogic:
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
         elif trading_algo==_TRADING_ALGO_N_MIN_BUFFER_W_FLIP:
 
-            print(rnn_predictions_df.iloc[139:146])
+
             daily_trading_backtester = NMinBufferWFlipDailyTradingBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
                 rnn_predictions_df, portf_size, trade_comm)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
         elif trading_algo==_TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG:
-            raise Exception(f"Implement trading algo: {_TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG}")
+            daily_trading_backtester = OnlySignalNMinMovAvgBacktester()
+            daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
+                rnn_predictions_df, portf_size, trade_comm)
+
+            return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
         else:
             raise Exception(f"NOT RECOGNIZED trading algo {trading_algo}")
 
