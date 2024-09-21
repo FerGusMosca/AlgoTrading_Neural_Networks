@@ -25,8 +25,8 @@ def show_commands():
     print("#10-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop]")
     print("#11-TrainLSTMWithGrouping [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [grouping_unit] [grouping_classif_criteria]")
 
-    print("#12-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo]")
-    print("#13-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [grouping_unit]")
+    print("#12-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
+    print("#13-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [grouping_unit] [algo_params*]")
 
     #TrainNeuralNetworkAlgo
     print("#n-Exit")
@@ -38,6 +38,21 @@ def count_params( param_list, exp_len):
 def params_validation(cmd, param_list, exp_len):
     if (len(param_list) != exp_len):
         raise Exception("Command {} expects {} parameters".format(cmd, exp_len))
+
+
+def __get_testing_params__(trading_algo,cmd_param_list,base_length=10):
+    n_params = []
+    if (trading_algo == AlgosOrchestationLogic._TRADING_ALGO_RAW_ALGO):
+        params_validation("TestDailyLSTM", cmd_param_list, base_length)
+    elif (trading_algo == AlgosOrchestationLogic._TRADING_ALGO_N_MIN_BUFFER_W_FLIP):
+        params_validation("TestDailyLSTM", cmd_param_list, base_length+1)
+        n_params.append(int(cmd_param_list[base_length]))
+    elif (trading_algo == AlgosOrchestationLogic._TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG):
+        params_validation("TestDailyLSTM", cmd_param_list, base_length+2)
+        n_params.append(int(cmd_param_list[base_length]))
+        n_params.append(int(cmd_param_list[base_length+1]))
+
+    return  n_params
 
 
 def process_traing_LSTM_cmd(cmd_param_list):
@@ -355,7 +370,7 @@ def process_train_LSTM(symbol, variables_csv, str_from, str_to, model_output, cl
 
 
 def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, model_to_use, portf_size, trade_comm,
-                            trading_algo,grouping_unit=None):
+                            trading_algo,grouping_unit=None,n_params=[]):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -369,13 +384,16 @@ def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, m
                                          None,
                                          logger)
 
-        dataMgm.process_test_daily_LSTM(symbol, variables_csv,
-                                        model_to_use.replace('"', ""),
-                                        DateHandler.convert_str_date(str_from, _DATE_FORMAT),
-                                        DateHandler.convert_str_date(str_to, _DATE_FORMAT),
-                                        int(timesteps), float(portf_size), float(trade_comm),
-                                        trading_algo,
-                                        int(grouping_unit) if grouping_unit is not None else None
+        dataMgm.process_test_daily_LSTM(symbol=symbol, variables_csv=variables_csv,
+                                        model_to_use=model_to_use.replace('"', ""),
+                                        d_from=DateHandler.convert_str_date(str_from, _DATE_FORMAT),
+                                        d_to=DateHandler.convert_str_date(str_to, _DATE_FORMAT),
+                                        timesteps=int(timesteps),
+                                        portf_size=float(portf_size),
+                                        trade_comm=float(trade_comm),
+                                        trading_algo=trading_algo,
+                                        grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
+                                        n_algo_params=n_params
 
                                         )
 
@@ -465,15 +483,18 @@ def process_commands(cmd):
         process_daily_candles_graph(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3],
                                     cmd_param_list[4])
     elif cmd_param_list[0] == "TestDailyLSTM":
-        params_validation("TestDailyLSTM", cmd_param_list, 10)
+
+        trading_algo = cmd_param_list[9]
+        n_params=__get_testing_params__(trading_algo,cmd_param_list,10)
         process_test_daily_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
                                 cmd_param_list[5], cmd_param_list[6], cmd_param_list[7], cmd_param_list[8]
-                                , cmd_param_list[9])
+                                , cmd_param_list[9],grouping_unit=None,n_params= n_params)
     elif cmd_param_list[0] == "TestDailyLSTMWithGrouping":
-        params_validation("TestDailyLSTMWithGrouping", cmd_param_list, 11)
+        trading_algo = cmd_param_list[9]
+        n_params = __get_testing_params__(trading_algo, cmd_param_list, 11)
         process_test_daily_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
                                 cmd_param_list[5], cmd_param_list[6], cmd_param_list[7], cmd_param_list[8],
-                                cmd_param_list[9],cmd_param_list[10])
+                                cmd_param_list[9],grouping_unit=cmd_param_list[10],n_params=n_params)
 
     #
 

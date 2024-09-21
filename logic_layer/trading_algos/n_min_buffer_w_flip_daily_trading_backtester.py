@@ -84,7 +84,10 @@ class NMinBufferWFlipDailyTradingBacktester(BaseClassDailyTradingBacktester):
 
     #region Public Methods
 
-    def backtest_daily_predictions(self,rnn_predictions_df,portf_size,trade_comm):
+    def backtest_daily_predictions(self,rnn_predictions_df,portf_size,trade_comm,n_algo_params):
+
+        if(len(n_algo_params)>0):
+            NMinBufferWFlipDailyTradingBacktester.N_BUFFER=int(n_algo_params[0])
 
         trading_summary_df = self.__summarize_trading_positions__(rnn_predictions_df, portf_size, trade_comm,
                                                                   self._N_BUFFER)

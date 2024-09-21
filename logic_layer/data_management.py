@@ -28,11 +28,12 @@ GO_FIRST = "GO_FIRST"
 GO_HIGHEST_COUNT = "GO_HIGHEST_COUNT"
 GO_FLAT_ON_DIFF = "GO_FLAT_ON_DIFF"
 
-_TRADING_ALGO_RAW_ALGO="RAW_ALGO"
-_TRADING_ALGO_N_MIN_BUFFER_W_FLIP="N_MIN_BUFFER_W_FLIP"
-_TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG="ONLY_SIGNAL_N_MIN_+_MOV_AVG"
+
 
 class AlgosOrchestationLogic:
+    _TRADING_ALGO_RAW_ALGO = "RAW_ALGO"
+    _TRADING_ALGO_N_MIN_BUFFER_W_FLIP = "N_MIN_BUFFER_W_FLIP"
+    _TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG = "ONLY_SIGNAL_N_MIN_+_MOV_AVG"
 
     def __init__(self,hist_data_conn_str,ml_reports_conn_str,p_classification_map_key,logger):
 
@@ -43,6 +44,19 @@ class AlgosOrchestationLogic:
         self.date_range_classif_mgr = DateRangeClassificationManager(ml_reports_conn_str)
 
         self.timestamp_range_classif_mgr=TimestampClassificationManager(ml_reports_conn_str)
+
+
+    @staticmethod
+    def _GET_TRADING_ALGO_RAW_ALGO():
+        return AlgosOrchestationLogic._TRADING_ALGO_RAW_ALGO
+
+    @staticmethod
+    def _GET_TRADING_ALGO_N_MIN_BUFFER_W_FLIP():
+        return AlgosOrchestationLogic._TRADING_ALGO_N_MIN_BUFFER_W_FLIP
+
+    @staticmethod
+    def _GET__TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG():
+        return AlgosOrchestationLogic._TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG
 
     def __classify_group__(self,classifications, grouping_classif_criteria):
         unique_classes = classifications.unique()
@@ -122,29 +136,29 @@ class AlgosOrchestationLogic:
         return final_grouped_df
 
 
-    def __backtest_strategy__(self,rnn_predictions_df,portf_size, trade_comm,trading_algo):
+    def __backtest_strategy__(self,rnn_predictions_df,portf_size, trade_comm,trading_algo,n_algo_params=[]):
 
 
         #print(f"{rnn_predictions_df.head()}")
 
-        if trading_algo==_TRADING_ALGO_RAW_ALGO:
+        if trading_algo==AlgosOrchestationLogic._GET_TRADING_ALGO_RAW_ALGO():
             daily_trading_backtester = RawAlgoDailyTradingBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
-                                                                                            rnn_predictions_df, portf_size, trade_comm)
+                                                                                            rnn_predictions_df, portf_size, trade_comm,n_algo_params)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
-        elif trading_algo==_TRADING_ALGO_N_MIN_BUFFER_W_FLIP:
+        elif trading_algo==AlgosOrchestationLogic._GET_TRADING_ALGO_N_MIN_BUFFER_W_FLIP():
 
 
             daily_trading_backtester = NMinBufferWFlipDailyTradingBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
-                rnn_predictions_df, portf_size, trade_comm)
+                rnn_predictions_df, portf_size, trade_comm,n_algo_params)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
-        elif trading_algo==_TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG:
+        elif trading_algo==AlgosOrchestationLogic._GET__TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG():
             daily_trading_backtester = OnlySignalNMinMovAvgBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
-                rnn_predictions_df, portf_size, trade_comm)
+                rnn_predictions_df, portf_size, trade_comm,n_algo_params)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
         else:
@@ -435,7 +449,7 @@ class AlgosOrchestationLogic:
 
 
     def process_test_daily_LSTM(self,symbol,variables_csv, model_to_use, d_from,d_to,timesteps,portf_size, trade_comm,
-                                trading_algo,grouping_unit=None):
+                                trading_algo,grouping_unit=None,n_algo_params=[]):
         try:
 
             self.logger.do_log(f"Initializing backest for symbol {symbol} from {d_from} to {d_to} (porft_size={portf_size} comm={trade_comm} )", MessageType.INFO)
@@ -484,7 +498,7 @@ class AlgosOrchestationLogic:
 
                 rnn_predictions_df=rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df, model_to_use, timesteps)
 
-                daily_net_profit, total_positions, max_daily_cum_drawdown,trading_summary_df= self.__backtest_strategy__(rnn_predictions_df, portf_size, trade_comm,trading_algo)
+                daily_net_profit, total_positions, max_daily_cum_drawdown,trading_summary_df= self.__backtest_strategy__(rnn_predictions_df, portf_size, trade_comm,trading_algo,n_algo_params)
                 max_cum_drawdowns.append(max_daily_cum_drawdown)
                 daily_profits.append(daily_net_profit)
                 total_net_profit+=daily_net_profit

@@ -68,7 +68,7 @@ class RawAlgoDailyTradingBacktester(BaseClassDailyTradingBacktester):
 
     #region Public Methods
 
-    def backtest_daily_predictions(self,rnn_predictions_df,portf_size,trade_comm):
+    def backtest_daily_predictions(self,rnn_predictions_df,portf_size,trade_comm,n_algo_params=None):
 
         trading_summary_df = self.__summarize_trading_positions__(rnn_predictions_df, portf_size, trade_comm)
 

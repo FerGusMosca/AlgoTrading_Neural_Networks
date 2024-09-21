@@ -123,7 +123,11 @@ class OnlySignalNMinMovAvgBacktester(BaseClassDailyTradingBacktester):
 
 
 
-    def backtest_daily_predictions(self,rnn_predictions_df,portf_size,trade_comm):
+    def backtest_daily_predictions(self,rnn_predictions_df,portf_size,trade_comm,n_algo_params):
+
+        if(len(n_algo_params)==2):
+            OnlySignalNMinMovAvgBacktester.N_BUFFER=int(n_algo_params[0])
+            OnlySignalNMinMovAvgBacktester._N_MOV_AVG = int(n_algo_params[1])
 
         trading_summary_df = self.__summarize_trading_positions__(rnn_predictions_df, portf_size, trade_comm,
                                                                   self._N_BUFFER,self._N_MOV_AVG )
