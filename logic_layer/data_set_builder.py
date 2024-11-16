@@ -156,13 +156,17 @@ class DataSetBuilder():
         # Return the final merged dataframe
         return merged_df
 
-    def build_minute_series(self,series_csv,d_from,d_to, output_col=None):
+    def build_minute_series(self,series_csv,d_from,d_to,interval=None, output_col=None):
+
+        if interval is None:
+            interval = DataSetBuilder._1_MIN_INTERVAL
+
         series_list = series_csv.split(",")
 
         series_data_dict = {}
 
         for serieID in series_list:
-            economic_values = self.economic_series_mgr.get_economic_values(serieID, DataSetBuilder._1_MIN_INTERVAL,
+            economic_values = self.economic_series_mgr.get_economic_values(serieID, interval,
                                                                            d_from, d_to)
             if len(economic_values) == 0:
                 return None #maybe we are in a holiday

@@ -6,6 +6,8 @@ from logic_layer.data_management import AlgosOrchestationLogic
 from IPython.display import display
 import pandas as pd
 
+from logic_layer.data_set_builder import DataSetBuilder
+
 _DATE_FORMAT = "%m/%d/%Y"
 
 last_trading_dict = None
@@ -56,13 +58,22 @@ def __get_testing_params__(trading_algo,cmd_param_list,base_length=10):
 
 
 def process_traing_LSTM_cmd(cmd_param_list):
-    if count_params(cmd_param_list, 15):
+    if count_params(cmd_param_list, 16):
+
+        params_validation("TrainLSTM", cmd_param_list, 16)
+        process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
+                           cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
+                           cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
+                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13], cmd_param_list[14]
+                           , interval= cmd_param_list[15])
+    elif count_params(cmd_param_list, 15):
 
         params_validation("TrainLSTM", cmd_param_list, 15)
         process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
                            cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
                            cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
-                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13], cmd_param_list[14])
+                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13], cmd_param_list[14]
+                           , interval= None)#will use default
     elif count_params(cmd_param_list, 19):  # group_as_mov_avg + grouping_mov_avg_unit
         params_validation("TrainLSTM", cmd_param_list, 19)
         process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
@@ -335,7 +346,7 @@ def process_train_neural_network_algo(symbol, variables_csv, str_from, str_to, d
 def process_train_LSTM(symbol, variables_csv, str_from, str_to, model_output, classification_key,
                        epochs, timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate,
                        accuracy_stop,grouping_unit=None,grouping_classif_criteria=None,
-                       group_as_mov_avg=False,grouping_mov_avg_unit=100):
+                       group_as_mov_avg=False,grouping_mov_avg_unit=100,interval=None):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -355,11 +366,16 @@ def process_train_LSTM(symbol, variables_csv, str_from, str_to, model_output, cl
                                    model_output.replace('"', ""),
                                    classification_key, int(epochs), int(timestamps),
                                    int(n_neurons), float(learning_rate),
-                                   float(reg_rate), float(dropout_rate),float(clipping_rate),
-                                   float(accuracy_stop),
-                                   int(grouping_unit) if grouping_unit is not None else None,
-                                   grouping_classif_criteria,
-                                   bool(group_as_mov_avg),int(grouping_mov_avg_unit))
+                                   float(reg_rate), float(dropout_rate),
+                                   interval=interval.replace('_', " ") if interval is not None else None,
+                                   clipping_rate= float(clipping_rate),
+                                   accuracy_stop= float(accuracy_stop),
+
+                                   grouping_unit= int(grouping_unit) if grouping_unit is not None else None,
+                                   grouping_classif_criteria= grouping_classif_criteria,
+                                   group_as_mov_avg= bool(group_as_mov_avg),
+                                   grouping_mov_avg_unit= int(grouping_mov_avg_unit)
+                                   )
 
         # TODO ---> print backtesting output
         logger.print("Model successfully trained for symbol {} and variables {}".format(symbol, variables_csv),
@@ -370,7 +386,7 @@ def process_train_LSTM(symbol, variables_csv, str_from, str_to, model_output, cl
 
 
 def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, model_to_use, portf_size, trade_comm,
-                            trading_algo,grouping_unit=None,n_params=[]):
+                            trading_algo,grouping_unit=None,n_params=[],interval=None):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -383,19 +399,36 @@ def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, m
         dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
                                          None,
                                          logger)
+        interval=interval.replace('_', " ")
+        if (interval== DataSetBuilder._1_MIN_INTERVAL or interval is None):
+            dataMgm.process_test_daily_LSTM(symbol=symbol, variables_csv=variables_csv,
+                                            model_to_use=model_to_use.replace('"', ""),
+                                            d_from=DateHandler.convert_str_date(str_from, _DATE_FORMAT),
+                                            d_to=DateHandler.convert_str_date(str_to, _DATE_FORMAT),
+                                            timesteps=int(timesteps),
+                                            portf_size=float(portf_size),
+                                            trade_comm=float(trade_comm),
+                                            trading_algo=trading_algo,
+                                            grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
+                                            n_algo_params=n_params,
+                                            interval=interval if interval is not None else None
+                                            )
+        elif interval==DataSetBuilder._1_DAY_INTERVAL:
+            dataMgm.process_test_scalping_LSTM(symbol=symbol, variables_csv=variables_csv,
+                                            model_to_use=model_to_use.replace('"', ""),
+                                            d_from=DateHandler.convert_str_date(str_from, _DATE_FORMAT),
+                                            d_to=DateHandler.convert_str_date(str_to, _DATE_FORMAT),
+                                            timesteps=int(timesteps),
+                                            portf_size=float(portf_size),
+                                            trade_comm=float(trade_comm),
+                                            trading_algo=trading_algo,
+                                            grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
+                                            n_algo_params=n_params,
+                                            interval=interval if interval is not None else None
+                                            )
+        else:
+            raise Exception(f"Unknown interval! : {interval}")
 
-        dataMgm.process_test_daily_LSTM(symbol=symbol, variables_csv=variables_csv,
-                                        model_to_use=model_to_use.replace('"', ""),
-                                        d_from=DateHandler.convert_str_date(str_from, _DATE_FORMAT),
-                                        d_to=DateHandler.convert_str_date(str_to, _DATE_FORMAT),
-                                        timesteps=int(timesteps),
-                                        portf_size=float(portf_size),
-                                        trade_comm=float(trade_comm),
-                                        trading_algo=trading_algo,
-                                        grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
-                                        n_algo_params=n_params
-
-                                        )
 
         logger.print(
             "Displaying predictions for LSTM model: symbol {} and model {} on {}".format(symbol, model_to_use, str_from),
@@ -484,11 +517,14 @@ def process_commands(cmd):
                                     cmd_param_list[4])
     elif cmd_param_list[0] == "TestDailyLSTM":
 
-        trading_algo = cmd_param_list[9]
-        n_params=__get_testing_params__(trading_algo,cmd_param_list,10)
-        process_test_daily_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                                cmd_param_list[5], cmd_param_list[6], cmd_param_list[7], cmd_param_list[8]
-                                , cmd_param_list[9],grouping_unit=None,n_params= n_params)
+        trading_algo = cmd_param_list[10]
+        n_params=__get_testing_params__(trading_algo,cmd_param_list,11)
+        process_test_daily_LSTM(symbol= cmd_param_list[1],variables_csv= cmd_param_list[2],
+                                str_from=cmd_param_list[3], str_to= cmd_param_list[4],
+                                timesteps= cmd_param_list[5], model_to_use= cmd_param_list[6],
+                                portf_size= cmd_param_list[7], trade_comm= cmd_param_list[8],
+                                trading_algo=trading_algo,
+                                interval  =cmd_param_list[9],grouping_unit=None,n_params= n_params)
     elif cmd_param_list[0] == "TestDailyLSTMWithGrouping":
         trading_algo = cmd_param_list[9]
         n_params = __get_testing_params__(trading_algo, cmd_param_list, 11)

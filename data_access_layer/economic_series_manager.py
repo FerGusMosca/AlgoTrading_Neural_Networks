@@ -1,3 +1,5 @@
+import math
+
 import pyodbc
 
 from business_entities.economic_value import EconomicValue
@@ -33,6 +35,18 @@ class EconomicSeriesManager:
         econ_val.nominal_volume = float(row[_NOMINAL_VOLUME_IDX]) if row[_NOMINAL_VOLUME_IDX] is not None else None
         return econ_val
 
+    def build_empty_economic_value(self, symbol,interval, dfrom, dto):
+        econ_val = EconomicValue(p_symbol=symbol,p_interval=interval,p_date= dfrom)
+
+        econ_val.open= math.nan
+        econ_val.high = math.nan
+        econ_val.low = math.nan
+        econ_val.close = math.nan
+        econ_val.trade = math.nan
+        econ_val.cash_volume =math.nan
+        econ_val.nominal_volume = math.nan
+        return econ_val
+
 
     def get_economic_values(self,symbol,interval, dfrom, dto):
         economic_values=[]
@@ -40,10 +54,14 @@ class EconomicSeriesManager:
             params = (symbol,interval,dfrom,dto)
             cursor.execute("{CALL GetCandles (?,?,?,?)}", params)
 
+            found=False
             for row in cursor:
+                found=True
                 economic_value=None
                 economic_value=self.build_economic_value(row)
                 economic_values.append(economic_value)
-
+            if not found:
+                economic_value = self.build_empty_economic_value(symbol,interval, dfrom, dto)
+                economic_values.append(economic_value)
 
         return economic_values

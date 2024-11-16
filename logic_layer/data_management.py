@@ -1,6 +1,7 @@
 import traceback
 from datetime import timedelta, datetime
 
+from common.util.dataframe_filler import DataframeFiller
 from common.util.dataframe_printer import DataframePrinter
 from common.util.graph_builder import GraphBuilder
 from common.util.image_handler import ImageHandler
@@ -136,7 +137,7 @@ class AlgosOrchestationLogic:
         return final_grouped_df
 
 
-    def __backtest_strategy__(self,rnn_predictions_df,portf_size, trade_comm,trading_algo,n_algo_params=[]):
+    def __backtest_daily_strategy__(self,rnn_predictions_df,portf_size, trade_comm,trading_algo,n_algo_params=[]):
 
 
         #print(f"{rnn_predictions_df.head()}")
@@ -446,10 +447,8 @@ class AlgosOrchestationLogic:
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
 
-
-
-    def process_test_daily_LSTM(self,symbol,variables_csv, model_to_use, d_from,d_to,timesteps,portf_size, trade_comm,
-                                trading_algo,grouping_unit=None,n_algo_params=[]):
+    def process_test_scalping_LSTM(self,symbol,variables_csv, model_to_use, d_from,d_to,timesteps,portf_size, trade_comm,
+                                trading_algo,interval=None,grouping_unit=None,n_algo_params=[]):
         try:
 
             self.logger.do_log(f"Initializing backest for symbol {symbol} from {d_from} to {d_to} (porft_size={portf_size} comm={trade_comm} )", MessageType.INFO)
@@ -466,30 +465,116 @@ class AlgosOrchestationLogic:
             accum_positions=0
 
             for day in business_days:
-                self.logger.do_log(
-                    f"Processing day {day}  )",
-                    MessageType.INFO)
+                self.logger.do_log(f"Processing day {day}  )",MessageType.INFO)
 
-                start_timestamp=day
-                end_timestamp= start_timestamp + timedelta(hours=23, minutes=59, seconds=59)
 
-                symbol_min_series_df = self.data_set_builder.build_minute_series(symbol,
-                                                                                 start_timestamp, end_timestamp,
+                start_day_timestamp=day
+                start_period = day  + pd.offsets.BDay(-1* (timesteps+2))#we go back <timesteps> business days in time
+                start_period_all_ind = start_period - timedelta(days=60)
+                end_period= start_day_timestamp + timedelta(hours=23, minutes=59, seconds=59)
+
+                symbol_int_series_df = self.data_set_builder.build_minute_series(symbol,
+                                                                                 start_period_all_ind, end_period,
                                                                                  output_col=["symbol", "date", "open",
-                                                                                             "high", "low", "close"])
+                                                                                             "high", "low", "close"],
+                                                                                 interval=interval)
 
-                if symbol_min_series_df is None:
+                if symbol_int_series_df is None:
                     self.logger.do_log(f"Skipping day {day} because missing values (probable holiday!)",MessageType.WARNING)
                     continue
 
 
-                variables_min_series_df = self.data_set_builder.build_minute_series(variables_csv, start_timestamp, end_timestamp,
+                variables_int_series_df = self.data_set_builder.build_minute_series(variables_csv, start_period_all_ind, end_period,
                                                                                     output_col=["symbol", "date", "open",
-                                                                                                "high", "low", "close"])
+                                                                                                "high", "low", "close"],
+                                                                                    interval=interval)
 
-                test_series_df = self.data_set_builder.merge_minute_series(symbol_min_series_df,
-                                                                           variables_min_series_df, "symbol", "date",
+                test_series_df = self.data_set_builder.merge_minute_series(symbol_int_series_df,
+                                                                           variables_int_series_df, "symbol", "date",
                                                                            symbol)
+
+                test_series_df = DataframeFiller.fill_missing_values(test_series_df)#We fill missing values with the last one
+
+                if grouping_unit is not None:
+                    test_series_df = self.__group_dataframe__(test_series_df, grouping_unit,variables_csv)
+                    print((test_series_df.head()))
+
+                #we filter the unecessary in all record to fetch all the indicators
+                test_series_df = test_series_df[test_series_df['date'] >= start_period ]
+
+
+                rnn_predictions_df=rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df, model_to_use, timesteps)
+
+                daily_net_profit, total_positions, max_daily_cum_drawdown,trading_summary_df= self.__backtest_daily_strategy__(
+                    rnn_predictions_df, portf_size, trade_comm, trading_algo, n_algo_params)
+                max_cum_drawdowns.append(max_daily_cum_drawdown)
+                daily_profits.append(daily_net_profit)
+                total_net_profit+=daily_net_profit
+                accum_positions+=total_positions
+
+                self.logger.do_log(f"Results for day {day}: Net_Profit=${daily_net_profit:.2f} (total positions={total_positions})", MessageType.INFO)
+                self.logger.do_log("---Summarizing trades---",MessageType.INFO)
+                for index, row in trading_summary_df[trading_summary_df['total_net_profit'].notnull()].iterrows():
+                    self.logger.do_log(f" Pos: {row['side']} --> open_time={row['open']} close_time={row['close']} open_price=${row['price_open']:.2f} close_price=${row['price_close']:.2f} --> net_profit=${row['total_net_profit']}",MessageType.INFO)
+                self.logger.do_log("--------------------",MessageType.INFO)
+
+
+            max_daily_drawdown=min(max_cum_drawdowns) if len(max_cum_drawdowns) is None else 0
+            max_total_drawdown= self.__calculate_max_total_drawdown__(daily_profits)
+            self.logger.do_log(f"---Summarizing PORTFOLIO PERFORMANCE---",MessageType.INFO)
+            self.logger.do_log(f" Total Net_Profit=${total_net_profit:.2f} Accum. Positions={accum_positions} Max. Daily Drawdown=${max_daily_drawdown:.2f} Max. Period Drawdown=${max_total_drawdown:.2f}", MessageType.INFO)
+
+        except Exception as e:
+            msg = "CRITICAL ERROR processing model @process_test_daily_LSTM:{}".format(str(e))
+            traceback.print_exc()
+            self.logger.do_log(msg, MessageType.ERROR)
+            raise Exception(msg)
+
+    def process_test_daily_LSTM(self,symbol,variables_csv, model_to_use, d_from,d_to,timesteps,portf_size, trade_comm,
+                                trading_algo,interval=None,grouping_unit=None,n_algo_params=[]):
+        try:
+
+            self.logger.do_log(f"Initializing backest for symbol {symbol} from {d_from} to {d_to} (porft_size={portf_size} comm={trade_comm} )", MessageType.INFO)
+            # Generate a date range between d_from and d_to
+            all_days = pd.date_range(start=d_from, end=d_to)
+
+            # Filter out weekends (Saturday = 5, Sunday = 6)
+            business_days = [day for day in all_days if day.weekday() < 5]
+            rnn_model_processer = DayTradingRNNModelCreator()
+
+            max_cum_drawdowns=[]
+            daily_profits=[]
+            total_net_profit=0
+            accum_positions=0
+
+            for day in business_days:
+                self.logger.do_log(f"Processing day {day}  )",MessageType.INFO)
+
+                start_timestamp=day
+                end_timestamp= start_timestamp + timedelta(hours=23, minutes=59, seconds=59)
+
+                symbol_int_series_df = self.data_set_builder.build_minute_series(symbol,
+                                                                                 start_timestamp, end_timestamp,
+                                                                                 output_col=["symbol", "date", "open",
+                                                                                             "high", "low", "close"],
+                                                                                 interval=interval)
+
+                if symbol_int_series_df is None:
+                    self.logger.do_log(f"Skipping day {day} because missing values (probable holiday!)",MessageType.WARNING)
+                    continue
+
+
+                variables_int_series_df = self.data_set_builder.build_minute_series(variables_csv, start_timestamp, end_timestamp,
+                                                                                    output_col=["symbol", "date", "open",
+                                                                                                "high", "low", "close"],
+                                                                                    interval=interval)
+
+                test_series_df = self.data_set_builder.merge_minute_series(symbol_int_series_df,
+                                                                           variables_int_series_df, "symbol", "date",
+                                                                           symbol)
+
+                if(test_series_df[symbol].isna().any()):
+                    continue # must be a holiday
 
                 if grouping_unit is not None:
                     test_series_df = self.__group_dataframe__(test_series_df, grouping_unit,variables_csv)
@@ -498,7 +583,8 @@ class AlgosOrchestationLogic:
 
                 rnn_predictions_df=rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df, model_to_use, timesteps)
 
-                daily_net_profit, total_positions, max_daily_cum_drawdown,trading_summary_df= self.__backtest_strategy__(rnn_predictions_df, portf_size, trade_comm,trading_algo,n_algo_params)
+                daily_net_profit, total_positions, max_daily_cum_drawdown,trading_summary_df= self.__backtest_daily_strategy__(
+                    rnn_predictions_df, portf_size, trade_comm, trading_algo, n_algo_params)
                 max_cum_drawdowns.append(max_daily_cum_drawdown)
                 daily_profits.append(daily_net_profit)
                 total_net_profit+=daily_net_profit
@@ -524,19 +610,19 @@ class AlgosOrchestationLogic:
 
     def process_train_LSTM(self,symbol,variables_csv,d_from,d_to,model_output,classif_key,
                            epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate,
-                           clipping_rate=None,accuracy_stop=None,grouping_unit=None,
+                           interval=DataSetBuilder._1_MIN_INTERVAL,clipping_rate=None,accuracy_stop=None,grouping_unit=None,
                            grouping_classif_criteria=None,
                            group_as_mov_avg=False,grouping_mov_avg_unit=20):
         try:
             timestamp_range_clasifs=self.timestamp_range_classif_mgr.get_timestamp_range_classification_values(classif_key,d_from,d_to)
 
-            symbol_min_series_df= self.data_set_builder.build_minute_series(symbol, d_from, d_to, output_col=["symbol", "date", "open", "high", "low", "close"])
+            symbol_min_series_df= self.data_set_builder.build_minute_series(symbol, d_from, d_to, output_col=["symbol", "date", "open", "high", "low", "close"],interval=interval)
             symbol_min_series_df = self.data_set_builder.build_minute_series_classification(timestamp_range_clasifs,
                                                                                             symbol_min_series_df,
                                                                                             classif_col_name=classif_key,
                                                                                             not_found_clasif="FLAT")
 
-            variables_min_series_df=self.data_set_builder.build_minute_series(variables_csv, d_from, d_to, output_col=["symbol", "date", "open", "high", "low", "close"])
+            variables_min_series_df=self.data_set_builder.build_minute_series(variables_csv, d_from, d_to, output_col=["symbol", "date", "open", "high", "low", "close"],interval=interval)
 
             training_series_df= self.data_set_builder.merge_minute_series(symbol_min_series_df,variables_min_series_df,"symbol","date",symbol)
 
@@ -575,7 +661,7 @@ class AlgosOrchestationLogic:
         start_of_day = datetime(date.year, date.month, date.day)
         end_of_day = start_of_day + timedelta(hours=23, minutes=59, seconds=59)
 
-        prices_df= self.data_set_builder.build_minute_series(symbol,start_of_day,end_of_day)
+        prices_df= self.data_set_builder.build_minute_series(symbol,start_of_day,end_of_day,interval=DataSetBuilder._1_MIN_INTERVAL)
 
         GraphBuilder.build_candles_graph(prices_df,mov_avg_unit =mov_avg_unit)
 

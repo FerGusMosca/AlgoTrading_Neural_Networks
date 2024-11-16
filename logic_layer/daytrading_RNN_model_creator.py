@@ -12,6 +12,8 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
+from common.util.dataframe_filler import DataframeFiller
+
 _OUTPUT_DATE_FORMAT='%m/%d/%Y %H:%M:%S'
 
 
@@ -176,6 +178,7 @@ class DayTradingRNNModelCreator:
         safety_minutes (int): Number of time steps to look back in the time series.
         """
         try:
+            training_series_df = DataframeFiller.fill_missing_values(training_series_df)
 
             self.__preformat_training_set__(training_series_df)
             # Get training and test sets
