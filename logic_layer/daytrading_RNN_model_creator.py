@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import tensorflow
 from keras.src.callbacks import Callback
-from keras.src.layers import TimeDistributed
+from keras.src.layers import TimeDistributed, BatchNormalization
 from keras.src.optimizers import Adam
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
@@ -199,10 +199,12 @@ class DayTradingRNNModelCreator:
             # Define the LSTM model
             model = tensorflow.keras.models.Sequential()
             model.add(
-                LSTM(n_neurons, activation='relu', return_sequences=True, input_shape=(timesteps, X_train.shape[1])))
+                LSTM(n_neurons, activation='tanh', return_sequences=True, input_shape=(timesteps, X_train.shape[1])))
             model.add(Dropout(dropout_rate))  # Dropout layer with 20% dropout rate
-            model.add(LSTM(n_neurons, activation='relu'))  # Another LSTM layer without return_sequences
+            model.add(BatchNormalization())
+            model.add(LSTM(n_neurons, activation='tanh'))  # Another LSTM layer without return_sequences
             model.add(Dropout(dropout_rate))  # Dropout layer with 20% dropout rate
+            model.add(BatchNormalization())
             model.add(Dense(3, activation='softmax',
                             kernel_regularizer=tensorflow.keras.regularizers.l2(
                                 reg_rate)))  # Three classes: LONG, SHORT, FLAT

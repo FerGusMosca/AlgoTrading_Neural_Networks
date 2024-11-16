@@ -199,6 +199,10 @@ class BaseClassDailyTradingBacktester:
         current_drawdown = 0
 
         for profit in trading_summary_df['total_net_profit']:
+
+            if profit is None:
+                continue
+
             if profit < 0:
                 current_drawdown += profit
                 max_cum_drawdown = min(max_cum_drawdown, current_drawdown)

@@ -506,7 +506,7 @@ class AlgosOrchestationLogic:
 
                 self.logger.do_log(f"Results for day {day}: Net_Profit=${daily_net_profit:.2f} (total positions={total_positions})", MessageType.INFO)
                 self.logger.do_log("---Summarizing trades---",MessageType.INFO)
-                for index, row in trading_summary_df.iterrows():
+                for index, row in trading_summary_df[trading_summary_df['total_net_profit'].notnull()].iterrows():
                     self.logger.do_log(f" Pos: {row['side']} --> open_time={row['open']} close_time={row['close']} open_price=${row['price_open']:.2f} close_price=${row['price_close']:.2f} --> net_profit=${row['total_net_profit']}",MessageType.INFO)
                 self.logger.do_log("--------------------",MessageType.INFO)
 
@@ -518,6 +518,7 @@ class AlgosOrchestationLogic:
 
         except Exception as e:
             msg = "CRITICAL ERROR processing model @process_test_daily_LSTM:{}".format(str(e))
+            traceback.print_exc()
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
 
