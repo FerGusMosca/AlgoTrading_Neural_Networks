@@ -142,7 +142,7 @@ class DataSetBuilder():
         variables_pivot_df = variables_pivot_df.rename_axis(None, axis=1).reset_index()
 
         # Step 3: Merge symbol_min_series_df with variables_pivot_df using 'date_col' as the key
-        merged_df = pd.merge(symbol_min_series_df, variables_pivot_df, on=date_col, how='left')
+        merged_df = pd.merge(symbol_min_series_df, variables_pivot_df, on=date_col, how='outer')
 
         # Step 4: Rename columns of symbol_min_series_df in the merged dataframe
         merged_df = merged_df.rename(columns={
@@ -166,8 +166,7 @@ class DataSetBuilder():
         series_data_dict = {}
 
         for serieID in series_list:
-            economic_values = self.economic_series_mgr.get_economic_values(serieID, interval,
-                                                                           d_from, d_to)
+            economic_values = self.economic_series_mgr.get_economic_values(serieID,interval,d_from, d_to)
             if len(economic_values) == 0:
                 return None #maybe we are in a holiday
 

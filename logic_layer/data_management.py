@@ -136,7 +136,34 @@ class AlgosOrchestationLogic:
 
         return final_grouped_df
 
+    def __log_day_trading_results__(self,day,daily_net_profit,total_positions,trading_summary_df):
+        self.logger.do_log(
+            f"Results for day {day}: Net_Profit=${daily_net_profit:.2f} (total positions={total_positions})",
+            MessageType.INFO)
+        self.logger.do_log("---Summarizing trades---", MessageType.INFO)
+        for index, row in trading_summary_df[trading_summary_df['total_net_profit'].notnull()].iterrows():
+            self.logger.do_log(
+                f" Pos: {row['side']} --> open_time={row['open']} close_time={row['close']} open_price=${row['price_open']:.2f} close_price=${row['price_close']:.2f} --> net_profit=${row['total_net_profit']}",
+                MessageType.INFO)
+        self.logger.do_log("--------------------", MessageType.INFO)
 
+    def __backtest_scalping_strategy__(self,rnn_predictions_df,portf_size, trade_comm,trading_algo,n_algo_params=[]):
+
+
+        #print(f"{rnn_predictions_df.head()}")
+
+        if trading_algo==AlgosOrchestationLogic._GET_TRADING_ALGO_RAW_ALGO():
+            daily_trading_backtester = RawAlgoDailyTradingBacktester()
+            daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
+                                                                                            rnn_predictions_df, portf_size, trade_comm,n_algo_params)
+
+            return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
+        elif trading_algo==AlgosOrchestationLogic._GET_TRADING_ALGO_N_MIN_BUFFER_W_FLIP():
+            raise Exception(f'Not implemented algo')
+        elif trading_algo==AlgosOrchestationLogic._GET__TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG():
+            raise Exception(f'Not implemented algo')
+        else:
+            raise Exception(f"NOT RECOGNIZED trading algo {trading_algo}")
     def __backtest_daily_strategy__(self,rnn_predictions_df,portf_size, trade_comm,trading_algo,n_algo_params=[]):
 
 
@@ -463,10 +490,10 @@ class AlgosOrchestationLogic:
             daily_profits=[]
             total_net_profit=0
             accum_positions=0
+            rnn_predictions_df=None
 
             for day in business_days:
                 self.logger.do_log(f"Processing day {day}  )",MessageType.INFO)
-
 
                 start_day_timestamp=day
                 start_period = day  + pd.offsets.BDay(-1* (timesteps+2))#we go back <timesteps> business days in time
@@ -502,25 +529,15 @@ class AlgosOrchestationLogic:
                 #we filter the unecessary in all record to fetch all the indicators
                 test_series_df = test_series_df[test_series_df['date'] >= start_period ]
 
+                rnn_predictions_df_today = rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df,
+                                                                                    model_to_use, timesteps)
+                if rnn_predictions_df is None:
+                    rnn_predictions_df = pd.DataFrame(columns=rnn_predictions_df_today.columns).astype(rnn_predictions_df_today.dtypes)
+                rnn_predictions_df_today = rnn_predictions_df_today[rnn_predictions_df_today['date'] == day]
+                rnn_predictions_df = pd.concat([rnn_predictions_df, rnn_predictions_df_today], ignore_index=True)
 
-                rnn_predictions_df=rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df, model_to_use, timesteps)
+            #TODO Run backtests and evaluate performance
 
-                daily_net_profit, total_positions, max_daily_cum_drawdown,trading_summary_df= self.__backtest_daily_strategy__(
-                    rnn_predictions_df, portf_size, trade_comm, trading_algo, n_algo_params)
-                max_cum_drawdowns.append(max_daily_cum_drawdown)
-                daily_profits.append(daily_net_profit)
-                total_net_profit+=daily_net_profit
-                accum_positions+=total_positions
-
-                self.logger.do_log(f"Results for day {day}: Net_Profit=${daily_net_profit:.2f} (total positions={total_positions})", MessageType.INFO)
-                self.logger.do_log("---Summarizing trades---",MessageType.INFO)
-                for index, row in trading_summary_df[trading_summary_df['total_net_profit'].notnull()].iterrows():
-                    self.logger.do_log(f" Pos: {row['side']} --> open_time={row['open']} close_time={row['close']} open_price=${row['price_open']:.2f} close_price=${row['price_close']:.2f} --> net_profit=${row['total_net_profit']}",MessageType.INFO)
-                self.logger.do_log("--------------------",MessageType.INFO)
-
-
-            max_daily_drawdown=min(max_cum_drawdowns) if len(max_cum_drawdowns) is None else 0
-            max_total_drawdown= self.__calculate_max_total_drawdown__(daily_profits)
             self.logger.do_log(f"---Summarizing PORTFOLIO PERFORMANCE---",MessageType.INFO)
             self.logger.do_log(f" Total Net_Profit=${total_net_profit:.2f} Accum. Positions={accum_positions} Max. Daily Drawdown=${max_daily_drawdown:.2f} Max. Period Drawdown=${max_total_drawdown:.2f}", MessageType.INFO)
 
@@ -546,6 +563,7 @@ class AlgosOrchestationLogic:
             daily_profits=[]
             total_net_profit=0
             accum_positions=0
+            rnn_predictions_df=None
 
             for day in business_days:
                 self.logger.do_log(f"Processing day {day}  )",MessageType.INFO)
@@ -580,21 +598,16 @@ class AlgosOrchestationLogic:
                     test_series_df = self.__group_dataframe__(test_series_df, grouping_unit,variables_csv)
                     print((test_series_df.head()))
 
+                rnn_predictions_df = rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df, model_to_use,
+                                                                              timesteps)
 
-                rnn_predictions_df=rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df, model_to_use, timesteps)
-
-                daily_net_profit, total_positions, max_daily_cum_drawdown,trading_summary_df= self.__backtest_daily_strategy__(
+                daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = self.__backtest_daily_strategy__(
                     rnn_predictions_df, portf_size, trade_comm, trading_algo, n_algo_params)
                 max_cum_drawdowns.append(max_daily_cum_drawdown)
                 daily_profits.append(daily_net_profit)
-                total_net_profit+=daily_net_profit
-                accum_positions+=total_positions
-
-                self.logger.do_log(f"Results for day {day}: Net_Profit=${daily_net_profit:.2f} (total positions={total_positions})", MessageType.INFO)
-                self.logger.do_log("---Summarizing trades---",MessageType.INFO)
-                for index, row in trading_summary_df[trading_summary_df['total_net_profit'].notnull()].iterrows():
-                    self.logger.do_log(f" Pos: {row['side']} --> open_time={row['open']} close_time={row['close']} open_price=${row['price_open']:.2f} close_price=${row['price_close']:.2f} --> net_profit=${row['total_net_profit']}",MessageType.INFO)
-                self.logger.do_log("--------------------",MessageType.INFO)
+                total_net_profit += daily_net_profit
+                accum_positions += total_positions
+                self.__log_day_trading_results__(day, daily_net_profit, total_positions, trading_summary_df)
 
 
             max_daily_drawdown=min(max_cum_drawdowns) if len(max_cum_drawdowns) is None else 0
@@ -614,10 +627,19 @@ class AlgosOrchestationLogic:
                            grouping_classif_criteria=None,
                            group_as_mov_avg=False,grouping_mov_avg_unit=20):
         try:
-            timestamp_range_clasifs=self.timestamp_range_classif_mgr.get_timestamp_range_classification_values(classif_key,d_from,d_to)
+
+            range_clasifs=None
+            if interval==DataSetBuilder._1_MIN_INTERVAL:
+                range_clasifs=self.timestamp_range_classif_mgr.get_timestamp_range_classification_values(classif_key, d_from, d_to)
+            elif interval==DataSetBuilder._1_DAY_INTERVAL:
+                range_clasifs = self.date_range_classif_mgr.get_date_range_classification_values(
+                    classif_key, d_from, d_to)
+            else:
+                raise Exception(f'Invalid interval at process_train_LSTM:{interval}')
+
 
             symbol_min_series_df= self.data_set_builder.build_minute_series(symbol, d_from, d_to, output_col=["symbol", "date", "open", "high", "low", "close"],interval=interval)
-            symbol_min_series_df = self.data_set_builder.build_minute_series_classification(timestamp_range_clasifs,
+            symbol_min_series_df = self.data_set_builder.build_minute_series_classification(range_clasifs,
                                                                                             symbol_min_series_df,
                                                                                             classif_col_name=classif_key,
                                                                                             not_found_clasif="FLAT")
