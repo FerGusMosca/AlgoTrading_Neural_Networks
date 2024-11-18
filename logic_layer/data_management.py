@@ -540,6 +540,8 @@ class AlgosOrchestationLogic:
                 rnn_predictions_df = pd.concat([rnn_predictions_df, rnn_predictions_df_today], ignore_index=True)
 
             #TODO Run backtests and evaluate performance
+            max_daily_drawdown=0
+            max_total_drawdown=0
 
             self.logger.do_log(f"---Summarizing PORTFOLIO PERFORMANCE---",MessageType.INFO)
             self.logger.do_log(f" Total Net_Profit=${total_net_profit:.2f} Accum. Positions={accum_positions} Max. Daily Drawdown=${max_daily_drawdown:.2f} Max. Period Drawdown=${max_total_drawdown:.2f}", MessageType.INFO)

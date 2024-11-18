@@ -109,6 +109,37 @@ def __get_testing_params__(trading_algo,cmd_param_list,base_length=10):
 
     return  n_params
 
+def process_test_LSTM_cmd(cmd):
+    symbol = __get_param__(cmd, "symbol")
+    variables_csv = __get_param__(cmd, "variables_csv")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    timesteps=__get_param__(cmd,"timesteps")
+    model_to_use = __get_param__(cmd, "model_to_use")
+    portf_size=__get_param__(cmd,"portf_size")
+    comm=__get_param__(cmd,"comm")
+    interval=__get_param__(cmd,"interval",True,None)
+    trading_algo=__get_param__(cmd,"trading_algo")
+    grouping_unit=__get_param__(cmd,"grouping_unit",True,None)
+    n_buffer=__get_param__(cmd,"n_buffer",True,None)
+    mov_avg=__get_param__(cmd,"mov_avg",True,None)
+
+    cmd_param_list=[]
+    if n_buffer is not None:
+        cmd_param_list.append(n_buffer)
+
+    if mov_avg is not None:
+        cmd_param_list.append(mov_avg)
+
+
+    process_test_daily_LSTM(symbol=symbol, variables_csv=variables_csv, d_from=d_from, d_to=d_to,
+                            timesteps=timesteps,model_to_use=model_to_use, portf_size=portf_size,
+                            trade_comm=comm, trading_algo=trading_algo,interval=interval,
+                            grouping_unit=grouping_unit,n_params=cmd_param_list)
+
+    print(f"Test LSTM successfully finished...")
+
+
 
 def process_traing_LSTM_cmd(cmd,cmd_param_list):
     symbol = __get_param__(cmd, "symbol")
@@ -440,13 +471,13 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
         logger.print("CRITICAL ERROR running process_train_LSTM:{}".format(str(e)), MessageType.ERROR)
 
 
-def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, model_to_use, portf_size, trade_comm,
+def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model_to_use, portf_size, trade_comm,
                             trading_algo,grouping_unit=None,n_params=[],interval=None):
     loader = MLSettingsLoader()
     logger = Logger()
 
     try:
-        logger.print("Initializing model testing for symbol {} and model {} on {}".format(symbol, model_to_use, str_from),
+        logger.print("Initializing model testing for symbol {} and model {} on {}".format(symbol, model_to_use, d_from),
                      MessageType.INFO)
 
         config_settings = loader.load_settings("./configs/commands_mgr.ini")
@@ -458,8 +489,8 @@ def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, m
         if (interval== DataSetBuilder._1_MIN_INTERVAL or interval is None):
             dataMgm.process_test_daily_LSTM(symbol=symbol, variables_csv=variables_csv,
                                             model_to_use=model_to_use.replace('"', ""),
-                                            d_from=DateHandler.convert_str_date(str_from, _DATE_FORMAT),
-                                            d_to=DateHandler.convert_str_date(str_to, _DATE_FORMAT),
+                                            d_from=d_from,
+                                            d_to=d_to,
                                             timesteps=int(timesteps),
                                             portf_size=float(portf_size),
                                             trade_comm=float(trade_comm),
@@ -470,23 +501,23 @@ def process_test_daily_LSTM(symbol, variables_csv, str_from,str_to, timesteps, m
                                             )
         elif interval==DataSetBuilder._1_DAY_INTERVAL:
             dataMgm.process_test_scalping_LSTM(symbol=symbol, variables_csv=variables_csv,
-                                            model_to_use=model_to_use.replace('"', ""),
-                                            d_from=DateHandler.convert_str_date(str_from, _DATE_FORMAT),
-                                            d_to=DateHandler.convert_str_date(str_to, _DATE_FORMAT),
-                                            timesteps=int(timesteps),
-                                            portf_size=float(portf_size),
-                                            trade_comm=float(trade_comm),
-                                            trading_algo=trading_algo,
-                                            grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
-                                            n_algo_params=n_params,
-                                            interval=interval if interval is not None else None
-                                            )
+                                               model_to_use=model_to_use.replace('"', ""),
+                                               d_from=DateHandler.convert_str_date(d_from, _DATE_FORMAT),
+                                               d_to=DateHandler.convert_str_date(d_to, _DATE_FORMAT),
+                                               timesteps=int(timesteps),
+                                               portf_size=float(portf_size),
+                                               trade_comm=float(trade_comm),
+                                               trading_algo=trading_algo,
+                                               grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
+                                               n_algo_params=n_params,
+                                               interval=interval if interval is not None else None
+                                               )
         else:
             raise Exception(f"Unknown interval! : {interval}")
 
 
         logger.print(
-            "Displaying predictions for LSTM model: symbol {} and model {} on {}".format(symbol, model_to_use, str_from),
+            "Displaying predictions for LSTM model: symbol {} and model {} on {}".format(symbol, model_to_use, d_from),
             MessageType.INFO)
     except Exception as e:
         logger.print("CRITICAL ERROR running process_test_daily_LSTM:{}".format(str(e)), MessageType.ERROR)
@@ -565,24 +596,10 @@ def process_commands(cmd):
         process_daily_candles_graph(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3],
                                     cmd_param_list[4])
     elif cmd_param_list[0] == "TestDailyLSTM":
+        process_test_LSTM_cmd(cmd)
 
-        trading_algo = cmd_param_list[10]
-        n_params=__get_testing_params__(trading_algo,cmd_param_list,11)
-        process_test_daily_LSTM(symbol= cmd_param_list[1],variables_csv= cmd_param_list[2],
-                                str_from=cmd_param_list[3], str_to= cmd_param_list[4],
-                                timesteps= cmd_param_list[5], model_to_use= cmd_param_list[6],
-                                portf_size= cmd_param_list[7], trade_comm= cmd_param_list[8],
-                                trading_algo=trading_algo,
-                                interval  =cmd_param_list[9],grouping_unit=None,n_params= n_params)
     elif cmd_param_list[0] == "TestDailyLSTMWithGrouping":
-        trading_algo = cmd_param_list[9]
-        n_params = __get_testing_params__(trading_algo, cmd_param_list, 11)
-        process_test_daily_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                                cmd_param_list[5], cmd_param_list[6], cmd_param_list[7], cmd_param_list[8],
-                                cmd_param_list[9],grouping_unit=cmd_param_list[10],n_params=n_params)
-
-    #
-
+        process_test_LSTM_cmd(cmd)
 
     #TestDailyLSTM
 
