@@ -627,7 +627,8 @@ class AlgosOrchestationLogic:
                            epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate,
                            interval=DataSetBuilder._1_MIN_INTERVAL,clipping_rate=None,accuracy_stop=None,grouping_unit=None,
                            grouping_classif_criteria=None,
-                           group_as_mov_avg=False,grouping_mov_avg_unit=20):
+                           group_as_mov_avg=False,grouping_mov_avg_unit=20,
+                           batch_size=None,inner_activation=None):
         try:
 
             range_clasifs=None
@@ -667,7 +668,9 @@ class AlgosOrchestationLogic:
 
             rnn_model_trainer.train_daytrading_LSTM(training_series_df, model_output, symbol_min_series_df, classif_key,
                                                     epochs, timestamps, n_neurons, learning_rate, reg_rate,
-                                                    dropout_rate,clipping_rate,accuracy_stop)
+                                                    dropout_rate,clipping_rate,accuracy_stop,
+                                                    inner_activation=inner_activation,
+                                                    batch_size=batch_size)
 
             #pd.set_option('display.max_columns', None)
             #print(training_series_df.head())

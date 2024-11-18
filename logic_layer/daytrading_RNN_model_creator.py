@@ -179,8 +179,6 @@ class DayTradingRNNModelCreator:
         """
         try:
 
-            #inner_activation='relu'
-            #batch_size=210
             training_series_df = DataframeFiller.fill_missing_values(training_series_df)
 
             self.__preformat_training_set__(training_series_df)

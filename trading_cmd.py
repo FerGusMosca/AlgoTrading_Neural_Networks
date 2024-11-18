@@ -130,13 +130,16 @@ def process_traing_LSTM_cmd(cmd,cmd_param_list):
     grouping_classif_criteria=__get_param__(cmd,"grouping_classif_criteria",True)
     group_as_mov_avg=__get_param__(cmd,"grouping_classif_criteria",True,def_value=False)
     grouping_mov_avg_unit=__get_param__(cmd,"grouping_mov_avg_unit",True,def_value=100)
+    batch_size = __get_param__(cmd, "batch_size", True, def_value=None)
+    inner_activation = __get_param__(cmd, "inner_activation", True, def_value=None)
 
     process_train_LSTM(symbol=symbol, variables_csv=variables_csv, d_from=d_from, d_to=d_to, model_output=model_output,
                        classification_key=classif_key, epochs=epochs, timestamps=timesteps, n_neurons=n_neurons,
                        learning_rate=learning_rate, reg_rate=reg_rate, dropout_rate=dropout_rate,
                        clipping_rate=clipping_rate, accuracy_stop=acc_stop, interval=interval,
                        grouping_unit=grouping_unit,grouping_classif_criteria=grouping_classif_criteria,
-                       group_as_mov_avg=group_as_mov_avg,grouping_mov_avg_unit=grouping_mov_avg_unit)  # will use default
+                       group_as_mov_avg=group_as_mov_avg,grouping_mov_avg_unit=grouping_mov_avg_unit,
+                       batch_size=batch_size,inner_activation=inner_activation)  # will use default
 
     print(f"Train LSTM successfully finished...")
 
@@ -395,7 +398,8 @@ def process_train_neural_network_algo(symbol, variables_csv, str_from, str_to, d
 def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classification_key,
                        epochs, timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate,
                        accuracy_stop,grouping_unit=None,grouping_classif_criteria=None,
-                       group_as_mov_avg=False,grouping_mov_avg_unit=100,interval=None):
+                       group_as_mov_avg=False,grouping_mov_avg_unit=100,interval=None,
+                       batch_size=None,inner_activation=None):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -424,7 +428,8 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
                                    grouping_unit= int(grouping_unit) if grouping_unit is not None else None,
                                    grouping_classif_criteria= grouping_classif_criteria,
                                    group_as_mov_avg= bool(group_as_mov_avg),
-                                   grouping_mov_avg_unit= int(grouping_mov_avg_unit)
+                                   grouping_mov_avg_unit= int(grouping_mov_avg_unit),
+                                   batch_size=batch_size,inner_activation=inner_activation
                                    )
 
         # TODO ---> print backtesting output
@@ -553,7 +558,7 @@ def process_commands(cmd):
         process_traing_LSTM_cmd(cmd,cmd_param_list)
 
     elif cmd_param_list[0] == "TrainLSTMWithGrouping":
-        process_train_LSTM(cmd,cmd_param_list)
+        process_traing_LSTM_cmd(cmd,cmd_param_list)
     elif cmd_param_list[0] == "DailyCandlesGraph":
 
         params_validation("DailyCandlesGraph", cmd_param_list, 5)
