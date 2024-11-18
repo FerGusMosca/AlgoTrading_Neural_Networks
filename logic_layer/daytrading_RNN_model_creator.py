@@ -235,16 +235,24 @@ class DayTradingRNNModelCreator:
         except Exception as e:
             raise Exception(f"Error building LSTM model for symbol {symbol}: {e}")
 
+    def preload_model(self,model_to_use):
+        # Load the saved LSTM model
+        model = tensorflow.keras.models.load_model(model_to_use)
+        return  model
 
-
-    def test_daytrading_LSTM(self,symbol,test_series_df, model_to_use,timestamps):
+    def test_daytrading_LSTM(self,symbol,test_series_df, model_to_use,timestamps,price_to_use="close",
+                            preloaded_model=None, prev_states=None):
 
         self.__preformat_test_sets__(test_series_df)
 
         X_test=self.__get_test_sets__(test_series_df,symbol_col="trading_symbol",date_col="date")
 
-        # Load the saved LSTM model
-        model = tensorflow.keras.models.load_model(model_to_use)
+        model=None
+        if(preloaded_model is None):
+            # Load the saved LSTM model
+            model = tensorflow.keras.models.load_model(model_to_use)
+        else:
+            model=preloaded_model
 
         # timestamps= Number of timestamps used in training (adjust this to match your model's training configuration)
         # Create a time series generator for the test data
@@ -253,10 +261,15 @@ class DayTradingRNNModelCreator:
         )
 
         # Generate predictions
-        predictions = model.predict(test_generator)
+        states=None
+        if prev_states is None:
+            predictions = model.predict(test_generator)
+        else:
+            predictions = model.predict(test_generator,prev_states)
 
         # Convert predictions to actions (LONG, SHORT, FLAT)
         actions = np.argmax(predictions, axis=1)
+
         action_labels = {0: "LONG", 1: "SHORT", 2: "FLAT"}
         action_series = pd.Series(actions).map(action_labels)
 
@@ -274,9 +287,9 @@ class DayTradingRNNModelCreator:
         })
 
 
-        result_df=self.__add_trading_prices__(test_series_df,result_df,f"open_{symbol}",dates,"trading_symbol_price")
+        result_df=self.__add_trading_prices__(test_series_df,result_df,f"{price_to_use}_{symbol}",dates,"trading_symbol_price")
 
 
-        return result_df
+        return result_df,states
 
     #endregion

@@ -12,6 +12,7 @@ import pandas as pd
 from logic_layer.data_set_builder import DataSetBuilder
 
 _DATE_FORMAT = "%m/%d/%Y"
+_TIMESTAMP_FORMAT='%m/%d/%Yt%H:%M:%S'
 
 last_trading_dict = None
 
@@ -79,6 +80,12 @@ def __get_param__(command, key, optional=False,def_value=None):
     except Exception:
         pass  # No es una fecha válida, continuamos con las siguientes verificaciones
 
+    # Intentar convertir a fecha en formato MM/dd/yyyy HH:mm:ss
+    try:
+        return  DateHandler.convert_str_date(value, _TIMESTAMP_FORMAT)
+    except Exception:
+        pass  # No es una fecha válida, continuamos con las siguientes verificaciones
+
     # Intentar convertir a entero
     try:
         return int(value)
@@ -123,6 +130,7 @@ def process_test_LSTM_cmd(cmd):
     grouping_unit=__get_param__(cmd,"grouping_unit",True,None)
     n_buffer=__get_param__(cmd,"n_buffer",True,None)
     mov_avg=__get_param__(cmd,"mov_avg",True,None)
+    use_sliding_window = True if __get_param__(cmd, "use_sliding_window", True,def_value="False") == "True" else False  # use_sliding_window
 
     cmd_param_list=[]
     if n_buffer is not None:
@@ -135,7 +143,8 @@ def process_test_LSTM_cmd(cmd):
     process_test_daily_LSTM(symbol=symbol, variables_csv=variables_csv, d_from=d_from, d_to=d_to,
                             timesteps=timesteps,model_to_use=model_to_use, portf_size=portf_size,
                             trade_comm=comm, trading_algo=trading_algo,interval=interval,
-                            grouping_unit=grouping_unit,n_params=cmd_param_list)
+                            grouping_unit=grouping_unit,n_params=cmd_param_list,
+                            use_sliding_window=use_sliding_window)
 
     print(f"Test LSTM successfully finished...")
 
@@ -163,6 +172,7 @@ def process_traing_LSTM_cmd(cmd,cmd_param_list):
     grouping_mov_avg_unit=__get_param__(cmd,"grouping_mov_avg_unit",True,def_value=100)
     batch_size = __get_param__(cmd, "batch_size", True, def_value=None)
     inner_activation = __get_param__(cmd, "inner_activation", True, def_value=None)
+
 
     process_train_LSTM(symbol=symbol, variables_csv=variables_csv, d_from=d_from, d_to=d_to, model_output=model_output,
                        classification_key=classif_key, epochs=epochs, timestamps=timesteps, n_neurons=n_neurons,
@@ -472,7 +482,7 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
 
 
 def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model_to_use, portf_size, trade_comm,
-                            trading_algo,grouping_unit=None,n_params=[],interval=None):
+                            trading_algo,grouping_unit=None,n_params=[],interval=None,use_sliding_window=False):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -497,7 +507,8 @@ def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model
                                             trading_algo=trading_algo,
                                             grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
                                             n_algo_params=n_params,
-                                            interval=interval if interval is not None else None
+                                            interval=interval if interval is not None else None,
+                                            use_sliding_window=use_sliding_window
                                             )
         elif interval==DataSetBuilder._1_DAY_INTERVAL:
             dataMgm.process_test_scalping_LSTM(symbol=symbol, variables_csv=variables_csv,
