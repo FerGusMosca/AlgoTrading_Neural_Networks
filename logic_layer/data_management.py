@@ -529,6 +529,9 @@ class AlgosOrchestationLogic:
                 #we filter the unecessary in all record to fetch all the indicators
                 test_series_df = test_series_df[test_series_df['date'] >= start_period ]
 
+                if(test_series_df[symbol].isna().any()):
+                    continue # must be a holiday
+
                 rnn_predictions_df_today = rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df,
                                                                                     model_to_use, timesteps)
                 if rnn_predictions_df is None:
@@ -577,7 +580,7 @@ class AlgosOrchestationLogic:
                                                                                              "high", "low", "close"],
                                                                                  interval=interval)
 
-                if symbol_int_series_df is None:
+                if symbol_int_series_df is None or symbol_int_series_df.shape[0] <= 1:
                     self.logger.do_log(f"Skipping day {day} because missing values (probable holiday!)",MessageType.WARNING)
                     continue
 
@@ -591,8 +594,7 @@ class AlgosOrchestationLogic:
                                                                            variables_int_series_df, "symbol", "date",
                                                                            symbol)
 
-                if(test_series_df[symbol].isna().any()):
-                    continue # must be a holiday
+
 
                 if grouping_unit is not None:
                     test_series_df = self.__group_dataframe__(test_series_df, grouping_unit,variables_csv)

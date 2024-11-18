@@ -167,7 +167,7 @@ class DayTradingRNNModelCreator:
 
     def train_daytrading_LSTM(self, training_series_df, model_output, symbol, classif_key, epochs,
                    timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate=None,
-                              accuracy_stop=None):
+                              accuracy_stop=None,inner_activation='tanh',batch_size=1):
         """
         Build and train an LSTM model on the given training data and save the model.
 
@@ -178,6 +178,9 @@ class DayTradingRNNModelCreator:
         safety_minutes (int): Number of time steps to look back in the time series.
         """
         try:
+
+            #inner_activation='relu'
+            #batch_size=210
             training_series_df = DataframeFiller.fill_missing_values(training_series_df)
 
             self.__preformat_training_set__(training_series_df)
@@ -195,17 +198,17 @@ class DayTradingRNNModelCreator:
             # Generador de series temporales para datos de entrenamiento y prueba
             train_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(X_train, y_train,
                                                                                           length=timesteps,
-                                                                                          batch_size=1)
+                                                                                          batch_size=batch_size)
             test_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(X_test, y_test,
-                                                                                         length=timesteps, batch_size=1)
+                                                                                         length=timesteps, batch_size=batch_size)
 
             # Define the LSTM model
             model = tensorflow.keras.models.Sequential()
             model.add(
-                LSTM(n_neurons, activation='tanh', return_sequences=True, input_shape=(timesteps, X_train.shape[1])))
+                LSTM(n_neurons, activation=inner_activation, return_sequences=True, input_shape=(timesteps, X_train.shape[1])))
             model.add(Dropout(dropout_rate))  # Dropout layer with 20% dropout rate
             model.add(BatchNormalization())
-            model.add(LSTM(n_neurons, activation='tanh'))  # Another LSTM layer without return_sequences
+            model.add(LSTM(n_neurons, activation=inner_activation))  # Another LSTM layer without return_sequences
             model.add(Dropout(dropout_rate))  # Dropout layer with 20% dropout rate
             model.add(BatchNormalization())
             model.add(Dense(3, activation='softmax',

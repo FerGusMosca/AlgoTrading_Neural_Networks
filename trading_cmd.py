@@ -1,3 +1,6 @@
+import re
+from datetime import datetime
+
 from common.util.date_handler import DateHandler
 from common.util.logger import Logger
 from common.util.ml_settings_loader import MLSettingsLoader
@@ -42,6 +45,56 @@ def params_validation(cmd, param_list, exp_len):
         raise Exception("Command {} expects {} parameters".format(cmd, exp_len))
 
 
+def __get_value_after_equals__(command, key,optional=False):
+    # Separamos el comando en partes por espacios
+    parts = command.split(" ")
+
+    # Recorremos las partes buscando las que coincidan con la clave
+    for part in parts:
+        # Verificamos si la parte contiene el key seguido de "="
+        if part.startswith(key + "="):
+            # Extraemos el valor después del "="
+            value = part.split("=")[1].strip()  # Tomamos lo que está después del '='
+
+            # Si el valor está entre comillas, eliminamos las comillas
+            if value.startswith('"') or value.startswith("'"):
+                value = value[1:-1]  # Eliminamos las comillas
+
+            return value
+
+    if not optional:
+    # Si no se encontró la clave, lanzamos una excepción
+        raise KeyError(f"Key {key} not found.")
+    else:
+        return None
+def __get_param__(command, key, optional=False,def_value=None):
+    value = __get_value_after_equals__(command, key,optional)
+
+    if value==None and optional:
+        return  def_value
+
+    # Intentar convertir a fecha en formato MM/dd/yyyy
+    try:
+        return  DateHandler.convert_str_date(value, _DATE_FORMAT)
+    except Exception:
+        pass  # No es una fecha válida, continuamos con las siguientes verificaciones
+
+    # Intentar convertir a entero
+    try:
+        return int(value)
+    except ValueError:
+        pass  # No es un entero válido, continuamos con las siguientes verificaciones
+
+    # Intentar convertir a float con dos decimales
+    try:
+        return float(value)
+    except ValueError:
+        pass  # No es un float válido, continuamos con el último caso
+
+    # Si no es ninguno de los anteriores, lo devolvemos como string
+    return value
+
+
 def __get_testing_params__(trading_algo,cmd_param_list,base_length=10):
     n_params = []
     if (trading_algo == AlgosOrchestationLogic._TRADING_ALGO_RAW_ALGO):
@@ -57,41 +110,37 @@ def __get_testing_params__(trading_algo,cmd_param_list,base_length=10):
     return  n_params
 
 
-def process_traing_LSTM_cmd(cmd_param_list):
-    if count_params(cmd_param_list, 16):
+def process_traing_LSTM_cmd(cmd,cmd_param_list):
+    symbol = __get_param__(cmd, "symbol")
+    variables_csv = __get_param__(cmd, "variables_csv")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    model_output = __get_param__(cmd, "model_output")
+    classif_key = __get_param__(cmd, "classif_key")
+    epochs = __get_param__(cmd, "epochs")
+    n_neurons = __get_param__(cmd, "n_neurons")
+    timesteps = __get_param__(cmd, "timesteps")
+    learning_rate = __get_param__(cmd, "learning_rate")
+    dropout_rate = __get_param__(cmd, "dropout_rate")
+    clipping_rate = __get_param__(cmd, "clipping_rate")
+    reg_rate = __get_param__(cmd, "reg_rate")
+    acc_stop = __get_param__(cmd, "acc_stop")
+    interval = __get_param__(cmd, "interval",True,None)
+    grouping_unit=__get_param__(cmd,"grouping_unit",True)
+    grouping_classif_criteria=__get_param__(cmd,"grouping_classif_criteria",True)
+    group_as_mov_avg=__get_param__(cmd,"grouping_classif_criteria",True,def_value=False)
+    grouping_mov_avg_unit=__get_param__(cmd,"grouping_mov_avg_unit",True,def_value=100)
 
-        params_validation("TrainLSTM", cmd_param_list, 16)
-        process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                           cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
-                           cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
-                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13], cmd_param_list[14]
-                           , interval= cmd_param_list[15])
-    elif count_params(cmd_param_list, 15):
+    process_train_LSTM(symbol=symbol, variables_csv=variables_csv, d_from=d_from, d_to=d_to, model_output=model_output,
+                       classification_key=classif_key, epochs=epochs, timestamps=timesteps, n_neurons=n_neurons,
+                       learning_rate=learning_rate, reg_rate=reg_rate, dropout_rate=dropout_rate,
+                       clipping_rate=clipping_rate, accuracy_stop=acc_stop, interval=interval,
+                       grouping_unit=grouping_unit,grouping_classif_criteria=grouping_classif_criteria,
+                       group_as_mov_avg=group_as_mov_avg,grouping_mov_avg_unit=grouping_mov_avg_unit)  # will use default
 
-        params_validation("TrainLSTM", cmd_param_list, 15)
-        process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                           cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
-                           cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
-                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13], cmd_param_list[14]
-                           , interval= None)#will use default
-    elif count_params(cmd_param_list, 19):  # group_as_mov_avg + grouping_mov_avg_unit
-        params_validation("TrainLSTM", cmd_param_list, 19)
-        process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                           cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
-                           cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
-                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13],
-                           cmd_param_list[14],
-                           grouping_unit=cmd_param_list[15], grouping_classif_criteria=cmd_param_list[16],
-                           group_as_mov_avg=cmd_param_list[17] == "True", grouping_mov_avg_unit=cmd_param_list[18])
+    print(f"Train LSTM successfully finished...")
 
-    elif count_params(cmd_param_list, 17):  # group_as_mov_avg + grouping_mov_avg_unit
-        params_validation("TrainLSTM", cmd_param_list, 17)
-        process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                           cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
-                           cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
-                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13],
-                           cmd_param_list[14],
-                           group_as_mov_avg=cmd_param_list[15] == "True", grouping_mov_avg_unit=cmd_param_list[16])
+
 
 
 def process_train_ml_algos(cmd_param_list, str_from, str_to, classification_key=None):
@@ -343,7 +392,7 @@ def process_train_neural_network_algo(symbol, variables_csv, str_from, str_to, d
         logger.print("CRITICAL ERROR running proces_train_neural_network_algo:{}".format(str(e)), MessageType.ERROR)
 
 
-def process_train_LSTM(symbol, variables_csv, str_from, str_to, model_output, classification_key,
+def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classification_key,
                        epochs, timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate,
                        accuracy_stop,grouping_unit=None,grouping_classif_criteria=None,
                        group_as_mov_avg=False,grouping_mov_avg_unit=100,interval=None):
@@ -361,8 +410,9 @@ def process_train_LSTM(symbol, variables_csv, str_from, str_to, model_output, cl
                                          logger)
 
         dataMgm.process_train_LSTM(symbol, variables_csv,
-                                   DateHandler.convert_str_date(str_from, _DATE_FORMAT),
-                                   DateHandler.convert_str_date(str_to, _DATE_FORMAT),
+                                   #DateHandler.convert_str_date(str_from, _DATE_FORMAT),
+                                   #DateHandler.convert_str_date(str_to, _DATE_FORMAT),
+                                   d_from, d_to,
                                    model_output.replace('"', ""),
                                    classification_key, int(epochs), int(timestamps),
                                    int(n_neurons), float(learning_rate),
@@ -500,16 +550,10 @@ def process_commands(cmd):
                                              cmd_param_list[5], cmd_param_list[6])
 
     elif cmd_param_list[0] == "TrainLSTM":
-        process_traing_LSTM_cmd(cmd_param_list)
+        process_traing_LSTM_cmd(cmd,cmd_param_list)
 
     elif cmd_param_list[0] == "TrainLSTMWithGrouping":
-        params_validation("TrainLSTMWithGrouping", cmd_param_list, 17)
-        process_train_LSTM(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                           cmd_param_list[5], cmd_param_list[6], cmd_param_list[7],
-                           cmd_param_list[8], cmd_param_list[9], cmd_param_list[10]
-                           , cmd_param_list[11], cmd_param_list[12], cmd_param_list[13], cmd_param_list[14]
-                           , cmd_param_list[15] , cmd_param_list[16])
-    #
+        process_train_LSTM(cmd,cmd_param_list)
     elif cmd_param_list[0] == "DailyCandlesGraph":
 
         params_validation("DailyCandlesGraph", cmd_param_list, 5)
