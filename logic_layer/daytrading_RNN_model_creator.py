@@ -4,13 +4,14 @@ import pandas as pd
 import numpy as np
 import tensorflow
 from keras.src.callbacks import Callback
-from keras.src.layers import TimeDistributed, BatchNormalization
+from keras.src.layers import TimeDistributed, BatchNormalization, InputLayer
 from keras.src.optimizers import Adam
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+
 
 from common.util.dataframe_filler import DataframeFiller
 
@@ -202,8 +203,9 @@ class DayTradingRNNModelCreator:
 
             # Define the LSTM model
             model = tensorflow.keras.models.Sequential()
-            model.add(
-                LSTM(n_neurons, activation=inner_activation, return_sequences=True, input_shape=(timesteps, X_train.shape[1])))
+            model.add(LSTM(n_neurons, activation=inner_activation, return_sequences=True, input_shape=(timesteps, X_train.shape[1])))
+
+
             model.add(Dropout(dropout_rate))  # Dropout layer with 20% dropout rate
             model.add(BatchNormalization())
             model.add(LSTM(n_neurons, activation=inner_activation))  # Another LSTM layer without return_sequences
@@ -240,7 +242,58 @@ class DayTradingRNNModelCreator:
         model = tensorflow.keras.models.load_model(model_to_use)
         return  model
 
-    def test_daytrading_LSTM(self,symbol,test_series_df, model_to_use,timestamps,price_to_use="close",
+    def test_stateful_daytrading_LSTM(self, symbol, test_series_df, model_to_use, timesteps, price_to_use="close",
+                                      preloaded_model=None):
+        self.__preformat_test_sets__(test_series_df)
+
+        # Prepare the test dataset
+        X_test = self.__get_test_sets__(test_series_df, symbol_col="trading_symbol", date_col="date")
+
+        # Load the LSTM model
+        if preloaded_model is None:
+            model = tensorflow.keras.models.load_model(model_to_use)
+        else:
+            model = preloaded_model
+
+        # Create a time series generator for sequential test data
+        test_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(
+            X_test, np.zeros(len(X_test)), length=timesteps, batch_size=1
+        )
+
+        # Perform predictions iteratively
+        predictions = []
+        for i in range(len(test_generator)):
+            X_batch, _ = test_generator[i]  # Get the current batch (1 timestep window)
+            pred = model.predict(X_batch, batch_size=1)  # No states involved
+            predictions.append(pred)
+
+        # Convert predictions to actions (e.g., LONG, SHORT, FLAT)
+        predictions = np.vstack(predictions)  # Combine predictions into a single array
+        actions = np.argmax(predictions, axis=1)
+
+        # Map actions to readable labels
+        action_labels = {0: "LONG", 1: "SHORT", 2: "FLAT"}
+        action_series = pd.Series(actions).map(action_labels)
+
+        # Adjust the DataFrame to match prediction length
+        dates = pd.to_datetime(test_series_df['date'].iloc[timesteps:].reset_index(drop=True), unit='s')
+        formatted_dates = dates.dt.strftime(_OUTPUT_DATE_FORMAT)
+
+        # Create the final result DataFrame
+        result_df = pd.DataFrame({
+            'trading_symbol': symbol,
+            'date': dates,
+            'formatted_date': formatted_dates,
+            'action': action_series
+        })
+
+        # Add trading prices for better analysis
+        result_df = self.__add_trading_prices__(test_series_df, result_df, f"{price_to_use}_{symbol}", dates,
+                                                "trading_symbol_price")
+
+        return result_df
+
+    def test_daytrading_LSTM(self,symbol,test_series_df, model_to_use,timesteps,price_to_use="close",
                             preloaded_model=None, prev_states=None):
 
         self.__preformat_test_sets__(test_series_df)
@@ -257,7 +310,7 @@ class DayTradingRNNModelCreator:
         # timestamps= Number of timestamps used in training (adjust this to match your model's training configuration)
         # Create a time series generator for the test data
         test_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(
-            X_test, np.zeros(len(X_test)), length=timestamps, batch_size=1
+            X_test, np.zeros(len(X_test)), length=timesteps, batch_size=1
         )
 
         # Generate predictions
@@ -274,7 +327,7 @@ class DayTradingRNNModelCreator:
         action_series = pd.Series(actions).map(action_labels)
 
         # Adjust the DataFrame to match the length of the predictions
-        dates = pd.to_datetime(test_series_df['date'].iloc[timestamps:].reset_index(drop=True), unit='s')
+        dates = pd.to_datetime(test_series_df['date'].iloc[timesteps:].reset_index(drop=True), unit='s')
         formatted_dates = dates.dt.strftime(_OUTPUT_DATE_FORMAT)
         #symbols = test_series_df['trading_symbol'].iloc[timestamps:].reset_index(drop=True)
 

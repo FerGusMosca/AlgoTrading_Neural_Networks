@@ -547,7 +547,8 @@ class AlgosOrchestationLogic:
                     continue # must be a holiday
 
                 rnn_predictions_df_today,states = rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df,
-                                                                                    model_to_use, timesteps,prev_states=states)
+                                                                                           model_to_use, timesteps,
+                                                                                           prev_states=states)
                 if rnn_predictions_df is None:
                     rnn_predictions_df = pd.DataFrame(columns=rnn_predictions_df_today.columns).astype(rnn_predictions_df_today.dtypes)
                 rnn_predictions_df_today = rnn_predictions_df_today[rnn_predictions_df_today['date'] == day]
@@ -568,36 +569,33 @@ class AlgosOrchestationLogic:
 
     def __process_LSTM_day_single_run__(self,rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol):
 
-        rnn_predictions_today_df,states = rnn_model_processer.test_daytrading_LSTM(symbol,
-                                                                                  test_series_df,
-                                                                                  model_to_use,
-                                                                                  timesteps, price_to_use="close")
+        rnn_predictions_today_df,states = rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df, model_to_use,
+                                                                                   timesteps, price_to_use="close")
         self.logger.do_log(f"Predicting ALL TRADES for day {day} and symbol {symbol}",MessageType.INFO)
         return rnn_predictions_today_df
 
 
     def __process_LSTM_day_as_sliding_window__(self,rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol):
         rnn_predictions_today_df = None
-        preloaded_model = rnn_model_processer.preload_model(model_to_use=model_to_use)
+        #preloaded_model = rnn_model_processer.preload_model(model_to_use=model_to_use)
         states=None
         for i, window in enumerate(self.__sliding_window__(test_series_df, timesteps)):
             test_series_curr_window_df = window.copy()
             min_timestamp = test_series_curr_window_df["date"].min()
             max_timestamp = test_series_curr_window_df["date"].max()
-            self.logger.do_log(
-                f"Processing Window from {min_timestamp} to {max_timestamp} for day {day} for symbol {symbol}",
-                MessageType.INFO)
+            self.logger.do_log(f"Processing Window from {min_timestamp} to {max_timestamp} for day {day} for symbol {symbol}",MessageType.INFO)
 
             if rnn_predictions_today_df is None:  # we initialize the summarization df
                 rnn_predictions_today_df = pd.DataFrame(columns=test_series_curr_window_df.columns).astype(
                     test_series_curr_window_df.dtypes)
 
             rnn_predictions_curr_window_df,states = rnn_model_processer.test_daytrading_LSTM(symbol,
-                                                                                      test_series_curr_window_df,
-                                                                                      model_to_use,
-                                                                                      timesteps, price_to_use="close",
-                                                                                      preloaded_model=preloaded_model,
-                                                                                      prev_states=states)
+                                                                                             test_series_curr_window_df,
+                                                                                             model_to_use= model_to_use,
+                                                                                             timesteps= timesteps,
+                                                                                             price_to_use="close",
+                                                                                             #preloaded_model=preloaded_model,
+                                                                                             prev_states=states)
 
             pred_action = rnn_predictions_curr_window_df["action"].iloc[0]
             curr_mkt_price = rnn_predictions_curr_window_df["trading_symbol_price"].iloc[0]
@@ -607,6 +605,44 @@ class AlgosOrchestationLogic:
                 MessageType.INFO)
 
             rnn_predictions_today_df = pd.concat([rnn_predictions_today_df, rnn_predictions_curr_window_df],ignore_index=True)
+        return rnn_predictions_today_df
+
+    def __process_LSTM_day_as_cum_sliding_window__(self,rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol):
+        rnn_predictions_today_df = None
+        #preloaded_model = rnn_model_processer.preload_model(model_to_use=model_to_use)
+        states=None
+        for i, window in enumerate(self.__sliding_window__(test_series_df, timesteps)):
+            test_series_curr_window_df = window.copy()
+            min_timestamp = test_series_curr_window_df["date"].min()
+            max_timestamp = test_series_curr_window_df["date"].max()
+
+            curr_min_df= test_series_df[test_series_df['date'] <= max_timestamp]
+            self.logger.do_log(f"Processing Window from {min_timestamp} to {max_timestamp} for day {day} for symbol {symbol}",MessageType.INFO)
+
+            if rnn_predictions_today_df is None:  # we initialize the summarization df
+                rnn_predictions_today_df =  pd.DataFrame(columns=['trading_symbol', 'date', 'formatted_date', 'action'])
+
+            rnn_predictions_curr_window_df = rnn_model_processer.test_stateful_daytrading_LSTM(symbol=symbol,
+                                                                                             test_series_df=curr_min_df,
+                                                                                             model_to_use=model_to_use,
+                                                                                             timesteps=timesteps,
+                                                                                             price_to_use="close")
+
+
+
+            # rnn_predictions_curr_window_df,states = rnn_model_processer.test_daytrading_LSTM(symbol=symbol,
+            #                                                                                  test_series_df=curr_min_df,
+            #                                                                                  model_to_use=model_to_use,
+            #                                                                                  timesteps=timesteps,
+            #                                                                                  price_to_use="close",
+            #                                                                                  prev_states=states)
+
+            pred_action = rnn_predictions_curr_window_df["action"].iloc[-1]
+            curr_mkt_price = rnn_predictions_curr_window_df["trading_symbol_price"].iloc[-1]
+            end_of_timestamp = rnn_predictions_curr_window_df["date"].iloc[-1]
+            self.logger.do_log(f"Predicting at {pred_action} at end of {end_of_timestamp} at current mkt price={curr_mkt_price} for symbol {symbol}",MessageType.INFO)
+
+            rnn_predictions_today_df = pd.concat([rnn_predictions_today_df, rnn_predictions_curr_window_df.iloc[-1].to_frame().T],ignore_index=True)
         return rnn_predictions_today_df
 
 
@@ -677,7 +713,8 @@ class AlgosOrchestationLogic:
                 test_series_df = test_series_df.dropna(subset=[symbol])
 
                 if use_sliding_window:#slower, but we only pass every <timestemps> records to make sure of the accuracy of the prediction
-                    rnn_predictions_today_df=self.__process_LSTM_day_as_sliding_window__(rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol)
+                    #rnn_predictions_today_df=self.__process_LSTM_day_as_sliding_window__(rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol)
+                    rnn_predictions_today_df = self.__process_LSTM_day_as_cum_sliding_window__(rnn_model_processer,model_to_use, test_series_df,timesteps, day, symbol)
                 else:#faster, but we pass the dataframe with ALL the daily records, which might create some look ahead bias
                     rnn_predictions_today_df=self.__process_LSTM_day_single_run__(rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol)
 
@@ -704,7 +741,7 @@ class AlgosOrchestationLogic:
                            interval=DataSetBuilder._1_MIN_INTERVAL,clipping_rate=None,accuracy_stop=None,grouping_unit=None,
                            grouping_classif_criteria=None,
                            group_as_mov_avg=False,grouping_mov_avg_unit=20,
-                           batch_size=None,inner_activation=None):
+                           batch_size=1,inner_activation=None):
         try:
 
             range_clasifs=None

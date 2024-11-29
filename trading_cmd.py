@@ -28,8 +28,8 @@ def show_commands():
     print("#7-EvalMLBiasedAlgo [Symbol] [indicator] [SeriesCSV] [from] [to] [inverted] [classif_key]")
     print("#8-TrainNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [depth] [learning_rate] [iterations] [model_output] [classif_key]")
     print("#9-BacktestNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [model_to_use] [classif_key]")
-    print("#10-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop]")
-    print("#11-TrainLSTMWithGrouping [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [grouping_unit] [grouping_classif_criteria]")
+    print("#10-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [batch_size*] [inner_activation*]")
+    print("#11-TrainLSTMWithGrouping [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [grouping_unit] [grouping_classif_criteria] [batch_size*] [inner_activation*]")
 
     print("#12-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#13-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [grouping_unit] [algo_params*]")
@@ -170,7 +170,7 @@ def process_traing_LSTM_cmd(cmd,cmd_param_list):
     grouping_classif_criteria=__get_param__(cmd,"grouping_classif_criteria",True)
     group_as_mov_avg=__get_param__(cmd,"grouping_classif_criteria",True,def_value=False)
     grouping_mov_avg_unit=__get_param__(cmd,"grouping_mov_avg_unit",True,def_value=100)
-    batch_size = __get_param__(cmd, "batch_size", True, def_value=None)
+    batch_size = __get_param__(cmd, "batch_size", True, def_value=1)
     inner_activation = __get_param__(cmd, "inner_activation", True, def_value=None)
 
 
@@ -440,7 +440,7 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
                        epochs, timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate,
                        accuracy_stop,grouping_unit=None,grouping_classif_criteria=None,
                        group_as_mov_avg=False,grouping_mov_avg_unit=100,interval=None,
-                       batch_size=None,inner_activation=None):
+                       batch_size=1,inner_activation=None):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -513,8 +513,8 @@ def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model
         elif interval==DataSetBuilder._1_DAY_INTERVAL:
             dataMgm.process_test_scalping_LSTM(symbol=symbol, variables_csv=variables_csv,
                                                model_to_use=model_to_use.replace('"', ""),
-                                               d_from=DateHandler.convert_str_date(d_from, _DATE_FORMAT),
-                                               d_to=DateHandler.convert_str_date(d_to, _DATE_FORMAT),
+                                               d_from=d_from,
+                                               d_to=d_to,
                                                timesteps=int(timesteps),
                                                portf_size=float(portf_size),
                                                trade_comm=float(trade_comm),
