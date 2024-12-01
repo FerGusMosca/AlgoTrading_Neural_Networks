@@ -741,7 +741,7 @@ class AlgosOrchestationLogic:
                            interval=DataSetBuilder._1_MIN_INTERVAL,clipping_rate=None,accuracy_stop=None,grouping_unit=None,
                            grouping_classif_criteria=None,
                            group_as_mov_avg=False,grouping_mov_avg_unit=20,
-                           batch_size=1,inner_activation=None):
+                           batch_size=1,inner_activation=None, make_stationary=False):
         try:
 
             range_clasifs=None
@@ -783,6 +783,7 @@ class AlgosOrchestationLogic:
                                                     epochs, timestamps, n_neurons, learning_rate, reg_rate,
                                                     dropout_rate,clipping_rate,accuracy_stop,
                                                     inner_activation=inner_activation,
+                                                    make_stationary=make_stationary,
                                                     batch_size=batch_size)
 
             #pd.set_option('display.max_columns', None)

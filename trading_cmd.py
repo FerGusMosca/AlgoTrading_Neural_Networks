@@ -28,7 +28,7 @@ def show_commands():
     print("#7-EvalMLBiasedAlgo [Symbol] [indicator] [SeriesCSV] [from] [to] [inverted] [classif_key]")
     print("#8-TrainNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [depth] [learning_rate] [iterations] [model_output] [classif_key]")
     print("#9-BacktestNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [model_to_use] [classif_key]")
-    print("#10-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [batch_size*] [inner_activation*]")
+    print("#10-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [batch_size*] [inner_activation*] [make_stationary*]")
     print("#11-TrainLSTMWithGrouping [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [grouping_unit] [grouping_classif_criteria] [batch_size*] [inner_activation*]")
 
     print("#12-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
@@ -68,6 +68,15 @@ def __get_value_after_equals__(command, key,optional=False):
         raise KeyError(f"Key {key} not found.")
     else:
         return None
+
+def __get_bool_param__(command, key, optional=False,def_value=None):
+    str_val = __get_param__(command,key,optional,def_value)
+
+    if str_val=="True" or str_val=="False":
+        return str_val=="True"
+    else:
+        return def_value
+
 def __get_param__(command, key, optional=False,def_value=None):
     value = __get_value_after_equals__(command, key,optional)
 
@@ -168,10 +177,11 @@ def process_traing_LSTM_cmd(cmd,cmd_param_list):
     interval = __get_param__(cmd, "interval",True,None)
     grouping_unit=__get_param__(cmd,"grouping_unit",True)
     grouping_classif_criteria=__get_param__(cmd,"grouping_classif_criteria",True)
-    group_as_mov_avg=__get_param__(cmd,"grouping_classif_criteria",True,def_value=False)
+    group_as_mov_avg=__get_bool_param__(cmd,"grouping_classif_criteria",True,def_value=False)
     grouping_mov_avg_unit=__get_param__(cmd,"grouping_mov_avg_unit",True,def_value=100)
     batch_size = __get_param__(cmd, "batch_size", True, def_value=1)
     inner_activation = __get_param__(cmd, "inner_activation", True, def_value=None)
+    make_stationary = __get_bool_param__(cmd, "make_stationary", True,False)
 
 
     process_train_LSTM(symbol=symbol, variables_csv=variables_csv, d_from=d_from, d_to=d_to, model_output=model_output,
@@ -180,7 +190,8 @@ def process_traing_LSTM_cmd(cmd,cmd_param_list):
                        clipping_rate=clipping_rate, accuracy_stop=acc_stop, interval=interval,
                        grouping_unit=grouping_unit,grouping_classif_criteria=grouping_classif_criteria,
                        group_as_mov_avg=group_as_mov_avg,grouping_mov_avg_unit=grouping_mov_avg_unit,
-                       batch_size=batch_size,inner_activation=inner_activation)  # will use default
+                       batch_size=batch_size,inner_activation=inner_activation,
+                       make_stationary=make_stationary)  # will use default
 
     print(f"Train LSTM successfully finished...")
 
@@ -440,7 +451,7 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
                        epochs, timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate,
                        accuracy_stop,grouping_unit=None,grouping_classif_criteria=None,
                        group_as_mov_avg=False,grouping_mov_avg_unit=100,interval=None,
-                       batch_size=1,inner_activation=None):
+                       batch_size=1,inner_activation=None,make_stationary=False):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -470,7 +481,8 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
                                    grouping_classif_criteria= grouping_classif_criteria,
                                    group_as_mov_avg= bool(group_as_mov_avg),
                                    grouping_mov_avg_unit= int(grouping_mov_avg_unit),
-                                   batch_size=batch_size,inner_activation=inner_activation
+                                   batch_size=batch_size,inner_activation=inner_activation,
+                                   make_stationary=make_stationary
                                    )
 
         # TODO ---> print backtesting output

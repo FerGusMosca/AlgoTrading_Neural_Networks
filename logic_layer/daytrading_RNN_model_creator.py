@@ -8,6 +8,7 @@ from keras.src.layers import TimeDistributed, BatchNormalization, InputLayer
 from keras.src.optimizers import Adam
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
+from statsmodels.tsa.stattools import adfuller
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -51,6 +52,28 @@ class DayTradingRNNModelCreator:
         test_series_df (pd.DataFrame): DataFrame containing the test time series data.
         """
         test_series_df.dropna(inplace=True)
+
+    # Function to make all numeric variables in the dataframe stationary
+    def __make_stationary__(self,df):
+        for var in df.columns:
+            # Check if the column is numeric (ignore non-numeric columns like dates)
+            if pd.api.types.is_numeric_dtype(df[var]):
+                # Perform the Augmented Dickey-Fuller (ADF) test to check if the series is stationary
+                result = adfuller(df[var])
+                print(f"ADF Statistic for {var}: {result[0]}, p-value: {result[1]}")
+
+                # If the p-value is greater than 0.05, the series is non-stationary and needs differencing
+                if result[1] > 0.05:
+                    # Apply first-order differencing to make the series stationary
+                    df[var] = df[var].diff().dropna()  # Differencing removes the first value (NaN after diff)
+                    print(f"Variable {var} has been made stationary using differencing.")
+                else:
+                    print(f"Variable {var} is already stationary.")
+            else:
+                print(f"Skipping non-numeric column: {var}")
+
+        return df
+
     def __preformat_training_set__(self,training_series_df):
 
         training_series_df.dropna(inplace=True)
@@ -168,7 +191,7 @@ class DayTradingRNNModelCreator:
 
     def train_daytrading_LSTM(self, training_series_df, model_output, symbol, classif_key, epochs,
                    timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate=None,
-                              accuracy_stop=None,inner_activation='tanh',batch_size=1):
+                              accuracy_stop=None, make_stationary=False,inner_activation='tanh',batch_size=1):
         """
         Build and train an LSTM model on the given training data and save the model.
 
@@ -181,6 +204,9 @@ class DayTradingRNNModelCreator:
         try:
 
             training_series_df = DataframeFiller.fill_missing_values(training_series_df)
+
+            if make_stationary:
+                training_series_df=self.__make_stationary__(training_series_df)
 
             self.__preformat_training_set__(training_series_df)
             # Get training and test sets
