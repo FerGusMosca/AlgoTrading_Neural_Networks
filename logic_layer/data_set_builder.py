@@ -156,7 +156,7 @@ class DataSetBuilder():
         # Return the final merged dataframe
         return merged_df
 
-    def build_minute_series(self,series_csv,d_from,d_to,interval=None, output_col=None):
+    def build_interval_series(self,series_csv,d_from,d_to,interval=None, output_col=None):
 
         if interval is None:
             interval = DataSetBuilder._1_MIN_INTERVAL
