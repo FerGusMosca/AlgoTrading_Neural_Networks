@@ -139,7 +139,7 @@ def process_test_LSTM_cmd(cmd):
     grouping_unit=__get_param__(cmd,"grouping_unit",True,None)
     n_buffer=__get_param__(cmd,"n_buffer",True,None)
     mov_avg=__get_param__(cmd,"mov_avg",True,None)
-    use_sliding_window = True if __get_param__(cmd, "use_sliding_window", True,def_value="False") == "True" else False  # use_sliding_window
+    use_sliding_window = __get_param__(cmd, "use_sliding_window", True,def_value="None")#NONE,CUT_INPUT_DF,GET_FAKE_DATA
 
     cmd_param_list=[]
     if n_buffer is not None:
@@ -494,7 +494,7 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
 
 
 def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model_to_use, portf_size, trade_comm,
-                            trading_algo,grouping_unit=None,n_params=[],interval=None,use_sliding_window=False):
+                            trading_algo,grouping_unit=None,n_params=[],interval=None,use_sliding_window=None):
     loader = MLSettingsLoader()
     logger = Logger()
 

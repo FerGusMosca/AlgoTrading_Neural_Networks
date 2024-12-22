@@ -1,11 +1,15 @@
 import traceback
 from datetime import timedelta, datetime
 
+from common.enums.grouping_criterias import GroupCriteria as gc
+from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws
+from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas
 from common.util.dataframe_filler import DataframeFiller
 from common.util.dataframe_printer import DataframePrinter
 from common.util.graph_builder import GraphBuilder
 from common.util.image_handler import ImageHandler
 from common.util.light_logger import LightLogger
+from common.util.random_walk_generator import RandomWalkGenerator
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
 from data_access_layer.timestamp_classification_manager import TimestampClassificationManager
 
@@ -24,18 +28,7 @@ import pandas as pd
 from logic_layer.neural_network_models_trainer import NeuralNetworkModelTrainer
 from logic_layer.daytrading_RNN_model_creator import DayTradingRNNModelCreator
 
-# Global variables
-GO_FIRST = "GO_FIRST"
-GO_HIGHEST_COUNT = "GO_HIGHEST_COUNT"
-GO_FLAT_ON_DIFF = "GO_FLAT_ON_DIFF"
-
-
-
 class AlgosOrchestationLogic:
-    _TRADING_ALGO_RAW_ALGO = "RAW_ALGO"
-    _TRADING_ALGO_N_MIN_BUFFER_W_FLIP = "N_MIN_BUFFER_W_FLIP"
-    _TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG = "ONLY_SIGNAL_N_MIN_+_MOV_AVG"
-
     def __init__(self,hist_data_conn_str,ml_reports_conn_str,p_classification_map_key,logger):
 
         self.logger=logger
@@ -47,18 +40,6 @@ class AlgosOrchestationLogic:
         self.timestamp_range_classif_mgr=TimestampClassificationManager(ml_reports_conn_str)
 
 
-    @staticmethod
-    def _GET_TRADING_ALGO_RAW_ALGO():
-        return AlgosOrchestationLogic._TRADING_ALGO_RAW_ALGO
-
-    @staticmethod
-    def _GET_TRADING_ALGO_N_MIN_BUFFER_W_FLIP():
-        return AlgosOrchestationLogic._TRADING_ALGO_N_MIN_BUFFER_W_FLIP
-
-    @staticmethod
-    def _GET__TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG():
-        return AlgosOrchestationLogic._TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG
-
     def __classify_group__(self,classifications, grouping_classif_criteria):
         unique_classes = classifications.unique()
 
@@ -67,13 +48,13 @@ class AlgosOrchestationLogic:
             return unique_classes[0]
 
         # Apply different criteria for multiple classifications
-        if grouping_classif_criteria == GO_FIRST:
+        if gc(grouping_classif_criteria) == gc.GO_FIRST:
             # Return the first classification in the group
             return classifications.iloc[0]
-        elif grouping_classif_criteria == GO_HIGHEST_COUNT:
+        elif gc(grouping_classif_criteria) == gc.GO_HIGHEST_COUNT:
             # Return the most frequent classification
             return classifications.mode().iloc[0]
-        elif grouping_classif_criteria == GO_FLAT_ON_DIFF:
+        elif gc(grouping_classif_criteria) == gc.GO_FLAT_ON_DIFF:
             # Mark the entire group as "FLAT"
             return "FLAT"
         else:
@@ -163,18 +144,17 @@ class AlgosOrchestationLogic:
 
     def __backtest_scalping_strategy__(self,rnn_predictions_df,portf_size, trade_comm,trading_algo,n_algo_params=[]):
 
-
         #print(f"{rnn_predictions_df.head()}")
 
-        if trading_algo==AlgosOrchestationLogic._GET_TRADING_ALGO_RAW_ALGO():
+        if tas(trading_algo)==tas.RAW_ALGO:
             daily_trading_backtester = RawAlgoDailyTradingBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
                                                                                             rnn_predictions_df, portf_size, trade_comm,n_algo_params)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
-        elif trading_algo==AlgosOrchestationLogic._GET_TRADING_ALGO_N_MIN_BUFFER_W_FLIP():
+        elif tas(trading_algo)==tas.N_MIN_BUFFER_W_FLIP:
             raise Exception(f'Not implemented algo')
-        elif trading_algo==AlgosOrchestationLogic._GET__TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG():
+        elif tas(trading_algo)==tas.ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG:
             raise Exception(f'Not implemented algo')
         else:
             raise Exception(f"NOT RECOGNIZED trading algo {trading_algo}")
@@ -183,13 +163,13 @@ class AlgosOrchestationLogic:
 
         #print(f"{rnn_predictions_df.head()}")
 
-        if trading_algo==AlgosOrchestationLogic._GET_TRADING_ALGO_RAW_ALGO():
+        if tas(trading_algo)==tas.RAW_ALGO:
             daily_trading_backtester = RawAlgoDailyTradingBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
                                                                                             rnn_predictions_df, portf_size, trade_comm,n_algo_params)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
-        elif trading_algo==AlgosOrchestationLogic._GET_TRADING_ALGO_N_MIN_BUFFER_W_FLIP():
+        elif tas(trading_algo)==tas.N_MIN_BUFFER_W_FLIP:
 
 
             daily_trading_backtester = NMinBufferWFlipDailyTradingBacktester()
@@ -197,7 +177,7 @@ class AlgosOrchestationLogic:
                 rnn_predictions_df, portf_size, trade_comm,n_algo_params)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
-        elif trading_algo==AlgosOrchestationLogic._GET__TRADING_ALGO_ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG():
+        elif tas(trading_algo)==tas.ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG:
             daily_trading_backtester = OnlySignalNMinMovAvgBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
                 rnn_predictions_df, portf_size, trade_comm,n_algo_params)
@@ -251,13 +231,20 @@ class AlgosOrchestationLogic:
         max_daily_drawdown = 0
         max_total_drawdown = 0
 
-        ml_analyzer = MLModelAnalyzer()
+        ml_analyzer = MLModelAnalyzer(self.logger)
+
+        #n-We pre-process the predictions --> chg action->Prediction
+        rnn_predictions_df.rename(columns={'action': 'Prediction'}, inplace=True)
         predictions_dic = {}
         predictions_dic[algo] = rnn_predictions_df
-        symbol_df = symbol_int_series_df  # TODO see how to best apply only open numbers
 
-        ml_analyzer.backtest_predictions(predictions_dic=predictions_dic,
-                                         symbol_df=symbol_df, symbol=symbol, bias=None,
+        #n-We add the colum <symbol> with the price to use : the 'open' price
+        symbol_df = symbol_int_series_df  # TODO see how to best apply only open numbers
+        symbol_df[symbol] = symbol_df['open'] #
+
+        #n-We run the backtest
+        portf_pos_dict= ml_analyzer.backtest_predictions(predictions_dic=predictions_dic,
+                                         symbol_df=symbol_df, symbol=symbol, bias="NONE",
                                          last_trading_dict=None)
 
         self.logger.do_log(f"---Summarizing PORTFOLIO PERFORMANCE---", MessageType.INFO)
@@ -647,6 +634,47 @@ class AlgosOrchestationLogic:
             rnn_predictions_today_df = pd.concat([rnn_predictions_today_df, rnn_predictions_curr_window_df],ignore_index=True)
         return rnn_predictions_today_df
 
+
+    #
+    def __process_LSTM_day_as_fill_fake_data__(self,rnn_model_processer,model_to_use,test_series_df,timesteps,
+                                               day,symbol,variables_csv):
+        rnn_predictions_today_df = None
+        #preloaded_model = rnn_model_processer.preload_model(model_to_use=model_to_use)
+        states=None
+        for i, window in enumerate(self.__sliding_window__(test_series_df, timesteps)):
+            test_series_curr_window_df = window.copy()
+            min_window_timestamp = test_series_curr_window_df["date"].min()
+            max_window_timestamp = test_series_curr_window_df["date"].max()
+            max_df_timestamp=test_series_df["date"].max()
+
+            curr_min_df= test_series_df[test_series_df['date'] <= max_window_timestamp]
+            self.logger.do_log(f"Processing Window from {min_window_timestamp} to {max_window_timestamp} for day {day} for symbol {symbol}", MessageType.INFO)
+
+            # We fill with random values
+            curr_min_df = RandomWalkGenerator.__fill_with_random_walk_values__(symbol, curr_min_df,
+                                                                               max_window_timestamp,
+                                                                               max_df_timestamp,
+                                                                               variables_csv)
+            if rnn_predictions_today_df is None:  # we initialize the summarization df
+                rnn_predictions_today_df =  pd.DataFrame(columns=['trading_symbol', 'date', 'formatted_date', 'action'])
+
+            rnn_predictions_curr_window_df,_ = rnn_model_processer.test_daytrading_LSTM(symbol,
+                                                                                     curr_min_df,
+                                                                                     model_to_use= model_to_use,
+                                                                                     timesteps= timesteps,
+                                                                                     price_to_use="close",
+                                                                                     #preloaded_model=preloaded_model,
+                                                                                     prev_states=states)
+
+            pred_action = rnn_predictions_curr_window_df["action"].iloc[-1]
+            curr_mkt_price = rnn_predictions_curr_window_df["trading_symbol_price"].iloc[-1]
+            end_of_timestamp = rnn_predictions_curr_window_df["date"].iloc[-1]
+            self.logger.do_log(f"Predicting at {pred_action} at end of {end_of_timestamp} at current mkt price={curr_mkt_price} for symbol {symbol}",MessageType.INFO)
+
+            rnn_predictions_today_df = pd.concat([rnn_predictions_today_df, rnn_predictions_curr_window_df.iloc[-1].to_frame().T],ignore_index=True)
+        return rnn_predictions_today_df
+
+
     def __process_LSTM_day_as_cum_sliding_window__(self,rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol):
         rnn_predictions_today_df = None
         #preloaded_model = rnn_model_processer.preload_model(model_to_use=model_to_use)
@@ -658,6 +686,8 @@ class AlgosOrchestationLogic:
 
             curr_min_df= test_series_df[test_series_df['date'] <= max_timestamp]
             self.logger.do_log(f"Processing Window from {min_timestamp} to {max_timestamp} for day {day} for symbol {symbol}",MessageType.INFO)
+
+
 
             if rnn_predictions_today_df is None:  # we initialize the summarization df
                 rnn_predictions_today_df =  pd.DataFrame(columns=['trading_symbol', 'date', 'formatted_date', 'action'])
@@ -701,7 +731,7 @@ class AlgosOrchestationLogic:
 
     def process_test_daily_LSTM(self,symbol,variables_csv, model_to_use, d_from,d_to,timesteps,portf_size, trade_comm,
                                 trading_algo,interval=None,grouping_unit=None,n_algo_params=[],
-                                use_sliding_window=False):
+                                use_sliding_window=None):
         try:
 
             self.logger.do_log(f"Initializing backest for symbol {symbol} from {d_from} to {d_to} (porft_size={portf_size} comm={trade_comm} )", MessageType.INFO)
@@ -753,11 +783,15 @@ class AlgosOrchestationLogic:
                 #preprocess before the predictions
                 test_series_df = test_series_df.dropna(subset=[symbol])
 
-                if use_sliding_window:#slower, but we only pass every <timestemps> records to make sure of the accuracy of the prediction
+                if sws(use_sliding_window)==sws.CUT_INPUT_DF :#slower, but we only pass every <timestemps> records to make sure of the accuracy of the prediction
                     #rnn_predictions_today_df=self.__process_LSTM_day_as_sliding_window__(rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol)
                     rnn_predictions_today_df = self.__process_LSTM_day_as_cum_sliding_window__(rnn_model_processer,model_to_use, test_series_df,timesteps, day, symbol)
-                else:#faster, but we pass the dataframe with ALL the daily records, which might create some look ahead bias
+                elif sws(use_sliding_window)==sws.NONE:#faster, but we pass the dataframe with ALL the daily records, which might create some look ahead bias
                     rnn_predictions_today_df=self.__process_LSTM_day_single_run__(rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol)
+                elif sws(use_sliding_window)==sws.GET_FAKE_DATA:
+                    rnn_predictions_today_df = self.__process_LSTM_day_as_fill_fake_data__(rnn_model_processer,model_to_use,test_series_df,timesteps, day, symbol,variables_csv)
+                else:
+                    raise  Exception(f"Could not find use_sliding_window param {use_sliding_window}")
 
                 total_net_profit+=self.__run_LSTM_daily_backtest__(day, symbol, rnn_predictions_today_df, portf_size, trade_comm,
                                                 trading_algo, n_algo_params,max_cum_drawdowns, daily_profits,
