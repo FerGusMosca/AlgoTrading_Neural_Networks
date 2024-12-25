@@ -1,6 +1,7 @@
 import traceback
 from datetime import timedelta, datetime
 
+from business_entities.porft_summary import PortfSummary
 from common.enums.grouping_criterias import GroupCriteria as gc
 from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws
 from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas
@@ -158,33 +159,33 @@ class AlgosOrchestationLogic:
             raise Exception(f'Not implemented algo')
         else:
             raise Exception(f"NOT RECOGNIZED trading algo {trading_algo}")
-    def __backtest_daily_strategy__(self,rnn_predictions_df,portf_size, trade_comm,trading_algo,n_algo_params=[]):
+    def __backtest_daily_strategy__(self,rnn_predictions_df,portf_summary):
 
 
         #print(f"{rnn_predictions_df.head()}")
 
-        if tas(trading_algo)==tas.RAW_ALGO:
+        if tas(portf_summary.trading_algo)==tas.RAW_ALGO:
             daily_trading_backtester = RawAlgoDailyTradingBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
-                                                                                            rnn_predictions_df, portf_size, trade_comm,n_algo_params)
+                                                                                            rnn_predictions_df, portf_summary.portf_pos_size, portf_summary.trade_comm,portf_summary.n_algo_params)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
-        elif tas(trading_algo)==tas.N_MIN_BUFFER_W_FLIP:
+        elif tas(portf_summary.trading_algo)==tas.N_MIN_BUFFER_W_FLIP:
 
 
             daily_trading_backtester = NMinBufferWFlipDailyTradingBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
-                rnn_predictions_df, portf_size, trade_comm,n_algo_params)
+                rnn_predictions_df, portf_summary.portf_pos_size, portf_summary.trade_comm,portf_summary.n_algo_params)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
-        elif tas(trading_algo)==tas.ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG:
+        elif tas(portf_summary.trading_algo)==tas.ONLY_SIGNAL_N_MIN_PLUS_MOV_AVG:
             daily_trading_backtester = OnlySignalNMinMovAvgBacktester()
             daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = daily_trading_backtester.backtest_daily_predictions(
-                rnn_predictions_df, portf_size, trade_comm,n_algo_params)
+                rnn_predictions_df, portf_summary.portf_pos_size, portf_summary.trade_comm,portf_summary.n_algo_params)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
         else:
-            raise Exception(f"NOT RECOGNIZED trading algo {trading_algo}")
+            raise Exception(f"NOT RECOGNIZED trading algo {portf_summary.trading_algo}")
 
     # Returns prices of Symbol, starting on day, for N timesteps of X interval
     # Ex: If inteval is Day and start day 10/10/2023  and timesteps is 10
@@ -252,9 +253,6 @@ class AlgosOrchestationLogic:
 
         return None
 
-    def __calculate_max_total_drawdown__(self,daily_profits):
-        daily_trading_backtester = RawAlgoDailyTradingBacktester()
-        return daily_trading_backtester.calculate_max_total_drawdown(daily_profits)
 
     def train_algos(self,series_csv,d_from,d_to):
 
@@ -669,7 +667,7 @@ class AlgosOrchestationLogic:
             pred_action = rnn_predictions_curr_window_df["action"].iloc[-1]
             curr_mkt_price = rnn_predictions_curr_window_df["trading_symbol_price"].iloc[-1]
             end_of_timestamp = rnn_predictions_curr_window_df["date"].iloc[-1]
-            self.logger.do_log(f"Predicting at {pred_action} at end of {end_of_timestamp} at current mkt price={curr_mkt_price} for symbol {symbol}",MessageType.INFO)
+            self.logger.do_log(f"{datetime.now()}-Predicting at {pred_action} at end of {end_of_timestamp} at current mkt price={curr_mkt_price} for symbol {symbol}",MessageType.INFO)
 
             rnn_predictions_today_df = pd.concat([rnn_predictions_today_df, rnn_predictions_curr_window_df.iloc[-1].to_frame().T],ignore_index=True)
         return rnn_predictions_today_df
@@ -716,15 +714,14 @@ class AlgosOrchestationLogic:
         return rnn_predictions_today_df
 
 
-    def __run_LSTM_daily_backtest__(self,day,symbol,rnn_predictions_today_df, portf_size, trade_comm, trading_algo, n_algo_params,
-                                        max_cum_drawdowns,daily_profits,accum_positions):
-        self.logger.do_log(f"Backtesting all day {day} for symbol {symbol}", MessageType.INFO)
+    def __run_LSTM_daily_backtest__(self,day,rnn_predictions_today_df,portf_summary):
+        self.logger.do_log(f"Backtesting all day {day} for symbol {portf_summary.symbol}", MessageType.INFO)
         daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df = self.__backtest_daily_strategy__(
-            rnn_predictions_today_df, portf_size, trade_comm, trading_algo, n_algo_params)
-        max_cum_drawdowns.append(max_daily_cum_drawdown)
-        daily_profits.append(daily_net_profit)
+                                                                                        rnn_predictions_today_df, portf_summary)
+        portf_summary.max_cum_drawdowns.append(max_daily_cum_drawdown)
+        portf_summary.daily_profits.append(daily_net_profit)
 
-        accum_positions += total_positions
+        portf_summary.accum_positions += total_positions
         self.__log_day_trading_results__(day, daily_net_profit, total_positions, trading_summary_df)
         self.logger.do_log(f"Moving to the next business day from {day}", MessageType.INFO)
         return  daily_net_profit
@@ -742,18 +739,15 @@ class AlgosOrchestationLogic:
             business_days = [day for day in all_days if day.weekday() < 5]
             rnn_model_processer = DayTradingRNNModelCreator()
 
-            max_cum_drawdowns=[]
-            daily_profits=[]
-            total_net_profit=0
-            accum_positions=0
-
+            portf_summary = PortfSummary(symbol,portf_size,p_trade_comm= trade_comm,
+                                         p_trading_algo= trading_algo,p_algo_params=n_algo_params)
             for day in business_days:
                 self.logger.do_log(f"Processing day {day}  )",MessageType.INFO)
 
                 start_timestamp=day if (d_from.hour == 0 and d_from.minute == 0 and d_to.second == 0) else d_from
                 end_timestamp= (start_timestamp + timedelta(hours=23, minutes=59, seconds=59)) if (d_to.hour == 0 and d_to.minute == 0 and d_to.second == 0) else d_to
 
-                symbol_int_series_df = self.data_set_builder.build_interval_series(symbol, start_timestamp,
+                symbol_int_series_df = self.data_set_builder.build_interval_series(portf_summary.symbol, start_timestamp,
                                                                                    end_timestamp, interval=interval,
                                                                                    output_col=["symbol", "date", "open",
                                                                                                "high", "low", "close"])
@@ -772,38 +766,46 @@ class AlgosOrchestationLogic:
 
                 test_series_df = self.data_set_builder.merge_minute_series(symbol_int_series_df,
                                                                            variables_int_series_df, "symbol", "date",
-                                                                           symbol)
-
-
+                                                                           portf_summary.symbol)
 
                 if grouping_unit is not None:
                     test_series_df = self.__group_dataframe__(test_series_df, grouping_unit,variables_csv)
                     print((test_series_df.head()))
 
                 #preprocess before the predictions
-                test_series_df = test_series_df.dropna(subset=[symbol])
+                test_series_df = test_series_df.dropna(subset=[portf_summary.symbol])
 
                 if sws(use_sliding_window)==sws.CUT_INPUT_DF :#slower, but we only pass every <timestemps> records to make sure of the accuracy of the prediction
                     #rnn_predictions_today_df=self.__process_LSTM_day_as_sliding_window__(rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol)
-                    rnn_predictions_today_df = self.__process_LSTM_day_as_cum_sliding_window__(rnn_model_processer,model_to_use, test_series_df,timesteps, day, symbol)
+                    rnn_predictions_today_df = self.__process_LSTM_day_as_cum_sliding_window__(rnn_model_processer,model_to_use, test_series_df,timesteps, day, portf_summary.symbol)
                 elif sws(use_sliding_window)==sws.NONE:#faster, but we pass the dataframe with ALL the daily records, which might create some look ahead bias
-                    rnn_predictions_today_df=self.__process_LSTM_day_single_run__(rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol)
+                    rnn_predictions_today_df=self.__process_LSTM_day_single_run__(rnn_model_processer,model_to_use,test_series_df,timesteps,day,portf_summary.symbol)
                 elif sws(use_sliding_window)==sws.GET_FAKE_DATA:
-                    rnn_predictions_today_df = self.__process_LSTM_day_as_fill_fake_data__(rnn_model_processer,model_to_use,test_series_df,timesteps, day, symbol,variables_csv)
+                    rnn_predictions_today_df = self.__process_LSTM_day_as_fill_fake_data__(rnn_model_processer,model_to_use,test_series_df,timesteps, day, portf_summary.symbol,variables_csv)
                 else:
                     raise  Exception(f"Could not find use_sliding_window param {use_sliding_window}")
 
-                total_net_profit+=self.__run_LSTM_daily_backtest__(day, symbol, rnn_predictions_today_df, portf_size, trade_comm,
-                                                trading_algo, n_algo_params,max_cum_drawdowns, daily_profits,
-                                                 accum_positions)
+                portf_summary.total_net_profit+=self.__run_LSTM_daily_backtest__(day, rnn_predictions_today_df,
+                                                                                portf_summary)
+
+                new_position_summary=portf_summary.calculate_last_portf_position_summary(day)#We append the day summary
+
+                self.logger.do_log(f"PERFORMANCE--> day {new_position_summary.day}: Profit:{new_position_summary.day_nom_profit:2f} ( drawdown={new_position_summary.day_drawdown:2f})", MessageType.INFO)
 
 
 
+            portf_summary.update_max_drawdown()
+            self.logger.do_log(f"---Re Displaying Daily PERFORMANCE---", MessageType.INFO)
+            for pos_summary in portf_summary.portf_pos_summary:
+                self.logger.do_log(f" day {pos_summary.day}: Profit:{pos_summary.day_nom_profit:2f} ( drawdown={pos_summary.day_drawdown:2f})", MessageType.INFO)
+            self.logger.do_log(f"---------------------------------------", MessageType.INFO)
+            self.logger.do_log(f"---Summarizing PORTFOLIO PERFORMANCE---", MessageType.INFO)
+            self.logger.do_log(
+                f" Total Net_Profit=${portf_summary.total_net_profit:.2f} Accum. Positions={portf_summary.accum_positions} Max. Daily Drawdown=${portf_summary.max_daily_drawdown:.2f} Max. Period Drawdown=${portf_summary.max_drawdown:.2f}",
+                MessageType.INFO)
 
-            max_daily_drawdown=min(max_cum_drawdowns) if len(max_cum_drawdowns) is None else 0
-            max_total_drawdown= self.__calculate_max_total_drawdown__(daily_profits)
-            self.logger.do_log(f"---Summarizing PORTFOLIO PERFORMANCE---",MessageType.INFO)
-            self.logger.do_log(f" Total Net_Profit=${total_net_profit:.2f} Accum. Positions={accum_positions} Max. Daily Drawdown=${max_daily_drawdown:.2f} Max. Period Drawdown=${max_total_drawdown:.2f}", MessageType.INFO)
+
+
 
         except Exception as e:
             msg = "CRITICAL ERROR processing model @process_test_daily_LSTM:{}".format(str(e))
