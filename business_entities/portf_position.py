@@ -7,6 +7,11 @@ class PortfolioPosition():
     _SIDE_SHORT = "SHORT"
     _DEF_PORTF_AMT = 100000
 
+
+    @staticmethod
+    def get_def_portf_amt():
+        return  PortfolioPosition._DEF_PORTF_AMT
+
     def __init__(self,p_symbol):
         self.symbol =p_symbol
         self.side=None

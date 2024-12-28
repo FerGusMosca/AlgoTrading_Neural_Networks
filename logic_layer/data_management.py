@@ -299,8 +299,8 @@ class AlgosOrchestationLogic:
     def evaluate_trading_performance(self,symbol,series_csv,d_from,d_to,bias,last_trading_dict=None):
 
         try:
-            symbol_df = self.data_set_builder.build_daily_series_classification(symbol, d_from, d_to)
-            series_df = self.data_set_builder.build_daily_series_classification(series_csv, d_from, d_to)
+            symbol_df = self.data_set_builder.build_daily_series_classification(symbol, d_from, d_to,add_classif_col=False)
+            series_df = self.data_set_builder.build_daily_series_classification(series_csv, d_from, d_to,add_classif_col=False)
             mlAnalyzer = MLModelAnalyzer(self.logger)
             portf_pos_dict = mlAnalyzer.evaluate_trading_performance_last_model(symbol_df,symbol,series_df, bias,last_trading_dict)
 
@@ -574,9 +574,8 @@ class AlgosOrchestationLogic:
                 if(test_series_df[symbol].isna().any()):
                     continue # must be a holiday
 
-                rnn_predictions_df_today,states = rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df,
-                                                                                           model_to_use, timesteps,
-                                                                                           prev_states=states)
+                rnn_predictions_df_today,states = rnn_model_processer.test_LSTM(symbol, test_series_df, model_to_use,
+                                                                                timesteps, prev_states=states)
                 if rnn_predictions_df is None:
                     rnn_predictions_df = pd.DataFrame(columns=rnn_predictions_df_today.columns).astype(rnn_predictions_df_today.dtypes)
                 rnn_predictions_df_today = rnn_predictions_df_today[rnn_predictions_df_today['date'] == day]
@@ -594,8 +593,8 @@ class AlgosOrchestationLogic:
 
     def __process_LSTM_day_single_run__(self,rnn_model_processer,model_to_use,test_series_df,timesteps,day,symbol):
 
-        rnn_predictions_today_df,states = rnn_model_processer.test_daytrading_LSTM(symbol, test_series_df, model_to_use,
-                                                                                   timesteps, price_to_use="close")
+        rnn_predictions_today_df,states = rnn_model_processer.test_LSTM(symbol, test_series_df, model_to_use, timesteps,
+                                                                        price_to_use="close")
         self.logger.do_log(f"Predicting ALL TRADES for day {day} and symbol {symbol}",MessageType.INFO)
         return rnn_predictions_today_df
 
@@ -614,13 +613,11 @@ class AlgosOrchestationLogic:
                 rnn_predictions_today_df = pd.DataFrame(columns=test_series_curr_window_df.columns).astype(
                     test_series_curr_window_df.dtypes)
 
-            rnn_predictions_curr_window_df,states = rnn_model_processer.test_daytrading_LSTM(symbol,
-                                                                                             test_series_curr_window_df,
-                                                                                             model_to_use= model_to_use,
-                                                                                             timesteps= timesteps,
-                                                                                             price_to_use="close",
-                                                                                             #preloaded_model=preloaded_model,
-                                                                                             prev_states=states)
+            rnn_predictions_curr_window_df,states = rnn_model_processer.test_LSTM(symbol, test_series_curr_window_df,
+                                                                                  model_to_use=model_to_use,
+                                                                                  timesteps=timesteps,
+                                                                                  price_to_use="close",
+                                                                                  prev_states=states)
 
             pred_action = rnn_predictions_curr_window_df["action"].iloc[0]
             curr_mkt_price = rnn_predictions_curr_window_df["trading_symbol_price"].iloc[0]
@@ -656,13 +653,10 @@ class AlgosOrchestationLogic:
             if rnn_predictions_today_df is None:  # we initialize the summarization df
                 rnn_predictions_today_df =  pd.DataFrame(columns=['trading_symbol', 'date', 'formatted_date', 'action'])
 
-            rnn_predictions_curr_window_df,_ = rnn_model_processer.test_daytrading_LSTM(symbol,
-                                                                                     curr_min_df,
-                                                                                     model_to_use= model_to_use,
-                                                                                     timesteps= timesteps,
-                                                                                     price_to_use="close",
-                                                                                     #preloaded_model=preloaded_model,
-                                                                                     prev_states=states)
+            rnn_predictions_curr_window_df,_ = rnn_model_processer.test_LSTM(symbol, curr_min_df,
+                                                                             model_to_use=model_to_use,
+                                                                             timesteps=timesteps, price_to_use="close",
+                                                                             prev_states=states)
 
             pred_action = rnn_predictions_curr_window_df["action"].iloc[-1]
             curr_mkt_price = rnn_predictions_curr_window_df["trading_symbol_price"].iloc[-1]
@@ -690,11 +684,11 @@ class AlgosOrchestationLogic:
             if rnn_predictions_today_df is None:  # we initialize the summarization df
                 rnn_predictions_today_df =  pd.DataFrame(columns=['trading_symbol', 'date', 'formatted_date', 'action'])
 
-            rnn_predictions_curr_window_df = rnn_model_processer.test_stateful_daytrading_LSTM(symbol=symbol,
-                                                                                             test_series_df=curr_min_df,
-                                                                                             model_to_use=model_to_use,
-                                                                                             timesteps=timesteps,
-                                                                                             price_to_use="close")
+            rnn_predictions_curr_window_df = rnn_model_processer.test_stateful_LSTM(symbol=symbol,
+                                                                                    test_series_df=curr_min_df,
+                                                                                    model_to_use=model_to_use,
+                                                                                    timesteps=timesteps,
+                                                                                    price_to_use="close")
 
 
 
@@ -861,12 +855,10 @@ class AlgosOrchestationLogic:
 
             rnn_model_trainer= DayTradingRNNModelCreator()
 
-            rnn_model_trainer.train_daytrading_LSTM(training_series_df, model_output, symbol_min_series_df, classif_key,
-                                                    epochs, timestamps, n_neurons, learning_rate, reg_rate,
-                                                    dropout_rate,clipping_rate,accuracy_stop,
-                                                    inner_activation=inner_activation,
-                                                    make_stationary=make_stationary,
-                                                    batch_size=batch_size)
+            rnn_model_trainer.train_LSTM(training_series_df, model_output, symbol_min_series_df, classif_key, epochs,
+                                         timestamps, n_neurons, learning_rate, reg_rate, dropout_rate, clipping_rate,
+                                         accuracy_stop, make_stationary=make_stationary,
+                                         inner_activation=inner_activation, batch_size=batch_size)
 
             #pd.set_option('display.max_columns', None)
             #print(training_series_df.head())

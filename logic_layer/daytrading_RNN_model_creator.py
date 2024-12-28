@@ -189,7 +189,7 @@ class DayTradingRNNModelCreator:
 
     #region Public Methods
 
-    def train_daytrading_LSTM(self, training_series_df, model_output, symbol, classif_key, epochs,
+    def train_LSTM(self, training_series_df, model_output, symbol, classif_key, epochs,
                    timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate=None,
                               accuracy_stop=None, make_stationary=False,inner_activation='tanh',batch_size=1):
         """
@@ -268,7 +268,7 @@ class DayTradingRNNModelCreator:
         model = tensorflow.keras.models.load_model(model_to_use)
         return  model
 
-    def test_stateful_daytrading_LSTM(self, symbol, test_series_df, model_to_use, timesteps, price_to_use="close",
+    def test_stateful_LSTM(self, symbol, test_series_df, model_to_use, timesteps, price_to_use="close",
                                       preloaded_model=None):
         self.__preformat_test_sets__(test_series_df)
 
@@ -319,7 +319,7 @@ class DayTradingRNNModelCreator:
 
         return result_df
 
-    def test_daytrading_LSTM(self,symbol,test_series_df, model_to_use,timesteps,price_to_use="close",
+    def test_LSTM(self,symbol,test_series_df, model_to_use,timesteps,price_to_use="close",
                             preloaded_model=None, prev_states=None):
 
         self.__preformat_test_sets__(test_series_df)

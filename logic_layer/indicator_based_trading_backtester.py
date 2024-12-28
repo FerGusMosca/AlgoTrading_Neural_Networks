@@ -85,7 +85,7 @@ class IndicatorBasedTradingBacktester:
             pct_profit=pos.calculate_pct_profit()
             th_nom_profit=pos.calculate_th_nom_profit()
 
-            portf_pos_summary=PortfPositionSummary(pos,pct_profit,th_nom_profit,PortfolioPosition._DEF_PORTF_AMT)
+            portf_pos_summary=PortfPositionSummary(pos,pct_profit,th_nom_profit,PortfolioPosition.get_def_portf_amt())
             summary.append_position_summary(portf_pos_summary)
 
 

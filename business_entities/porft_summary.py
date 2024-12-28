@@ -1,3 +1,4 @@
+from business_entities.portf_pnl_summary import PortfPnLSummary
 from business_entities.portf_position_summary import PortfPositionSummary
 from common.util.financial_calculation_helper import FinancialCalculationsHelper
 
@@ -44,6 +45,6 @@ class PortfSummary:
 
 
     def calculate_last_portf_position_summary(self,day):
-        position_summary= PortfPositionSummary(day,self.daily_profits[-1],self.max_cum_drawdowns[-1])
+        position_summary= PortfPnLSummary(day,self.daily_profits[-1],self.max_cum_drawdowns[-1])
         self.portf_pos_summary.append(position_summary)
         return  position_summary
