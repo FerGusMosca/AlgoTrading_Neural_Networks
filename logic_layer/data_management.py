@@ -571,7 +571,7 @@ class AlgosOrchestationLogic:
                 #we filter the unecessary in all record to fetch all the indicators
                 test_series_df = test_series_df[test_series_df['date'] >= start_period ]
 
-                if(test_series_df[symbol].isna().any()):
+                if(test_series_df["trading_symbol"].isna().any()):
                     continue # must be a holiday
 
                 rnn_predictions_df_today,states = rnn_model_processer.test_LSTM(symbol, test_series_df, model_to_use,
@@ -878,6 +878,18 @@ class AlgosOrchestationLogic:
 
         prices_df= self.data_set_builder.build_interval_series(symbol, start_of_day, end_of_day,
                                                                interval=DataSetBuilder._1_MIN_INTERVAL)
+
+        GraphBuilder.build_candles_graph(prices_df,mov_avg_unit =mov_avg_unit)
+
+        return  None
+
+
+    def process_indicator_candles_graph(self,symbol, d_from,d_to, interval,mov_avg_unit):
+        start_of_day = datetime(d_from.year, d_from.month, d_from.day)
+        end_of_day = datetime(d_to.year, d_to.month, d_to.day) + timedelta(hours=23, minutes=59, seconds=59)
+
+        prices_df= self.data_set_builder.build_interval_series(symbol, start_of_day, end_of_day,
+                                                               interval=interval)
 
         GraphBuilder.build_candles_graph(prices_df,mov_avg_unit =mov_avg_unit)
 

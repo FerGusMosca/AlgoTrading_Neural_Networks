@@ -18,7 +18,8 @@ last_trading_dict = None
 
 
 def show_commands():
-    print("#0-DailyCandlesGraph  [Symbol] [date] [interval] [mmov_avg]")
+    print("#0.1-DailyCandlesGraph  [Symbol] [date] [interval] [mmov_avg]")
+    print("#0.2-IndicatorCandlesGraph  [Symbol] [from] [to] [interval] [mmov_avg]")
     print("#1-TrainMLAlgos  [SeriesCSV] [from] [to] [classif_key]")
     print("#2-RunPredictionsLastModel [SeriesCSV] [from] [to] [classif_key]")
     print("#3-EvalBiasedTradingAlgo [Symbol] [SeriesCSV] [from] [to] [Bias] [classif_key]")
@@ -546,6 +547,32 @@ def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model
         logger.print("CRITICAL ERROR running process_test_daily_LSTM:{}".format(str(e)), MessageType.ERROR)
 
 
+
+def process_indicator_candles_graph(symbol, d_from,d_to, interval,mov_avg_unit):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print(f"Initializing indicator candle graph creation for symbol {symbol} from {d_from} to {d_to}",
+                     MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                         None, logger)
+
+        dataMgm.process_indicator_candles_graph(symbol,
+                                            DateHandler.convert_str_date(d_from, _DATE_FORMAT),
+                                            DateHandler.convert_str_date(d_to, _DATE_FORMAT),
+                                            interval.replace('_', " "),int(mov_avg_unit))
+
+        logger.print(f"Indicator Graph successfully shown for symbol {symbol} from {d_from} to {d_to}",MessageType.INFO)
+
+    except Exception as e:
+        logger.print("CRITICAL ERROR running process_indicator_candles_graph:{}".format(str(e)), MessageType.ERROR)
+
+
+
 def process_daily_candles_graph(symbol, date, interval,mov_avg_unit):
     loader = MLSettingsLoader()
     logger = Logger()
@@ -618,6 +645,11 @@ def process_commands(cmd):
         params_validation("DailyCandlesGraph", cmd_param_list, 5)
         process_daily_candles_graph(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3],
                                     cmd_param_list[4])
+    elif cmd_param_list[0] == "IndicatorCandlesGraph":
+
+        params_validation("IndicatorCandlesGraph", cmd_param_list, 6)
+        process_indicator_candles_graph(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3],
+                                    cmd_param_list[4],cmd_param_list[5])
     elif cmd_param_list[0] == "TestDailyLSTM":
         process_test_LSTM_cmd(cmd)
 
