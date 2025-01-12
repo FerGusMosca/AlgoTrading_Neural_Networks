@@ -1,5 +1,6 @@
 import math
 
+import joblib
 import pandas as pd
 import numpy as np
 import tensorflow
@@ -17,7 +18,7 @@ from sklearn.preprocessing import LabelEncoder
 from common.util.dataframe_filler import DataframeFiller
 
 _OUTPUT_DATE_FORMAT='%m/%d/%Y %H:%M:%S'
-
+_OUTPUT_PATH="./output/"
 
 class CustomEarlyStopping(Callback):
     def __init__(self, monitor_train='accuracy', monitor_val='val_accuracy', threshold=0.8):
@@ -52,6 +53,17 @@ class DayTradingRNNModelCreator:
         test_series_df (pd.DataFrame): DataFrame containing the test time series data.
         """
         test_series_df.dropna(inplace=True)
+
+
+    def __load_scaler_and_normalize__(self,X):
+        scaler = joblib.load(f"{_OUTPUT_PATH}last_scaler.pkl")
+        X = scaler.transform(X)
+        return X
+    def __normalize_and_save_scaler__(self,X):
+        scaler = StandardScaler()
+        X = scaler.fit_transform(X)
+        joblib.dump(scaler, f"{_OUTPUT_PATH}last_scaler.pkl")
+        return X
 
     # Function to make all numeric variables in the dataframe stationary
     def __make_stationary__(self,df):
@@ -111,8 +123,7 @@ class DayTradingRNNModelCreator:
             raise ValueError("feature_columns must be provided to match the training set.")
 
         # Normalize the feature data
-        scaler = StandardScaler()
-        X_test = scaler.fit_transform(X_test)
+        X_test= self.__load_scaler_and_normalize__(X_test)
 
         return X_test
 
@@ -169,8 +180,7 @@ class DayTradingRNNModelCreator:
         y = training_series_df[classif_key].values
 
         # Normalize the feature data
-        scaler = StandardScaler()
-        X = scaler.fit_transform(X)
+        X= self.__normalize_and_save_scaler__(X)
 
         # Encode the target variable (classif_key) to numeric values 1, 2, 3
         label_encoder_target = LabelEncoder()
@@ -205,11 +215,14 @@ class DayTradingRNNModelCreator:
 
             training_series_df = DataframeFiller.fill_missing_values(training_series_df)
 
+            #1-Stationary DF
             if make_stationary:
                 training_series_df=self.__make_stationary__(training_series_df)
 
+            #2-Preformat DF
             self.__preformat_training_set__(training_series_df)
-            # Get training and test sets
+
+            # Get training and test sets + #3-Normalize
             X_train, X_test, y_train, y_test = self.__get_training_sets__(training_series_df,
                                                                           "trading_symbol", "date",
                                                                           classif_key
@@ -320,10 +333,16 @@ class DayTradingRNNModelCreator:
         return result_df
 
     def test_LSTM(self,symbol,test_series_df, model_to_use,timesteps,price_to_use="close",
-                            preloaded_model=None, prev_states=None):
+                            preloaded_model=None, prev_states=None,make_stationary=True):
 
+        #1-Stationary DF
+        if make_stationary:
+            test_series_df = self.__make_stationary__(test_series_df)
+
+        # 2-Preformat DF
         self.__preformat_test_sets__(test_series_df)
 
+        #Get Test Sets + #3-Normalize
         X_test=self.__get_test_sets__(test_series_df,symbol_col="trading_symbol",date_col="date")
 
         model=None

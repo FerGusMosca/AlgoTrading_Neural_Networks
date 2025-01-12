@@ -533,7 +533,8 @@ class AlgosOrchestationLogic:
             raise Exception(msg)
 
     def process_test_scalping_LSTM(self,symbol,variables_csv, model_to_use, d_from,d_to,timesteps,portf_size, trade_comm,
-                                trading_algo,interval=None,grouping_unit=None,n_algo_params=[]):
+                                trading_algo,interval=None,grouping_unit=None,n_algo_params=[],
+                                   make_stationary=True):
         try:
 
             self.logger.do_log(f"Initializing backest for symbol {symbol} from {d_from} to {d_to} (porft_size={portf_size} comm={trade_comm} )", MessageType.INFO)
@@ -576,7 +577,8 @@ class AlgosOrchestationLogic:
                     continue # must be a holiday
 
                 rnn_predictions_df_today,states = rnn_model_processer.test_LSTM(symbol, test_series_df, model_to_use,
-                                                                                timesteps, prev_states=states)
+                                                                                timesteps, prev_states=states,
+                                                                                make_stationary=make_stationary)
                 if rnn_predictions_df is None:
                     rnn_predictions_df = pd.DataFrame(columns=rnn_predictions_df_today.columns).astype(rnn_predictions_df_today.dtypes)
                 rnn_predictions_df_today = rnn_predictions_df_today[rnn_predictions_df_today['date'] == day]
@@ -723,7 +725,7 @@ class AlgosOrchestationLogic:
 
     def process_test_daily_LSTM(self,symbol,variables_csv, model_to_use, d_from,d_to,timesteps,portf_size, trade_comm,
                                 trading_algo,interval=None,grouping_unit=None,n_algo_params=[],
-                                use_sliding_window=None):
+                                use_sliding_window=None,make_stationary=True):
         try:
 
             self.logger.do_log(f"Initializing backest for symbol {symbol} from {d_from} to {d_to} (porft_size={portf_size} comm={trade_comm} )", MessageType.INFO)

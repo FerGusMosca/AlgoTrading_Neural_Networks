@@ -141,6 +141,7 @@ def process_test_LSTM_cmd(cmd):
     n_buffer=__get_param__(cmd,"n_buffer",True,None)
     mov_avg=__get_param__(cmd,"mov_avg",True,None)
     use_sliding_window = __get_param__(cmd, "use_sliding_window", True,def_value="None")#NONE,CUT_INPUT_DF,GET_FAKE_DATA
+    make_stationary = __get_bool_param__(cmd, "make_stationary", True, False)
 
     cmd_param_list=[]
     if n_buffer is not None:
@@ -154,7 +155,7 @@ def process_test_LSTM_cmd(cmd):
                             timesteps=timesteps,model_to_use=model_to_use, portf_size=portf_size,
                             trade_comm=comm, trading_algo=trading_algo,interval=interval,
                             grouping_unit=grouping_unit,n_params=cmd_param_list,
-                            use_sliding_window=use_sliding_window)
+                            use_sliding_window=use_sliding_window,make_stationary=make_stationary)
 
     print(f"Test LSTM successfully finished...")
 
@@ -497,7 +498,8 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
 
 
 def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model_to_use, portf_size, trade_comm,
-                            trading_algo,grouping_unit=None,n_params=[],interval=None,use_sliding_window=None):
+                            trading_algo,grouping_unit=None,n_params=[],interval=None,use_sliding_window=None,
+                            make_stationary=True):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -523,7 +525,8 @@ def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model
                                             grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
                                             n_algo_params=n_params,
                                             interval=interval if interval is not None else None,
-                                            use_sliding_window=use_sliding_window
+                                            use_sliding_window=use_sliding_window,
+                                            make_stationary=make_stationary
                                             )
         elif interval==DataSetBuilder._1_DAY_INTERVAL:
             dataMgm.process_test_scalping_LSTM(symbol=symbol, variables_csv=variables_csv,
@@ -536,7 +539,8 @@ def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model
                                                trading_algo=trading_algo,
                                                grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
                                                n_algo_params=n_params,
-                                               interval=interval if interval is not None else None
+                                               interval=interval if interval is not None else None,
+                                               make_stationary=make_stationary
                                                )
         else:
             raise Exception(f"Unknown interval! : {interval}")
