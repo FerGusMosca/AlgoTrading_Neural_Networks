@@ -1,3 +1,6 @@
+import os
+from datetime import datetime
+
 from sklearn.model_selection import train_test_split
 import numpy as np
 import pandas as pd
@@ -13,6 +16,7 @@ from sklearn.tree import DecisionTreeClassifier
 
 from business_entities.portf_position import PortfolioPosition
 from common.util.dataframe_filler import DataframeFiller
+from common.util.file_writer import FileWriter
 from common.util.light_logger import LightLogger
 from framework.common.logger.message_type import MessageType
 # K Nearest Neighbors classification algorithm
@@ -34,6 +38,18 @@ class MLModelAnalyzer():
 
     def __init__(self,p_logger):
         self.logger=p_logger
+
+
+    @staticmethod
+    def __build_model_base_name__(series_csv, d_from, d_to,p_classif_key):
+
+        variables_def=series_csv.replace(",","+")
+        s_from=d_from.strftime('%d%m%Y')
+        s_to=d_to.strftime('%d%m%Y')
+        timestamp=datetime.now().strftime('%d%m%Y%H%M%S')
+
+        model_base_name=f"{p_classif_key}_{s_from}_{s_to}_{timestamp}"
+        return model_base_name,variables_def
 
     def __eval_exists_value_on_df__(self,panda_df,key,key_val,val_col):
         if panda_df[key] is not None:
@@ -112,10 +128,22 @@ class MLModelAnalyzer():
 
         return  y_hat_cat
 
-    def __persist_model__(self,trained_algo,algo_name,y_mapping):
-        file_path="{}{}".format(_OUTPUT_PATH,"{}.pkl".format(algo_name))
-        with open(file_path, 'wb') as file:
-            pickle.dump({'model': trained_algo, 'label_mapping': y_mapping}, file)
+    def __persist_model__(self,trained_model,algo_name,model_base_name,y_mapping,variables_def=None):
+        #We create the
+        FileWriter.__create_directory__(_OUTPUT_PATH,algo_name)
+
+        #Root paths and File Names
+        model_root_path= f"{_OUTPUT_PATH}{algo_name}/"
+        file_name = f"{algo_name}_{model_base_name}"
+
+        #The Model for storage
+        FileWriter.__dump_model__(model_root_path, file_name, trained_model, y_mapping, "wb")
+
+        #Description File
+        FileWriter.__write_file__(f"{model_root_path}{file_name}_desc.txt",variables_def,"w")
+
+        #The quick access model --> To be used by the next EvalBiasedTradingAlgo cmd
+        FileWriter.__dump_model__(_OUTPUT_PATH, algo_name, trained_model, y_mapping, "wb")
 
     def __fetch_model__(self,algo_name):
         file_path = "{}{}".format(_OUTPUT_PATH, "{}.pkl".format(algo_name))
@@ -168,7 +196,7 @@ class MLModelAnalyzer():
         X_numeric = X[X_num_cols]
         return  X_numeric
 
-    def run_logistic_regression_eval(self,X_train, y_train,X_test,y_test,y_mapping):
+    def run_logistic_regression_eval(self,X_train, y_train,X_test,y_test,y_mapping,model_base_name,variables_def):
         # TRAINING - Logistic Regression w/GridSearchcv
         resp_row = {'Model': 'Logistic Regression', 'Train Accuracy': None,'Test Accuracy':None}
 
@@ -188,7 +216,8 @@ class MLModelAnalyzer():
         resp_row["Test Accuracy"] = lr_accuracy
         self.logger.do_log("Logistic Regression - Test Accuracy Score :{}".format(lr_accuracy),MessageType.INFO)
 
-        self.__persist_model__(logreg_cv.best_estimator_, _LOGISTIC_REGRESSION_MODEL_NAME, y_mapping)
+        self.__persist_model__(logreg_cv.best_estimator_, _LOGISTIC_REGRESSION_MODEL_NAME, model_base_name, y_mapping,
+                               variables_def)
 
         #yhat = logreg_cv.predict(X_test)
         # self.plot_confusion_matrix(y_test, yhat)
@@ -266,7 +295,7 @@ class MLModelAnalyzer():
         y_hat = knn.predict(X_test_num)
         return  self.build_out_of_sample_report_row("K-Nearest Neighbour",y_test,y_hat)
 
-    def run_support_vector_machine_eval(self, X_train, y_train, X_test, y_test,y_mapping):
+    def run_support_vector_machine_eval(self, X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def):
         # TRAINING - SVM w/GridSearchcv
         resp_row = {'Model': 'Support Vector Machine', 'Train Accuracy': None, 'Test Accuracy': None}
 
@@ -290,11 +319,12 @@ class MLModelAnalyzer():
 
         #yhat = logreg_cv.predict(X_test)
         #self.plot_confusion_matrix(y_test, yhat)
-        self.__persist_model__(svm_cv.best_estimator_, _SVM_MODEL_NAME, y_mapping)
+
+        self.__persist_model__(svm_cv.best_estimator_, _SVM_MODEL_NAME, model_base_name, y_mapping, variables_def)
 
         return resp_row
 
-    def run_decision_tree_eval(self, X_train, y_train, X_test, y_test,y_mapping,reuse_last=False):
+    def run_decision_tree_eval(self, X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def,reuse_last=False):
         # TRAINING - Decission Tree w/GridSearchcv
         resp_row = {'Model': 'Decision Tree', 'Train Accuracy': None, 'Test Accuracy': None}
 
@@ -320,11 +350,12 @@ class MLModelAnalyzer():
         self.logger.do_log("Decision Tree - Test Accuracy Score :{}".format(tree_accuracy),MessageType.INFO)
         resp_row["Test Accuracy"] = tree_accuracy
 
-        self.__persist_model__(tree_cv.best_estimator_, _DECISSION_TREE_MODEL_NAME, y_mapping)
+        self.__persist_model__(tree_cv.best_estimator_, _DECISSION_TREE_MODEL_NAME, model_base_name, y_mapping,
+                               variables_def)
 
         return resp_row
 
-    def run_k_nearest_neighbour_eval(self, X_train, y_train, X_test, y_test,y_mapping):
+    def run_k_nearest_neighbour_eval(self, X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def):
         # TRAINING - KNN w/GridSearchcv
         resp_row = {'Model': 'K Nearest Neighbour', 'Train Accuracy': None, 'Test Accuracy': None}
 
@@ -347,11 +378,12 @@ class MLModelAnalyzer():
         self.logger.do_log("KNN - Test Accuracy Score :{}".format(knn_accuracy),MessageType.INFO)
         resp_row["Test Accuracy"] = knn_accuracy
 
-        self.__persist_model__(knn_cv.best_estimator_, _KNN_MODEL_NAME, y_mapping)
+        self.__persist_model__(knn_cv.best_estimator_, _KNN_MODEL_NAME, model_base_name, y_mapping, variables_def)
         return resp_row
 
 
-    def fit_and_evaluate(self,series_df,classification_col):
+    def fit_and_evaluate(self,series_df,classification_col,model_base_name,variables_def):
+
         comparisson_df = pd.DataFrame(columns=['Model','Train Accuracy','Test Accuracy'])
 
         series_df = DataframeFiller.fill_missing_values(series_df)
@@ -378,19 +410,19 @@ class MLModelAnalyzer():
         X_train, X_test, y_train, y_test =self.__clean_NaN__(X_train,X_test,y_train,y_test)
 
         #LOGISTIC REGRESSION
-        resp_row= self.run_logistic_regression_eval(X_train, y_train,X_test,y_test,y_mapping)
+        resp_row= self.run_logistic_regression_eval(X_train, y_train,X_test,y_test,y_mapping,model_base_name,variables_def)
         comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
         # SUPPORT VECTOR MACHINE
-        resp_row = self.run_support_vector_machine_eval(X_train, y_train, X_test, y_test,y_mapping)
+        resp_row = self.run_support_vector_machine_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
         comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
         # DECISSION TREE
-        resp_row = self.run_decision_tree_eval(X_train, y_train, X_test, y_test,y_mapping)
+        resp_row = self.run_decision_tree_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
         comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
         # K NEAREST NEIGHBOUR
-        resp_row = self.run_k_nearest_neighbour_eval(X_train, y_train, X_test, y_test,y_mapping)
+        resp_row = self.run_k_nearest_neighbour_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
         comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
         return comparisson_df

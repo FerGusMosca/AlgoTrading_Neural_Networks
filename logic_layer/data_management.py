@@ -254,12 +254,13 @@ class AlgosOrchestationLogic:
         return None
 
 
-    def train_algos(self,series_csv,d_from,d_to):
+    def train_algos(self,series_csv,d_from,d_to,p_classif_key):
 
         try:
             series_df= self.data_set_builder.build_daily_series_classification(series_csv, d_from, d_to)
             mlAnalyzer=MLModelAnalyzer(self.logger)
-            comp_df= mlAnalyzer.fit_and_evaluate(series_df, DataSetBuilder._CLASSIFICATION_COL)
+            model_base_name,variables_def =MLModelAnalyzer.__build_model_base_name__(series_csv,d_from,d_to,p_classif_key)
+            comp_df= mlAnalyzer.fit_and_evaluate(series_df, DataSetBuilder._CLASSIFICATION_COL,model_base_name,variables_def)
             return comp_df
 
         except Exception as e:

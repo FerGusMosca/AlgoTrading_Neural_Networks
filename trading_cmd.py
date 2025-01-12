@@ -207,11 +207,13 @@ def process_train_ml_algos(cmd_param_list, str_from, str_to, classification_key=
 
         config_settings = loader.load_settings("./configs/commands_mgr.ini")
 
+        classif_key=classification_key if classification_key is not None else config_settings["classification_map_key"]
+
         dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
-                                         classification_key if classification_key is not None else config_settings[
-                                             "classification_map_key"], logger)
+                                         classif_key, logger)
         dataMgm.train_algos(cmd_param_list, DateHandler.convert_str_date(str_from, _DATE_FORMAT),
-                            DateHandler.convert_str_date(str_to, _DATE_FORMAT))
+                            DateHandler.convert_str_date(str_to, _DATE_FORMAT),
+                            classif_key)
 
     except Exception as e:
         logger.print("CRITICAL ERROR bootstrapping the system:{}".format(str(e)), MessageType.ERROR)
