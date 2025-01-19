@@ -5,7 +5,7 @@ from common.util.date_handler import DateHandler
 from common.util.logger import Logger
 from common.util.ml_settings_loader import MLSettingsLoader
 from framework.common.logger.message_type import MessageType
-from logic_layer.data_management import AlgosOrchestationLogic
+from logic_layer.algos_orchestation_logic import AlgosOrchestationLogic
 from IPython.display import display
 import pandas as pd
 
@@ -34,6 +34,7 @@ def show_commands():
 
     print("#12-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#13-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [grouping_unit] [algo_params*]")
+    print("#14-BacktestSlopeModel [symbol] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
 
     #TrainNeuralNetworkAlgo
     print("#n-Exit")
@@ -125,6 +126,40 @@ def __get_testing_params__(trading_algo,cmd_param_list,base_length=10):
         n_params.append(int(cmd_param_list[base_length+1]))
 
     return  n_params
+
+def process_backtest_slope_model(cmd):
+    symbol = __get_param__(cmd, "symbol")
+    model_candle = __get_param__(cmd, "model_candle")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    portf_size = __get_param__(cmd, "portf_size",optional=True,def_value=100000)
+
+    trading_algo = __get_param__(cmd, "trading_algo")
+    candle_slope = __get_param__(cmd, "candle_slope", True, None)
+    slope_units = __get_param__(cmd, "slope_units", True, None)
+
+    trade_comm = __get_param__(cmd, "trade_comm", optional=True, def_value=0)
+    trade_comm_pct = __get_param__(cmd, "trade_comm_pct", optional=True, def_value=0)
+
+    cmd_param_dict = {}
+    if candle_slope is not None:
+        cmd_param_dict["candle_slope"]=candle_slope
+
+    if slope_units is not None:
+        cmd_param_dict["slope_units"]=slope_units
+
+    if trade_comm is not None:
+        cmd_param_dict["trade_comm"]=trade_comm
+
+    if trade_comm_pct is not None:
+        cmd_param_dict["trade_comm_pct"]=trade_comm_pct
+
+    process_backtest_slope_model_logic(symbol,model_candle=model_candle,d_from=d_from,d_to=d_to,
+                                        portf_size=portf_size,
+                                        trading_algo=trading_algo,algo_params=cmd_param_dict)
+
+    print(f"Test Backtest Slope Model finished...")
+
 
 def process_test_LSTM_cmd(cmd):
     symbol = __get_param__(cmd, "symbol")
@@ -578,6 +613,27 @@ def process_indicator_candles_graph(symbol, d_from,d_to, interval,mov_avg_unit):
         logger.print("CRITICAL ERROR running process_indicator_candles_graph:{}".format(str(e)), MessageType.ERROR)
 
 
+def process_backtest_slope_model_logic(symbol,model_candle,d_from,d_to,portf_size,trading_algo,algo_params):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print(f"Initializing model slope backtest for symbol {symbol} from {d_from} to {d_to}",MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        trd_algos = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                         None, logger)
+
+        trd_algos.process_backtest_slope_model(symbol,model_candle,d_from,d_to,portf_size,trading_algo,algo_params)
+
+        logger.print(f"Slope Model backtest successfully shown for symbol {symbol} from {d_from} to {d_to}",
+                     MessageType.INFO)
+
+    except Exception as e:
+        logger.print("CRITICAL ERROR running process_backtest_slope_model:{}".format(str(e)), MessageType.ERROR)
+
+
 
 def process_daily_candles_graph(symbol, date, interval,mov_avg_unit):
     loader = MLSettingsLoader()
@@ -658,6 +714,9 @@ def process_commands(cmd):
                                     cmd_param_list[4],cmd_param_list[5])
     elif cmd_param_list[0] == "TestDailyLSTM":
         process_test_LSTM_cmd(cmd)
+    elif cmd_param_list[0] == "BacktestSlopeModel":
+        process_backtest_slope_model(cmd)
+
 
     elif cmd_param_list[0] == "TestDailyLSTMWithGrouping":
         process_test_LSTM_cmd(cmd)

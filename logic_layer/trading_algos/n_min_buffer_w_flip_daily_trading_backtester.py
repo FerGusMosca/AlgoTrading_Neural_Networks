@@ -75,8 +75,7 @@ class NMinBufferWFlipDailyTradingBacktester(BaseClassDailyTradingBacktester):
             if index == len(result_df) - 1:
                 if portf_pos is not None:
                     trading_summary_df = self.__close_portf_position__(portf_pos, current_time, current_price,
-                                                                       portf_size, net_commissions,
-                                                                       trading_summary_df)
+                                                                       portf_size, net_commissions, trading_summary_df)
                     portf_pos = None
 
         return trading_summary_df

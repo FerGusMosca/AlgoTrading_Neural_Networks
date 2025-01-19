@@ -17,6 +17,8 @@ from data_access_layer.timestamp_classification_manager import TimestampClassifi
 from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
 from logic_layer.convolutional_neural_netowrk import ConvolutionalNeuralNetwork
+from logic_layer.trading_algos.direct_slope_backtester import DirectSlopeBacktester
+from logic_layer.trading_algos.inv_slope_backtester import InvSlopeBacktester
 from logic_layer.trading_algos.n_min_buffer_w_flip_daily_trading_backtester import NMinBufferWFlipDailyTradingBacktester
 from logic_layer.trading_algos.only_signal_n_min_plus_mov_avg import OnlySignalNMinMovAvgBacktester
 from logic_layer.trading_algos.raw_algo_daily_trading_backtester import RawAlgoDailyTradingBacktester
@@ -129,6 +131,21 @@ class AlgosOrchestationLogic:
                 MessageType.INFO)
         self.logger.do_log("--------------------", MessageType.INFO)
 
+
+    def __log_scalping_trading_results__(self,algo,daily_net_profit,total_positions,trading_summary_df):
+        self.logger.do_log(
+            f"Results for algo {algo}: Net_Profit=${daily_net_profit:,.2f} (total positions={total_positions})",
+            MessageType.INFO)
+        self.logger.do_log("---Summarizing trades---", MessageType.INFO)
+        for index, row in trading_summary_df[trading_summary_df['total_net_profit'].notnull()].iterrows():
+            self.logger.do_log(
+                f" Pos: {row['side']} --> open_time={row['open']} close_time={row['close']} "
+                f"open_price=${row['price_open']:,.2f} close_price=${row['price_close']:,.2f} --> "
+                f"net_profit=${row['total_net_profit']:,.2f} ==> Final Portfolio = ${row['end_portfolio']:,.2f}",
+                MessageType.INFO)
+
+        self.logger.do_log("--------------------", MessageType.INFO)
+
     def __sliding_window__(self,df, timesteps):
         """
         Genera ventanas deslizantes de tamaño `timesteps + 1` en un DataFrame.
@@ -184,6 +201,25 @@ class AlgosOrchestationLogic:
                 rnn_predictions_df, portf_summary.portf_pos_size, portf_summary.trade_comm,portf_summary.n_algo_params)
 
             return daily_net_profit, total_positions, max_daily_cum_drawdown, trading_summary_df
+
+        #InvSlopeBacktester
+
+        else:
+            raise Exception(f"NOT RECOGNIZED trading algo {portf_summary.trading_algo}")
+
+    def __backtest_slope_strategy__(self, series_df,trading_symbol,indicator,portf_size,
+                                    n_algo_params,portf_summary):
+
+        if tas(portf_summary.trading_algo) == tas.RAW_INV_SLOPE:
+            raw_slope_backtester=InvSlopeBacktester()
+            trading_summary_df = raw_slope_backtester.backtest_slope(series_df, trading_symbol, indicator, portf_size,
+                                                                     n_algo_params)
+        elif tas(portf_summary.trading_algo) == tas.RAW_DIRECT_SLOPE:
+            raw_slope_backtester=DirectSlopeBacktester()
+            trading_summary_df = raw_slope_backtester.backtest_slope(series_df, trading_symbol, indicator, portf_size,
+                                                                     n_algo_params)
+
+            return  trading_summary_df
         else:
             raise Exception(f"NOT RECOGNIZED trading algo {portf_summary.trading_algo}")
 
@@ -899,3 +935,34 @@ class AlgosOrchestationLogic:
         return  None
 
 
+    def process_backtest_slope_model(self,symbol,model_candle,d_from,d_to,portf_size,trading_algo,
+                                     n_algo_params):
+        start_of_day = datetime(d_from.year, d_from.month, d_from.day)
+        end_of_day = d_to + timedelta(hours=23, minutes=59, seconds=59)
+
+        symbol_series_df = self.data_set_builder.build_interval_series(symbol, d_from, d_to,
+                                                                       interval=DataSetBuilder._1_DAY_INTERVAL,
+                                                                       output_col=["symbol", "date", "open",
+                                                                                       "high", "low", "close"])
+
+        variables_series_df = self.data_set_builder.build_interval_series(model_candle, d_from, d_to,
+                                                                          interval=DataSetBuilder._1_DAY_INTERVAL,
+                                                                          output_col=["symbol", "date", "open",
+                                                                                          "high", "low", "close"])
+
+        training_series_df = self.data_set_builder.merge_minute_series(symbol_series_df, variables_series_df,
+                                                                       "symbol", "date", symbol)
+
+        portf_summary = PortfSummary(symbol, portf_size, p_trade_comm=0,
+                                     p_trading_algo=trading_algo, p_algo_params=n_algo_params)
+
+
+
+        daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df= self.__backtest_slope_strategy__(training_series_df,symbol_series_df,model_candle,portf_size,n_algo_params,
+                                                                                                    portf_summary=portf_summary)
+
+
+        self.__log_scalping_trading_results__(trading_summary_df,daily_net_profit,total_positions,trading_summary_df)
+
+
+        return daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df

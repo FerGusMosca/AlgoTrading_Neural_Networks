@@ -2,7 +2,7 @@ from common.util.date_handler import DateHandler
 from common.util.logger import Logger
 from common.util.ml_settings_loader import MLSettingsLoader
 from framework.common.logger.message_type import MessageType
-from logic_layer.data_management import AlgosOrchestationLogic
+from logic_layer.algos_orchestation_logic import AlgosOrchestationLogic
 from IPython.display import display
 import pandas as pd
 _DATE_FORMAT="%m/%d/%Y"

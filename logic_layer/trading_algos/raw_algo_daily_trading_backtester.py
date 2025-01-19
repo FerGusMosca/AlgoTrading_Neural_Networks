@@ -44,21 +44,22 @@ class RawAlgoDailyTradingBacktester(BaseClassDailyTradingBacktester):
                 portf_pos= PortfolioPosition(current_symbol)
                 portf_pos.open_pos(current_action,current_time,current_price)
 
-                trading_summary_df=self.__open_portf_position__(portf_pos, portf_size, trading_summary_df)
+                trading_summary_df= self.__open_portf_position__(portf_pos, portf_size, trading_summary_df)
 
             # If an open position is closed
             elif portf_pos is not None and (
                     (portf_pos.side == self._LONG_POS and current_action in [self._SHORT_POS, self._FLAT_POS]) or
                     (portf_pos.side == self._SHORT_POS and current_action in [self._LONG_POS, self._FLAT_POS])
             ):
-                trading_summary_df=self.__close_portf_position__(portf_pos, current_time, current_price, portf_size, net_commissions, trading_summary_df)
+                trading_summary_df= self.__close_portf_position__(portf_pos, current_time, current_price, portf_size,
+                                                                  net_commissions, trading_summary_df)
                 portf_pos=None
 
             # Handle closing positions at the end of the day
             if index == len(result_df) - 1:
                 if portf_pos is not None:
-                    trading_summary_df=self.__close_portf_position__(portf_pos, current_time, current_price, portf_size, net_commissions,
-                                                                     trading_summary_df)
+                    trading_summary_df= self.__close_portf_position__(portf_pos, current_time, current_price,
+                                                                      portf_size, net_commissions, trading_summary_df)
                     portf_pos = None
         # Return the trading summary DataFrame
         return trading_summary_df

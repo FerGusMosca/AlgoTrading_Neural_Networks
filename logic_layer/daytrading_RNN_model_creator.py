@@ -31,6 +31,7 @@ class CustomEarlyStopping(Callback):
         train_acc = logs.get(self.monitor_train)
         val_acc = logs.get(self.monitor_val)
 
+        print(f"Evaluating early stop for accuray={train_acc} val_accuracy={val_acc}")
         # Check both accuracies bigger than threshold
         if train_acc is not None and val_acc is not None:
             if train_acc >= self.threshold and val_acc >= self.threshold:

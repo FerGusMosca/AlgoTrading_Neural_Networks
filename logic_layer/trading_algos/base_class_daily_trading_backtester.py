@@ -3,6 +3,16 @@ import pandas as pd
 import numpy as np
 class BaseClassDailyTradingBacktester:
 
+    _DATE_COL="date"
+    _LONG_ACTION="LONG"
+    _SLOPE_UNITS_COL="slope_units"
+    _TRADING_SYMBOL_COL="trading_symbol"
+    _END_PORTF_SIZE_COL= "end_portfolio"
+    _CLOSE_COL_PREFIX="close"
+    _SLOPE_POSFIX="Slope"
+
+    _TRADE_COMM_PCT_KEY="trade_comm_pct"
+    _TRADE_COMM_NOM_KEY="trade_comm"
 
     _LONG_POS="LONG"
     _SHORT_POS="SHORT"
@@ -20,6 +30,20 @@ class BaseClassDailyTradingBacktester:
         ])
 
         return  trading_summary_df
+
+    def __extract_commission__(self,last_portf_size,n_algo_param_dict):
+
+        if BaseClassDailyTradingBacktester._TRADE_COMM_PCT_KEY in n_algo_param_dict:
+            comm_pct = float(n_algo_param_dict[BaseClassDailyTradingBacktester._TRADE_COMM_PCT_KEY])
+            comm= last_portf_size*comm_pct
+            new_portf_size=last_portf_size-comm
+            return new_portf_size,comm
+        elif BaseClassDailyTradingBacktester._TRADE_COMM_NOM_KEY in n_algo_param_dict:
+            comm= float(n_algo_param_dict[BaseClassDailyTradingBacktester._TRADE_COMM_NOM_KEY])
+            new_portf_size=last_portf_size-comm
+            return  new_portf_size,comm
+        else:
+            return 0
 
     def __append_position_row__(self,entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
                            pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows):
@@ -43,7 +67,8 @@ class BaseClassDailyTradingBacktester:
 
 
     def __update_position_row__(self,entry_symbol,entry_time,position_side,current_time,current_price,
-                                pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows):
+                                pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows,
+                                init_portf_size=None):
 
         # Filter the row that matches entry_symbol, entry_time, and position_side
         row_mask = (summary_rows['symbol'] == entry_symbol) & \
@@ -60,7 +85,11 @@ class BaseClassDailyTradingBacktester:
         summary_rows.loc[row_mask, 'unit_gross_profit'] = unit_gross_profit
         summary_rows.loc[row_mask, 'total_gross_profit'] = total_gross_profit
         summary_rows.loc[row_mask, 'total_net_profit'] = total_net_profit
-        summary_rows.loc[row_mask, 'portfolio_size'] = pos_size
+
+        end_portfolio_size=init_portf_size + total_net_profit if init_portf_size is not None else 0
+
+        summary_rows.loc[row_mask, 'end_portfolio'] = end_portfolio_size
+        summary_rows.loc[row_mask, 'portfolio_size'] = end_portfolio_size
         summary_rows.loc[row_mask, 'pos_size'] = pos_size
 
         # Return the updated DataFrame (optional, since `summary_rows` is modified in place)
@@ -83,15 +112,17 @@ class BaseClassDailyTradingBacktester:
 
 
         return  self.__update_position_row__(entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
-                                             pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows)
+                                             pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows,
+                                             init_portf_size=portf_size)
 
-    def __close_portf_position__(self,portf_pos,current_time,current_price,portf_size,net_commissions,summary_rows):
+    def __close_portf_position__(self,portf_pos,current_time,current_price,portf_size,nom_net_comm,summary_rows):
         portf_pos.date_close=current_time
         portf_pos.price_close=current_price
 
-        pos_size = int(portf_size / portf_pos.price_open)
+        pos_size=summary_rows.iloc[-1]["pos_size"]
         last_time = current_time
         last_price = current_price
+
 
         if portf_pos.side==self._LONG_POS:
             unit_gross_profit = last_price - portf_pos.price_open
@@ -101,13 +132,14 @@ class BaseClassDailyTradingBacktester:
             raise Exception(f"INVALID SIDE :{portf_pos.side}!! ")
 
         total_gross_profit = unit_gross_profit * pos_size
-        total_net_profit = total_gross_profit - net_commissions
+        total_net_profit = total_gross_profit - nom_net_comm
 
         return self.__update_position_row__(portf_pos.symbol, portf_pos.date_open, portf_pos.side,
                                             portf_pos.date_close,
                                             portf_pos.price_close,
                                             pos_size, unit_gross_profit, total_gross_profit, total_net_profit,
-                                            summary_rows)
+                                            summary_rows,
+                                            init_portf_size=portf_size)
 
     def __close_position__(self,entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
                            portf_size,net_commissions,summary_rows):
@@ -121,11 +153,15 @@ class BaseClassDailyTradingBacktester:
 
         return self.__update_position_row__(entry_symbol, entry_time, position_side, current_time,
                                             last_time,last_price,pos_size, unit_gross_profit, total_gross_profit,
-                                            total_net_profit,summary_rows)
+                                            total_net_profit,summary_rows,init_portf_size=portf_size)
 
 
-    def __open_portf_position__(self,portf_pos,portf_size,trading_summary_df):
-        pos_size = math.floor(portf_size / portf_pos.price_open)
+    def __open_portf_position__(self,portf_pos,init_portf_size,trading_summary_df,apply_round_units=False):
+
+        if apply_round_units:
+            pos_size = math.floor(init_portf_size / portf_pos.price_open)
+        else:
+            pos_size= init_portf_size / portf_pos.price_open
 
         new_row = pd.DataFrame({
             'symbol': [portf_pos.symbol],
@@ -137,7 +173,8 @@ class BaseClassDailyTradingBacktester:
             'unit_gross_profit': [None],
             'total_gross_profit': [None],
             'total_net_profit': [None],
-            'portfolio_size': [portf_size],
+            'end_portfolio':None,
+            'portfolio_size': [init_portf_size],
             'pos_size': [pos_size]
         })
 

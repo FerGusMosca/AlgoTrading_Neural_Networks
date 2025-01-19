@@ -107,16 +107,14 @@ class OnlySignalNMinMovAvgBacktester(BaseClassDailyTradingBacktester):
                 #We only close everything because of mom
                 if not self.__eval_momentum__(predictions_df, portf_pos.side, current_time, current_price, n_mov_avg_unit):
                     trading_summary_df = self.__close_portf_position__(portf_pos, current_time, current_price,
-                                                                       portf_size, net_commissions,
-                                                                       trading_summary_df)
+                                                                       portf_size, net_commissions, trading_summary_df)
                     portf_pos = None
 
             # Handle closing positions at the end of the day
             if index == len(predictions_df) - 1:
                 if portf_pos is not None:
                     trading_summary_df = self.__close_portf_position__(portf_pos, current_time, current_price,
-                                                                       portf_size, net_commissions,
-                                                                       trading_summary_df)
+                                                                       portf_size, net_commissions, trading_summary_df)
                     portf_pos = None
 
         return trading_summary_df
