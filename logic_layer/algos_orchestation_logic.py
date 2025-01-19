@@ -940,18 +940,24 @@ class AlgosOrchestationLogic:
         start_of_day = datetime(d_from.year, d_from.month, d_from.day)
         end_of_day = d_to + timedelta(hours=23, minutes=59, seconds=59)
 
+        #1- The trading symbol DF
         symbol_series_df = self.data_set_builder.build_interval_series(symbol, d_from, d_to,
                                                                        interval=DataSetBuilder._1_DAY_INTERVAL,
                                                                        output_col=["symbol", "date", "open",
                                                                                        "high", "low", "close"])
 
+        #2- The explanatory variables DF
         variables_series_df = self.data_set_builder.build_interval_series(model_candle, d_from, d_to,
                                                                           interval=DataSetBuilder._1_DAY_INTERVAL,
                                                                           output_col=["symbol", "date", "open",
                                                                                           "high", "low", "close"])
 
+        #3- We merge them
         training_series_df = self.data_set_builder.merge_minute_series(symbol_series_df, variables_series_df,
                                                                        "symbol", "date", symbol)
+
+        #4- We drop weekends and holidays
+        training_series_df = training_series_df.dropna(subset=[f"close_{symbol}"])
 
         portf_summary = PortfSummary(symbol, portf_size, p_trade_comm=0,
                                      p_trading_algo=trading_algo, p_algo_params=n_algo_params)
