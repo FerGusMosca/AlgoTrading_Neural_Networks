@@ -132,9 +132,11 @@ class AlgosOrchestationLogic:
         self.logger.do_log("--------------------", MessageType.INFO)
 
 
-    def __log_scalping_trading_results__(self,algo,daily_net_profit,total_positions,trading_summary_df):
+    def __log_scalping_trading_results__(self,algo,daily_net_profit,total_positions,max_cum_drawdown,trading_summary_df):
+
+        max_cum_drawdown_percentage = max_cum_drawdown * 100
         self.logger.do_log(
-            f"Results for algo {algo}: Net_Profit=${daily_net_profit:,.2f} (total positions={total_positions})",
+            f"Results for algo {algo}: Net_Profit=${daily_net_profit:,.2f} (total positions={total_positions} Max Drawdown ={max_cum_drawdown_percentage:.2f}%)",
             MessageType.INFO)
         self.logger.do_log("---Summarizing trades---", MessageType.INFO)
         for index, row in trading_summary_df[trading_summary_df['total_net_profit'].notnull()].iterrows():
@@ -212,14 +214,15 @@ class AlgosOrchestationLogic:
 
         if tas(portf_summary.trading_algo) == tas.RAW_INV_SLOPE:
             raw_slope_backtester=InvSlopeBacktester()
-            trading_summary_df = raw_slope_backtester.backtest_slope(series_df, trading_symbol, indicator, portf_size,
-                                                                     n_algo_params)
-        elif tas(portf_summary.trading_algo) == tas.RAW_DIRECT_SLOPE:
-            raw_slope_backtester=DirectSlopeBacktester()
-            trading_summary_df = raw_slope_backtester.backtest_slope(series_df, trading_symbol, indicator, portf_size,
+            return raw_slope_backtester.backtest_slope(series_df, trading_symbol, indicator, portf_size,
                                                                      n_algo_params)
 
-            return  trading_summary_df
+        elif tas(portf_summary.trading_algo) == tas.RAW_DIRECT_SLOPE:
+            raw_slope_backtester=DirectSlopeBacktester()
+            return raw_slope_backtester.backtest_slope(series_df, trading_symbol, indicator, portf_size,
+                                                                     n_algo_params)
+
+
         else:
             raise Exception(f"NOT RECOGNIZED trading algo {portf_summary.trading_algo}")
 
@@ -941,7 +944,7 @@ class AlgosOrchestationLogic:
         end_of_day = d_to + timedelta(hours=23, minutes=59, seconds=59)
 
         #1- The trading symbol DF
-        symbol_series_df = self.data_set_builder.build_interval_series(symbol, d_from, d_to,
+        symbol_series_df = self.data_set_builder.build_interval_series(symbol, start_of_day, end_of_day,
                                                                        interval=DataSetBuilder._1_DAY_INTERVAL,
                                                                        output_col=["symbol", "date", "open",
                                                                                        "high", "low", "close"])
@@ -968,7 +971,7 @@ class AlgosOrchestationLogic:
                                                                                                     portf_summary=portf_summary)
 
 
-        self.__log_scalping_trading_results__(trading_summary_df,daily_net_profit,total_positions,trading_summary_df)
+        self.__log_scalping_trading_results__(trading_summary_df,daily_net_profit,total_positions,max_cum_drawdown,trading_summary_df)
 
 
         return daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df

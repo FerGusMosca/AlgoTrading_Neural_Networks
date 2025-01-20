@@ -130,7 +130,7 @@ class OnlySignalNMinMovAvgBacktester(BaseClassDailyTradingBacktester):
         trading_summary_df = self.__summarize_trading_positions__(rnn_predictions_df, portf_size, trade_comm,
                                                                   self._N_BUFFER,self._N_MOV_AVG )
 
-        return self.__calculate_day_trading_summary__(trading_summary_df)
+        return self.__calculate_day_trading_summary__(trading_summary_df,None)
 
 
 

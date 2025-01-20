@@ -28,6 +28,6 @@ class InvSlopeBacktester(SlopeBacktester):
 
         trading_summary_df = self.__summarize_trading_positions__(series_df, portf_size, indicator, n_algo_param_dict)
 
-        return self.__calculate_day_trading_summary__(trading_summary_df)
+        return self.__calculate_day_trading_summary__(trading_summary_df, series_df)
 
 

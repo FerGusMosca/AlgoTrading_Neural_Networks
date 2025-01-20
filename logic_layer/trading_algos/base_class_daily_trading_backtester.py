@@ -1,6 +1,10 @@
 import math
 import pandas as pd
 import numpy as np
+
+from common.util.financial_calculation_helper import FinancialCalculationsHelper
+
+
 class BaseClassDailyTradingBacktester:
 
     _DATE_COL="date"
@@ -181,7 +185,7 @@ class BaseClassDailyTradingBacktester:
         trading_summary_df = pd.concat([trading_summary_df, new_row], ignore_index=True)
         return  trading_summary_df
 
-    def __calculate_day_trading_summary__(self, trading_summary_df):
+    def __calculate_day_trading_summary__(self, trading_summary_df, prices_df):
         """
         This method calculates the daily trading summary including:
         - Total net profit for the day.
@@ -218,5 +222,8 @@ class BaseClassDailyTradingBacktester:
                 max_cum_drawdown = min(max_cum_drawdown, current_drawdown)
             else:
                 current_drawdown = 0  # Reset the drawdown when there's a profit
+
+        if prices_df is not None:#we calculate the max drawdown more accurately
+            max_cum_drawdown=FinancialCalculationsHelper.calculate_max_drawdown_with_prices(trading_summary_df,prices_df,trading_summary_df["symbol"].iloc[0])
 
         return daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df

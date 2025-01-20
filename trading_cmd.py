@@ -18,8 +18,8 @@ last_trading_dict = None
 
 
 def show_commands():
-    print("#0.1-DailyCandlesGraph  [Symbol] [date] [interval] [mmov_avg]")
-    print("#0.2-IndicatorCandlesGraph  [Symbol] [from] [to] [interval] [mmov_avg]")
+    print("#0.1-DailyCandlesGraph [Symbol] [date] [interval] [mmov_avg]")
+    print("#0.2-IndicatorCandlesGraph [Symbol] [from] [to] [interval] [mmov_avg]")
     print("#1-TrainMLAlgos  [SeriesCSV] [from] [to] [classif_key]")
     print("#2-RunPredictionsLastModel [SeriesCSV] [from] [to] [classif_key]")
     print("#3-EvalBiasedTradingAlgo [Symbol] [SeriesCSV] [from] [to] [Bias] [classif_key]")

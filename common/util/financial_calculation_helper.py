@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 
 class FinancialCalculationsHelper():
@@ -31,3 +32,46 @@ class FinancialCalculationsHelper():
                 max_drawdown = cumulative_drawdown
 
         return -1 * abs(max_drawdown)
+
+
+    @staticmethod
+    def calculate_max_drawdown_with_prices(trading_summary_df, prices_df, trading_symbol):
+        # Column names for the asset prices
+        close_col = f"close_{trading_symbol}"
+
+        max_drawdowns = []
+
+        # Iterate over each row in trading_summary_df
+        for _, row in trading_summary_df.iterrows():
+            # Extract position dates and side
+            start_date = pd.to_datetime(row['open'])
+            end_date = pd.to_datetime(row['close'])
+            side = row['side']
+
+            # Filter series_df for the corresponding date range
+            position_prices = prices_df[(prices_df['date'] >= start_date) & (prices_df['date'] <= end_date)][close_col]
+
+            if position_prices.empty:
+                continue  # Skip if no data for the date range
+
+            # Convert prices to float if necessary
+            position_prices = position_prices.astype(float)
+
+            # Calculate the drawdown based on the side of the position
+            if side == "LONG":
+                # Long position: Drawdown = (peak - trough) / peak
+                peak = position_prices.cummax()
+                drawdown = (peak - position_prices) / peak
+            elif side == "SHORT":
+                # Short position: Drawdown = (trough - peak) / trough
+                trough = position_prices.cummin()
+                drawdown = (position_prices - trough) / trough
+            else:
+                raise ValueError(f"Unknown side: {side}")
+
+            # Find the maximum drawdown for this position
+            max_drawdown = drawdown.max()
+            max_drawdowns.append(max_drawdown)
+
+        # Return the highest drawdown among all positions
+        return max(max_drawdowns) if max_drawdowns else 0
