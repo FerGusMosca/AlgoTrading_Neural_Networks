@@ -14,6 +14,7 @@ class PortfolioPosition():
 
     def __init__(self,p_symbol):
         self.symbol =p_symbol
+        self.units=None
         self.side=None
         self.date_open=None
         self.price_open=None
@@ -21,15 +22,15 @@ class PortfolioPosition():
         self.price_close=None
 
 
-    def open_pos(self,side,date,price):
+    def open_pos(self,side,date,price,units=None):
         self.side=side
         self.date_open=date
+        self.units=units
 
         if isinstance(price, pd.Series):
             self.price_open = float(price.iloc[0])
         else:
             self.price_open=float(price)
-
 
     def close_pos(self,date,price):
 
@@ -62,7 +63,15 @@ class PortfolioPosition():
 
 
     def calculate_th_nom_profit(self,portf_amt=_DEF_PORTF_AMT):
-        pct_profit=self.calculate_pct_profit()
-        return  round((pct_profit/100)*portf_amt)
+
+        if portf_amt is not None:
+            pct_profit=self.calculate_pct_profit()
+            return  round((pct_profit/100)*portf_amt)
+        elif self.units is not None:
+            portf_amt= self.units*self.price_open
+            pct_profit = self.calculate_pct_profit()
+            return round((pct_profit / 100) * portf_amt)
+        else:
+            raise Exception("Cannot calculate th. nominal profit when portf_amt and positions units are NONE")
 
 

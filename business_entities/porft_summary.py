@@ -27,8 +27,6 @@ class PortfSummary:
     def append_position_summary(self,pos_summary):
         self.portf_pos_summary.append(pos_summary)
 
-
-
     def calculate_th_nom_profit(self):
 
         accum=0

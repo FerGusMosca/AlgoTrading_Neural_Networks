@@ -1,8 +1,14 @@
+import copy
 import math
 import pandas as pd
 import numpy as np
 
+from business_entities.porf_mult_positions import PortfMultPositions
+from business_entities.portf_position import PortfolioPosition
+from common.dto.etf_position_dto import ETFPositionDTO
+from common.enums.columns_prefix import ColumnsPrefix
 from common.util.financial_calculation_helper import FinancialCalculationsHelper
+
 
 
 class BaseClassDailyTradingBacktester:
@@ -59,6 +65,31 @@ class BaseClassDailyTradingBacktester:
             :return: A list of symbols without the prefix
             """
         return [col[len(col_prefix):] for col in df.columns if col.startswith(col_prefix)]
+
+
+    def __initiate_portfolio_multiple_positions__(self,symbols_csv,side,date,portf_size,curr_pos_portf_arr,prices_row):
+
+        portf_pos_arr=[]
+        curr_ETF_MTM=0
+        for curr_pos_portf in curr_pos_portf_arr:
+            if curr_pos_portf.active:
+                if prices_row[ColumnsPrefix.CLOSE_PREFIX.value + curr_pos_portf.symbol] is not None:
+                    curr_price=  prices_row[ColumnsPrefix.CLOSE_PREFIX.value + curr_pos_portf.symbol]
+                    curr_portf_pos_size=portf_size*curr_pos_portf.active_weight
+
+                    curr_portf_pos_units=curr_portf_pos_size/curr_price
+
+                    portf_pos=PortfolioPosition(curr_pos_portf.symbol)
+                    portf_pos.open_pos(side,date,curr_price,units=curr_portf_pos_units)
+
+                    portf_pos_arr.append(portf_pos)
+
+                    curr_ETF_MTM+= curr_portf_pos_units * curr_price
+                else:
+                    curr_date=prices_row["date"]
+                    raise Exception(f"CRITICAL error calculating MTM for security {curr_pos_portf.symbol}: no price found for date {curr_date}")
+        return PortfMultPositions(date,symbols_csv,side,portf_pos_arr,curr_ETF_MTM)
+        #return curr_ETF_MTM
 
     def __append_position_row__(self,entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
                            pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows):
@@ -238,3 +269,18 @@ class BaseClassDailyTradingBacktester:
             max_cum_drawdown=FinancialCalculationsHelper.calculate_max_drawdown_with_prices(trading_summary_df,prices_df,trading_summary_df["symbol"].iloc[0])
 
         return daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df
+
+
+    def __extract__active__positions_for_day__(self,row,etf_comp_dto_arr):
+
+        etfs_active_const_arr=[]
+        for etf_comp_dto in etf_comp_dto_arr:
+            etf_comp_dto_curr_day = copy.deepcopy(etf_comp_dto)
+            etf_comp_dto_curr_day.active = not pd.isna( row[f"{BaseClassDailyTradingBacktester._CLOSE_COL_PREFIX}_{etf_comp_dto.symbol}"])
+            etf_comp_dto_curr_day.active_weight=etf_comp_dto_curr_day.weight if etf_comp_dto_curr_day.active else 0
+            etfs_active_const_arr.append(etf_comp_dto_curr_day)
+
+        ETFPositionDTO.recalculate_weights(etf_comp_dto_arr,etfs_active_const_arr)
+
+        return etfs_active_const_arr
+

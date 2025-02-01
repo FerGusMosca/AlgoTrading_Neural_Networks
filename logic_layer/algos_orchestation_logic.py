@@ -1027,8 +1027,6 @@ class AlgosOrchestationLogic:
                 merged_training_series_df=self.data_set_builder.merge_dataframes(training_series_df,merged_training_series_df,
                                                                           "date")
 
-
-
         #6- We drop weekends and holidays
         merged_training_series_df= self.data_set_builder.drop_NaN_for_prefix(merged_training_series_df,
                                                                              ColumnsPrefix.CLOSE_PREFIX.value)

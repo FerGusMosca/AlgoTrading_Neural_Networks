@@ -29,7 +29,7 @@ class DirectSlopeBacktester(SlopeBacktester):
         if sum(col.startswith(ColumnsPrefix.CLOSE_PREFIX.value) for col in series_df.columns)<=1:
             trading_summary_df = self.__run_trades_single_pos__(series_df, portf_size, indicator, n_algo_param_dict)
         else:
-            trading_summary_df = self.__run_trades_mult_pos__(series_df, portf_size, indicator, n_algo_param_dict)
+            trading_summary_df = self.__run_trades_mult_pos__(series_df, portf_size, indicator, n_algo_param_dict,etf_comp_dto_arr)
 
 
         return self.__calculate_day_trading_summary__(trading_summary_df,series_df)
