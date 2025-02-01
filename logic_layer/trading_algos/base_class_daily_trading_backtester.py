@@ -49,6 +49,17 @@ class BaseClassDailyTradingBacktester:
         else:
             return 0
 
+
+    def __extract_trading_symbols_from_multiple_portf__(self,df, col_prefix="close_"):
+        """
+            Extracts all column names that start with a given prefix and removes the prefix.
+
+            :param df: Input dataframe
+            :param col_prefix: Prefix to filter and remove from column names
+            :return: A list of symbols without the prefix
+            """
+        return [col[len(col_prefix):] for col in df.columns if col.startswith(col_prefix)]
+
     def __append_position_row__(self,entry_symbol,entry_time,position_side,current_time,current_price,entry_price,
                            pos_size,unit_gross_profit,total_gross_profit,total_net_profit,summary_rows):
 

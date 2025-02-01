@@ -2,11 +2,13 @@ import traceback
 from datetime import timedelta, datetime
 
 from business_entities.porft_summary import PortfSummary
+from common.enums.columns_prefix import ColumnsPrefix
 from common.enums.grouping_criterias import GroupCriteria as gc
 from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws
 from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas
 from common.util.dataframe_filler import DataframeFiller
 from common.util.dataframe_printer import DataframePrinter
+from common.util.etf_logic_manager import ETFLogicManager
 from common.util.graph_builder import GraphBuilder
 from common.util.image_handler import ImageHandler
 from common.util.light_logger import LightLogger
@@ -209,18 +211,21 @@ class AlgosOrchestationLogic:
         else:
             raise Exception(f"NOT RECOGNIZED trading algo {portf_summary.trading_algo}")
 
-    def __backtest_slope_strategy__(self, series_df,trading_symbol,indicator,portf_size,
-                                    n_algo_params,portf_summary):
+    def __backtest_slope_strategy__(self, series_df,indicator,portf_size,
+                                    n_algo_params,portf_summary,
+                                    etf_comp_dto_arr=None):
 
         if tas(portf_summary.trading_algo) == tas.RAW_INV_SLOPE:
             raw_slope_backtester=InvSlopeBacktester()
-            return raw_slope_backtester.backtest_slope(series_df, trading_symbol, indicator, portf_size,
-                                                                     n_algo_params)
+            return raw_slope_backtester.backtest_slope(series_df, indicator, portf_size,
+                                                       n_algo_params,
+                                                       etf_comp_dto_arr=etf_comp_dto_arr)
 
         elif tas(portf_summary.trading_algo) == tas.RAW_DIRECT_SLOPE:
             raw_slope_backtester=DirectSlopeBacktester()
-            return raw_slope_backtester.backtest_slope(series_df, trading_symbol, indicator, portf_size,
-                                                                     n_algo_params)
+            return raw_slope_backtester.backtest_slope(series_df, indicator, portf_size,
+                                                       n_algo_params,
+                                                       etf_comp_dto_arr=etf_comp_dto_arr)
 
 
         else:
@@ -599,9 +604,8 @@ class AlgosOrchestationLogic:
                                                                                                   "high", "low",
                                                                                                   "close"])
                 #3- We merge everything in one single dataframe
-                test_series_df = self.data_set_builder.merge_minute_series(symbol_int_series_df,
-                                                                           variables_int_series_df, "symbol", "date",
-                                                                           symbol)
+                test_series_df = self.data_set_builder.merge_series(symbol_int_series_df, variables_int_series_df,
+                                                                    "symbol", "date", symbol)
 
                 #4- Given different frequencies of the data, we will the missing <interval> values with the last available data
                 test_series_df = DataframeFiller.fill_missing_values(test_series_df)#We fill missing values with the last one
@@ -800,9 +804,8 @@ class AlgosOrchestationLogic:
                                                                                                   "high", "low",
                                                                                                   "close"])
 
-                test_series_df = self.data_set_builder.merge_minute_series(symbol_int_series_df,
-                                                                           variables_int_series_df, "symbol", "date",
-                                                                           portf_summary.symbol)
+                test_series_df = self.data_set_builder.merge_series(symbol_int_series_df, variables_int_series_df,
+                                                                    "symbol", "date", portf_summary.symbol)
 
                 if grouping_unit is not None:
                     test_series_df = self.__group_dataframe__(test_series_df, grouping_unit,variables_csv)
@@ -880,7 +883,8 @@ class AlgosOrchestationLogic:
                                                                                  output_col=["symbol", "date", "open",
                                                                                              "high", "low", "close"])
 
-            training_series_df= self.data_set_builder.merge_minute_series(symbol_min_series_df,variables_min_series_df,"symbol","date",symbol)
+            training_series_df= self.data_set_builder.merge_series(symbol_min_series_df, variables_min_series_df,
+                                                                   "symbol", "date", symbol)
 
             if group_as_mov_avg:
                 training_series_df=self.data_set_builder.group_as_mov_avgs(training_series_df,variables_csv,grouping_mov_avg_unit)
@@ -956,8 +960,8 @@ class AlgosOrchestationLogic:
                                                                                           "high", "low", "close"])
 
         #3- We merge them
-        training_series_df = self.data_set_builder.merge_minute_series(symbol_series_df, variables_series_df,
-                                                                       "symbol", "date", symbol)
+        training_series_df = self.data_set_builder.merge_series(symbol_series_df, variables_series_df, "symbol", "date",
+                                                                symbol)
 
         #4- We drop weekends and holidays
         training_series_df = training_series_df.dropna(subset=[f"close_{symbol}"])
@@ -967,8 +971,74 @@ class AlgosOrchestationLogic:
 
 
 
-        daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df= self.__backtest_slope_strategy__(training_series_df,symbol_series_df,model_candle,portf_size,n_algo_params,
-                                                                                                    portf_summary=portf_summary)
+        daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df= self.__backtest_slope_strategy__(
+            training_series_df, model_candle, portf_size, n_algo_params, portf_summary=portf_summary)
+
+
+        self.__log_scalping_trading_results__(trading_summary_df,daily_net_profit,total_positions,max_cum_drawdown,trading_summary_df)
+
+
+        return daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df
+
+
+    def process_backtest_slope_model_on_custom_etf(self,etf_path,model_candle,d_from,d_to,portf_size,trading_algo,
+                                     n_algo_params):
+        start_of_day = datetime(d_from.year, d_from.month, d_from.day)
+        end_of_day = d_to + timedelta(hours=23, minutes=59, seconds=59)
+
+        #0- We extract the ETF composition info
+        symbols_csv=self.data_set_builder.extract_series_csv_from_etf_file(etf_path,1)
+        etf_comp_dto_arr = ETFLogicManager.__extract_etf_composition__(etf_path, 1, 0)
+
+        #1- The trading symbols DF
+        symbols_series_df = self.data_set_builder.build_interval_series(symbols_csv, start_of_day, end_of_day,
+                                                                        interval=DataSetBuilder._1_DAY_INTERVAL,
+                                                                        output_col=["symbol", "date", "open",
+                                                                                       "high", "low", "close"])
+
+        #2- We have one datafraem per symbol in the ETF
+        symbols_series_df_arr=self.data_set_builder.split_dataframe_by_symbol(symbols_series_df,"symbol")
+
+
+        #3- The explanatory variables DF
+        variables_series_df = self.data_set_builder.build_interval_series(model_candle, d_from, d_to,
+                                                                          interval=DataSetBuilder._1_DAY_INTERVAL,
+                                                                          output_col=["symbol", "date", "open",
+                                                                                          "high", "low", "close"])
+
+        #4- We merge them
+        training_series_df_arr={}
+        for symbol in  symbols_series_df_arr:
+            symbols_series_df= symbols_series_df_arr[symbol]
+            training_series_df = self.data_set_builder.merge_series(symbols_series_df,
+                                                                    variables_series_df,
+                                                                    "symbol","date",
+                                                                    symbol)
+            training_series_df_arr[symbol]=training_series_df
+
+
+        #5-We merge all the training_series_df
+        merged_training_series_df=None
+        for symbol in   training_series_df_arr:
+            training_series_df=training_series_df_arr[symbol]
+            if merged_training_series_df is None:
+                merged_training_series_df=training_series_df
+            else:
+                merged_training_series_df=self.data_set_builder.merge_dataframes(training_series_df,merged_training_series_df,
+                                                                          "date")
+
+
+
+        #6- We drop weekends and holidays
+        merged_training_series_df= self.data_set_builder.drop_NaN_for_prefix(merged_training_series_df,
+                                                                             ColumnsPrefix.CLOSE_PREFIX.value)
+
+        #7- We run the backtest
+        portf_summary = PortfSummary(symbols_csv, portf_size, p_trade_comm=0,p_trading_algo=trading_algo, p_algo_params=n_algo_params)
+
+        daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df= self.__backtest_slope_strategy__(
+            merged_training_series_df, model_candle, portf_size, n_algo_params, portf_summary=portf_summary,
+            etf_comp_dto_arr=etf_comp_dto_arr)
 
 
         self.__log_scalping_trading_results__(trading_summary_df,daily_net_profit,total_positions,max_cum_drawdown,trading_summary_df)

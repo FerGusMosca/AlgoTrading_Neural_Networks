@@ -1,5 +1,8 @@
+import csv
 from datetime import timedelta
 
+from common.enums.columns_prefix import ColumnsPrefix
+from common.util.csv_reader import CSVReader
 from common.util.dataframe_concat import DataframeConcat
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
 from data_access_layer.economic_series_manager import EconomicSeriesManager
@@ -133,8 +136,41 @@ class DataSetBuilder():
 
         return  df
 
+    def drop_NaN_for_prefix(self,df, col_prefix=ColumnsPrefix.CLOSE_PREFIX.value):
+        """
+        Removes rows where all columns starting with a specific prefix (e.g., "close_") are NaN.
 
-    def merge_minute_series(sel,symbol_min_series_df,variables_min_series_df,symbol_col,date_col, symbol):
+        :param df: Input dataframe
+        :param col_prefix: Prefix of columns to check for NaN values
+        :return: Filtered dataframe
+        """
+        # Remove rows where all columns starting with `col_prefix` are NaN
+        df = df.dropna(how='all', subset=[col for col in df.columns if col.startswith(col_prefix)])
+
+        return df
+
+    def merge_dataframes(self,df_1, df_2,pivot_col):
+        """
+        Merges two dataframes on the 'date' column, keeping all columns from both dataframes.
+        Removes duplicate columns like 'trading_symbol' if they exist in both dataframes.
+
+        :param df_1: First dataframe
+        :param df_2: Second dataframe
+        :return: Merged dataframe
+        """
+        # Merge on 'date', using an outer join to keep all rows
+        merged_df = pd.merge(df_1, df_2, on=pivot_col, how="outer", suffixes=('', '_dup'))
+
+        # Remove duplicated columns (e.g., 'trading_symbol_dup' if 'trading_symbol' exists)
+        for col in merged_df.columns:
+            if col.endswith('_dup'):
+                original_col = col[:-4]  # Remove '_dup' suffix
+                if original_col in merged_df.columns:
+                    merged_df.drop(columns=[col], inplace=True)
+
+        return merged_df
+
+    def merge_series(sel,symbol_min_series_df,variables_min_series_df,symbol_col,date_col, symbol):
         # Step 1: Pivot the variables_min_series_df to turn 'symbol_col' values into columns
         variables_pivot_df = variables_min_series_df.pivot(index=date_col, columns=symbol_col, values='open')
 
@@ -155,6 +191,28 @@ class DataSetBuilder():
 
         # Return the final merged dataframe
         return merged_df
+
+    def extract_series_csv_from_etf_file(self,etf_path,col_index):
+        """
+        Extracts unique symbols (column 2) from a given CSV file and returns them as a CSV string.
+        :param file_path: Path to the input CSV file
+        :return: CSV string containing unique symbols
+        """
+        return  CSVReader.extract_col_csv(etf_path,col_index)
+
+    def split_dataframe_by_symbol(self,symbols_series_df,symbol_col):
+        """
+        Splits a dataframe into multiple dataframes based on unique values in the 'symbol' column.
+
+        :param symbols_series_df: The input dataframe containing price data with a 'symbol' column.
+        :return: A dictionary where keys are unique symbols and values are the respective dataframes.
+        """
+        separated_dataframes = {}  # Dictionary to store dataframes by symbol
+
+        for symbol in symbols_series_df[symbol_col].unique():  # Get unique symbols
+            separated_dataframes[symbol] = symbols_series_df[symbols_series_df[symbol_col] == symbol].copy()
+
+        return separated_dataframes
 
     def build_interval_series(self,series_csv,d_from,d_to,interval=None, output_col=None):
 
