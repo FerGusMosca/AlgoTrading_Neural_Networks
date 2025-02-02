@@ -134,18 +134,19 @@ class AlgosOrchestationLogic:
         self.logger.do_log("--------------------", MessageType.INFO)
 
 
-    def __log_scalping_trading_results__(self,algo,daily_net_profit,total_positions,max_cum_drawdown,trading_summary_df):
+    def __log_scalping_trading_results__(self,summary_dto):
 
-        max_cum_drawdown_percentage = max_cum_drawdown * 100
+        max_cum_drawdown_percentage = summary_dto.max_cum_drawdown * 100
         self.logger.do_log(
-            f"Results for algo {algo}: Net_Profit=${daily_net_profit:,.2f} (total positions={total_positions} Max Drawdown ={max_cum_drawdown_percentage:.2f}%)",
+            f"Results for algo {summary_dto.algo}: Net_Profit=${summary_dto.daily_net_profit:,.2f} (total positions={summary_dto.total_positions} Max Drawdown ={max_cum_drawdown_percentage:.2f}%)",
             MessageType.INFO)
         self.logger.do_log("---Summarizing trades---", MessageType.INFO)
-        for index, row in trading_summary_df[trading_summary_df['total_net_profit'].notnull()].iterrows():
+        for index, row in summary_dto.trading_summary_df[summary_dto.trading_summary_df['total_net_profit'].notnull()].iterrows():
             self.logger.do_log(
                 f" Pos: {row['side']} --> open_time={row['open']} close_time={row['close']} "
                 f"open_price=${row['price_open']:,.2f} close_price=${row['price_close']:,.2f} --> "
-                f"net_profit=${row['total_net_profit']:,.2f} ==> Final Portfolio = ${row['end_portfolio']:,.2f}",
+                f"net_profit=${row['total_net_profit']:,.2f} ==> Final Portfolio = ${row['end_portfolio']:,.2f}"
+                f" ( Pos. Profit=${row['pct_profit']}  Max. Cum. Drawdown=${row['max_drawdown']})",
                 MessageType.INFO)
 
         self.logger.do_log("--------------------", MessageType.INFO)
@@ -969,16 +970,15 @@ class AlgosOrchestationLogic:
         portf_summary = PortfSummary(symbol, portf_size, p_trade_comm=0,
                                      p_trading_algo=trading_algo, p_algo_params=n_algo_params)
 
+        summary_dto= self.__backtest_slope_strategy__(  training_series_df,
+                                                        model_candle,
+                                                        portf_size,
+                                                        n_algo_params,
+                                                        portf_summary=portf_summary)
 
 
-        daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df= self.__backtest_slope_strategy__(
-            training_series_df, model_candle, portf_size, n_algo_params, portf_summary=portf_summary)
-
-
-        self.__log_scalping_trading_results__(trading_summary_df,daily_net_profit,total_positions,max_cum_drawdown,trading_summary_df)
-
-
-        return daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df
+        self.__log_scalping_trading_results__(summary_dto)
+        return summary_dto
 
 
     def process_backtest_slope_model_on_custom_etf(self,etf_path,model_candle,d_from,d_to,portf_size,trading_algo,
@@ -1033,13 +1033,13 @@ class AlgosOrchestationLogic:
 
         #7- We run the backtest
         portf_summary = PortfSummary(symbols_csv, portf_size, p_trade_comm=0,p_trading_algo=trading_algo, p_algo_params=n_algo_params)
+        summ_dto= self.__backtest_slope_strategy__(
+                                                    merged_training_series_df,
+                                                    model_candle, portf_size,
+                                                    n_algo_params,
+                                                    portf_summary=portf_summary,
+                                                    etf_comp_dto_arr=etf_comp_dto_arr)
 
-        daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df= self.__backtest_slope_strategy__(
-            merged_training_series_df, model_candle, portf_size, n_algo_params, portf_summary=portf_summary,
-            etf_comp_dto_arr=etf_comp_dto_arr)
 
-
-        self.__log_scalping_trading_results__(trading_summary_df,daily_net_profit,total_positions,max_cum_drawdown,trading_summary_df)
-
-
-        return daily_net_profit, total_positions, max_cum_drawdown, trading_summary_df
+        self.__log_scalping_trading_results__(summ_dto)
+        return summ_dto

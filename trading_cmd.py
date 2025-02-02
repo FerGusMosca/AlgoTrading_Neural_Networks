@@ -1,4 +1,5 @@
 import re
+import traceback
 from datetime import datetime
 
 from common.util.date_handler import DateHandler
@@ -318,7 +319,7 @@ def process_biased_trading_algo(symbol, cmd_series_csv, str_from, str_to, bias, 
             print("From={} To={}".format(str_from, str_to))
             print("Nom. Profit={}".format(summary.calculate_th_nom_profit()))
             print("Pos. Size={}".format(summary.portf_pos_size))
-            print("Est. Max Drawdown={}".format(summary.max_drawdown))
+            print("Est. Max Drawdown={}".format(summary.max_drawdown_on_MTM))
 
 
     except Exception as e:
@@ -665,6 +666,7 @@ def process_backtest_slope_model_logic(symbol,model_candle,d_from,d_to,portf_siz
                      MessageType.INFO)
 
     except Exception as e:
+        print(traceback.format_exc())
         logger.print("CRITICAL ERROR running process_backtest_slope_model:{}".format(str(e)), MessageType.ERROR)
 
 
@@ -686,6 +688,7 @@ def process_backtest_slope_model_on_custom_etf_logic(etf_path,model_candle,d_fro
                      MessageType.INFO)
 
     except Exception as e:
+        print(traceback.format_exc())
         logger.print("CRITICAL ERROR running process_backtest_slope_model_on_custom_etf_logic:{}".format(str(e)), MessageType.ERROR)
 
 

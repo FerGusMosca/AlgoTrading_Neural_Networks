@@ -20,6 +20,7 @@ class PortfolioPosition():
         self.price_open=None
         self.date_close=None
         self.price_close=None
+        self.daily_MTMs=[]
 
 
     def open_pos(self,side,date,price,units=None):
@@ -32,6 +33,8 @@ class PortfolioPosition():
         else:
             self.price_open=float(price)
 
+        self.daily_MTMs.append(price*units)
+
     def close_pos(self,date,price):
 
         self.date_close=date
@@ -40,6 +43,16 @@ class PortfolioPosition():
             self.price_close = float(price.iloc[0])
         else:
             self.price_close=float(price)
+
+        self.daily_MTMs.append(price * self.units)
+
+
+    def calculate_and_append_MTM(self,price):
+
+        if price is not None and self.units is not None:
+            self.daily_MTMs.append(price*self.units)
+
+        return price
 
     def is_open(self):
         return self.date_close is None

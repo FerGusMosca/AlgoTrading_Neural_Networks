@@ -34,6 +34,7 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
         trading_summary_df =  self.__initialize_dataframe__()
 
         portf_pos = None
+        last_portf_size=round(init_portf_size,2)
         net_commissions=0
         new_portf_size=init_portf_size
 
@@ -52,7 +53,8 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
                 if self.long_signal(current_slope):
                     # Open position
                     portf_pos = PortfolioPosition(current_symbol)
-                    portf_pos.open_pos(SlopeBacktester._LONG_ACTION, current_date, current_price)
+                    new_portf_size, net_commissions = self.__extract_commission__(last_portf_size, n_algo_param_dict)
+                    portf_pos.open_pos(SlopeBacktester._LONG_ACTION, current_date, current_price,units=new_portf_size/current_price)
 
                     last_portf_size=init_portf_size if trading_summary_df.empty else trading_summary_df.iloc[-1][SlopeBacktester._END_PORTF_SIZE_COL]
                     new_portf_size,net_commissions= self.__extract_commission__(last_portf_size,n_algo_param_dict)
@@ -63,12 +65,16 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
             else: #Position Closed
 
                 if self.close_long_signal(current_slope):
+                    final_MTM = portf_pos.calculate_and_append_MTM(current_price)
+                    last_portf_size = final_MTM - net_commissions
 
                     trading_summary_df = self.__close_portf_position__(portf_pos, current_date, current_price,
                                                                        new_portf_size, net_commissions,
                                                                        trading_summary_df)
 
                     portf_pos = None
+                else:
+                    portf_pos.calculate_and_append_MTM(current_price)
 
             # Handle closing positions at the end of the day
             if index == len(predictions_df) - 1:
@@ -100,8 +106,8 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
 
         portf_pos = None
         net_commissions=0
-        new_portf_size=init_portf_size
-        last_portf_size=init_portf_size
+        new_portf_size=round(init_portf_size,2)
+        last_portf_size=round(init_portf_size,2)
         trading_symbols=self.__extract_trading_symbols_from_multiple_portf__(predictions_df,ColumnsPrefix.CLOSE_PREFIX.value)
         current_symbol = ",".join(trading_symbols)
 
@@ -130,21 +136,25 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
             else: #Position Closed
 
                 if self.close_long_signal(current_slope):
-                    final_MTM = portf_pos.calcualte_MTM(row,current_date)
-                    last_portf_size= final_MTM - net_commissions #TODO last_portfolio_size better recalc
+                    final_MTM = portf_pos.calculate_and_append_MTM(row,current_date)
+                    last_portf_size= final_MTM - net_commissions
                     trading_summary_df = self.__close_portf_position__(portf_pos, current_date, final_MTM,
                                                                        new_portf_size, net_commissions,
-                                                                       trading_summary_df)
+                                                                       trading_summary_df,last_portf_size=last_portf_size)
 
                     portf_pos = None
+                else:
+                    portf_pos.calculate_and_append_MTM(row, current_date,error_if_missing=False)
 
             # Handle closing positions at the end of the day
             if index == len(predictions_df) - 1:
                 if portf_pos is not None:
-                    final_MTM = portf_pos.calcualte_MTM(row,current_date)
+                    final_MTM = portf_pos.calculate_and_append_MTM(row,current_date)
+                    last_portf_size = final_MTM - net_commissions
                     trading_summary_df = self.__close_portf_position__(portf_pos, current_date, final_MTM,
                                                                        new_portf_size, net_commissions,
-                                                                       trading_summary_df)
+                                                                       trading_summary_df,
+                                                                       last_portf_size=last_portf_size)
                     portf_pos = None
 
         return trading_summary_df
