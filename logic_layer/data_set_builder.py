@@ -28,6 +28,15 @@ class DataSetBuilder():
 
     #region Private Methods
 
+    def persist_sinthetic_indicator(self, indicators_series_df):
+        for index,row in indicators_series_df.iterrows():
+            indicator=row["indicator"]
+            date=row["date"]
+            interval=DataSetBuilder._1_DAY_INTERVAL
+            value=row["signal"]
+
+            self.economic_series_mgr.persist_economic_series(indicator,date,interval,value)
+
     def get_classification_for_date(self,date, timestamp_range_clasifs,not_found_clasif):
         for date_range in timestamp_range_clasifs:
             if date_range.date_start <= date <= date_range.date_end:
@@ -199,6 +208,34 @@ class DataSetBuilder():
         :return: CSV string containing unique symbols
         """
         return  CSVReader.extract_col_csv(etf_path,col_index)
+
+
+    def privot_and_merge_dataframes(self,indicators_series_df):
+        indicators_series_df_dict = self.split_dataframe_by_symbol(indicators_series_df, "symbol")
+
+        for indicator in indicators_series_df_dict.keys():
+            indicator_df = indicators_series_df_dict[indicator]
+            indicators_series_df_dict[indicator] = indicator_df.rename(columns={
+                'symbol': 'symbol_{}'.format(indicator),
+                'open': 'open_{}'.format(indicator),
+                'high': 'high_{}'.format(indicator),
+                'low': 'low_{}'.format(indicator),
+                'close': 'close_{}'.format(indicator)
+            })
+
+        indicators_df = None
+        last_indicator=None
+        for indicator in indicators_series_df_dict.keys():
+            indicator_df = indicators_series_df_dict[indicator]
+            last_indicator=indicator
+            if indicators_df is None:
+                indicators_df = indicator_df
+            else:
+                indicators_df = self.merge_dataframes(indicators_df,
+                                                                       indicator_df,
+                                                                       "date")
+
+        return indicators_df
 
     def split_dataframe_by_symbol(self,symbols_series_df,symbol_col):
         """

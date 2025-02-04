@@ -48,6 +48,13 @@ class EconomicSeriesManager:
         return econ_val
 
 
+    def persist_economic_series(self,symbol,date,interval, value):
+        economic_values = []
+        with self.connection.cursor() as cursor:
+            params = (symbol,date, interval,  value,  value,  value,  value,None,None,None)
+            cursor.execute("{CALL PersistCandle (?,?,?,?,?,?,?,?,?,?)}", params)
+
+
     def get_economic_values(self,symbol,interval, dfrom, dto):
         economic_values=[]
         with self.connection.cursor() as cursor:

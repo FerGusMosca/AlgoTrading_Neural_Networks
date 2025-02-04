@@ -16,6 +16,6 @@ class CSVReader():
                 if len(row) > col:  # Ensure the row has at least two columns
                     col_arr.append(row[col])  # Add the symbol (column 2) to the set to ensure uniqueness
 
-        cols_csv = ",".join(sorted(col_arr))  # Convert to CSV string
+        cols_csv = ",".join(col_arr)  # Convert to CSV string
 
         return cols_csv

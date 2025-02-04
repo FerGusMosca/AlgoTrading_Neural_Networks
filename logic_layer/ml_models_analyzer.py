@@ -414,8 +414,8 @@ class MLModelAnalyzer():
         comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
         # SUPPORT VECTOR MACHINE
-        resp_row = self.run_support_vector_machine_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
-        comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
+        #resp_row = self.run_support_vector_machine_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
+        #comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
         # DECISSION TREE
         resp_row = self.run_decision_tree_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)

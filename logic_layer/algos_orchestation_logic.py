@@ -2,6 +2,7 @@ import traceback
 from datetime import timedelta, datetime
 
 from business_entities.porft_summary import PortfSummary
+from common.dto.indicator_type_dto import IndicatorTypeDTO
 from common.enums.columns_prefix import ColumnsPrefix
 from common.enums.grouping_criterias import GroupCriteria as gc
 from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws
@@ -14,11 +15,13 @@ from common.util.image_handler import ImageHandler
 from common.util.light_logger import LightLogger
 from common.util.random_walk_generator import RandomWalkGenerator
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
+from data_access_layer.economic_series_manager import EconomicSeriesManager
 from data_access_layer.timestamp_classification_manager import TimestampClassificationManager
 
 from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
 from logic_layer.convolutional_neural_netowrk import ConvolutionalNeuralNetwork
+from logic_layer.indicator_algos.sintethic_indicator_creator import SintheticIndicatorCreator
 from logic_layer.trading_algos.direct_slope_backtester import DirectSlopeBacktester
 from logic_layer.trading_algos.inv_slope_backtester import InvSlopeBacktester
 from logic_layer.trading_algos.n_min_buffer_w_flip_daily_trading_backtester import NMinBufferWFlipDailyTradingBacktester
@@ -979,6 +982,39 @@ class AlgosOrchestationLogic:
 
         self.__log_scalping_trading_results__(summary_dto)
         return summary_dto
+
+
+    def process_create_sinthetic_indicator_logic(self,comp_path,model_candle,d_from,d_to,algo_params):
+        start_of_day = datetime(d_from.year, d_from.month, d_from.day)
+        end_of_day = d_to + timedelta(hours=23, minutes=59, seconds=59)
+
+        #0- We extract the ETF composition info
+        indicators_csv = self.data_set_builder.extract_series_csv_from_etf_file(comp_path, 0)
+        indicator_types = self.data_set_builder.extract_series_csv_from_etf_file(comp_path, 1)
+
+        #1- The trading symbols DF
+        indicators_series_df = self.data_set_builder.build_interval_series(indicators_csv, start_of_day, end_of_day,
+                                                                        interval=DataSetBuilder._1_DAY_INTERVAL,
+                                                                        output_col=["symbol", "date", "open",
+                                                                                       "high", "low", "close"])
+
+        #2- We have one datafraem per indicator
+        indicators_series_df=self.data_set_builder.privot_and_merge_dataframes(indicators_series_df)
+        indicators_series_df["indicator"]=model_candle
+
+        #3- Dto with indicator-type arrays
+        indicator_type_arr= IndicatorTypeDTO.load_indicator_type_data(indicators_csv,indicator_types)
+
+        #4- Build and create the indicator
+        ind_creator = SintheticIndicatorCreator()
+        indicators_series_df=ind_creator.build_sinthetic_indicator(indicators_series_df,indicator_type_arr,algo_params)
+
+        #4- We persist the newly created indicator
+        self.data_set_builder.persist_sinthetic_indicator(indicators_series_df)
+
+        self.logger.do_log(f"Successfully created {len(indicators_series_df)} records for indicator {model_candle}",MessageType.INFO)
+
+        return  indicators_series_df
 
 
     def process_backtest_slope_model_on_custom_etf(self,etf_path,model_candle,d_from,d_to,portf_size,trading_algo,

@@ -37,6 +37,7 @@ def show_commands():
     print("#13-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [grouping_unit] [algo_params*]")
     print("#14-BacktestSlopeModel [symbol] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#15-BacktestSlopeModelOnCustomETF [ETF_path] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
+    print("#16-CreateSintheticIndicator [Comp_path] [model_candle] [from] [to]")
 
     #TrainNeuralNetworkAlgo
     print("#n-Exit")
@@ -162,6 +163,24 @@ def process_backtest_slope_model(cmd):
 
     print(f"Test Backtest Slope Model finished...")
 
+
+def process_create_sinthetic_indicator(cmd):
+    comp_apth = __get_param__(cmd, "comp_path")
+    model_candle = __get_param__(cmd, "model_candle")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+
+    slope_units = __get_param__(cmd, "slope_units", True, None)
+
+    cmd_param_dict = {}
+
+    if slope_units is not None:
+        cmd_param_dict["slope_units"] = slope_units
+
+    process_create_sinthetic_indicator_logic(comp_apth, model_candle=model_candle, d_from=d_from, d_to=d_to,
+                                            algo_params=cmd_param_dict)
+
+    print(f"Create sinthetic indicator finished...")
 def process_backtest_slope_model_on_custom_etf(cmd):
     etf_path = __get_param__(cmd, "ETF_path")
     model_candle = __get_param__(cmd, "model_candle")
@@ -670,6 +689,29 @@ def process_backtest_slope_model_logic(symbol,model_candle,d_from,d_to,portf_siz
         logger.print("CRITICAL ERROR running process_backtest_slope_model:{}".format(str(e)), MessageType.ERROR)
 
 
+def process_create_sinthetic_indicator_logic(comp_path,model_candle,d_from,d_to,algo_params):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print(f"Initializing indicators file {comp_path} from {d_from} to {d_to}", MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        trd_algos = AlgosOrchestationLogic(config_settings["hist_data_conn_str"],
+                                           config_settings["ml_reports_conn_str"],
+                                           None, logger)
+
+        trd_algos.process_create_sinthetic_indicator_logic(comp_path, model_candle, d_from, d_to, algo_params)
+
+        logger.print(f"Sinthetic Indicator {model_candle} successfully created from ETF file {comp_path} from {d_from} to {d_to}",
+                     MessageType.INFO)
+
+    except Exception as e:
+        print(traceback.format_exc())
+        logger.print("CRITICAL ERROR running process_create_sinthetic_indicator_logic:{}".format(str(e)),MessageType.ERROR)
+
+
 def process_backtest_slope_model_on_custom_etf_logic(etf_path,model_candle,d_from,d_to,portf_size,trading_algo,algo_params):
     loader = MLSettingsLoader()
     logger = Logger()
@@ -781,6 +823,9 @@ def process_commands(cmd):
 
     elif cmd_param_list[0] == "TestDailyLSTMWithGrouping":
         process_test_LSTM_cmd(cmd)
+
+    elif cmd_param_list[0] == "CreateSintheticIndicator":
+        process_create_sinthetic_indicator(cmd)
 
     #TestDailyLSTM
 
