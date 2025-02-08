@@ -483,8 +483,8 @@ class MLModelAnalyzer():
         predictions_dict["Logistic Regression"]=y_hat_lr_df
 
         # SUPPORT VECTOR MACHINE
-        y_hat_svm_df= self.run_predictions(X,"date",_SVM_MODEL_NAME  )
-        predictions_dict["Support Vector Machine"] = y_hat_svm_df
+        #y_hat_svm_df= self.run_predictions(X,"date",_SVM_MODEL_NAME  )
+        #predictions_dict["Support Vector Machine"] = y_hat_svm_df
 
         # DECISION TREE
         y_hat_dec_tree_df= self.run_predictions(X,"date",_DECISSION_TREE_MODEL_NAME  )

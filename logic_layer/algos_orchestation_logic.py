@@ -25,6 +25,7 @@ from logic_layer.indicator_algos.sintethic_indicator_creator import SintheticInd
 from logic_layer.trading_algos.direct_slope_backtester import DirectSlopeBacktester
 from logic_layer.trading_algos.inv_slope_backtester import InvSlopeBacktester
 from logic_layer.trading_algos.n_min_buffer_w_flip_daily_trading_backtester import NMinBufferWFlipDailyTradingBacktester
+from logic_layer.trading_algos.on_off_backtester import OnOffBacktester
 from logic_layer.trading_algos.only_signal_n_min_plus_mov_avg import OnlySignalNMinMovAvgBacktester
 from logic_layer.trading_algos.raw_algo_daily_trading_backtester import RawAlgoDailyTradingBacktester
 from logic_layer.data_set_builder import DataSetBuilder
@@ -220,16 +221,22 @@ class AlgosOrchestationLogic:
                                     etf_comp_dto_arr=None):
 
         if tas(portf_summary.trading_algo) == tas.RAW_INV_SLOPE:
-            raw_slope_backtester=InvSlopeBacktester()
-            return raw_slope_backtester.backtest_slope(series_df, indicator, portf_size,
-                                                       n_algo_params,
-                                                       etf_comp_dto_arr=etf_comp_dto_arr)
+            on_off_backtester=InvSlopeBacktester()
+            return on_off_backtester.backtest_slope(series_df, indicator, portf_size,
+                                                    n_algo_params,
+                                                    etf_comp_dto_arr=etf_comp_dto_arr)
 
         elif tas(portf_summary.trading_algo) == tas.RAW_DIRECT_SLOPE:
-            raw_slope_backtester=DirectSlopeBacktester()
-            return raw_slope_backtester.backtest_slope(series_df, indicator, portf_size,
-                                                       n_algo_params,
-                                                       etf_comp_dto_arr=etf_comp_dto_arr)
+            on_off_backtester=DirectSlopeBacktester()
+            return on_off_backtester.backtest_slope(series_df, indicator, portf_size,
+                                                    n_algo_params,
+                                                    etf_comp_dto_arr=etf_comp_dto_arr)
+
+        elif tas(portf_summary.trading_algo) == tas.RAW_ON_OFF_VALUE:
+            on_off_backtester=OnOffBacktester()
+            return on_off_backtester.backtest_slope(series_df, indicator, portf_size,
+                                                    n_algo_params,
+                                                    etf_comp_dto_arr=etf_comp_dto_arr)
 
 
         else:
@@ -350,6 +357,10 @@ class AlgosOrchestationLogic:
         try:
             symbol_df = self.data_set_builder.build_daily_series_classification(symbol, d_from, d_to,add_classif_col=False)
             series_df = self.data_set_builder.build_daily_series_classification(series_csv, d_from, d_to,add_classif_col=False)
+
+            # Given different frequencies of the data, we will the missing <interval> values with the last available data
+            series_df = DataframeFiller.fill_missing_values(series_df)  # We fill missing values with the last one
+
             mlAnalyzer = MLModelAnalyzer(self.logger)
             portf_pos_dict = mlAnalyzer.evaluate_trading_performance_last_model(symbol_df,symbol,series_df, bias,last_trading_dict)
 

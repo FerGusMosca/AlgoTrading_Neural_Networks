@@ -22,6 +22,7 @@ class PortfSummary:
         self.max_drawdown=0
         self.max_daily_drawdown=0
         self.accum_positions=0
+        self.max_drawdown_on_MTM="-"
 
 
     def append_position_summary(self,pos_summary):

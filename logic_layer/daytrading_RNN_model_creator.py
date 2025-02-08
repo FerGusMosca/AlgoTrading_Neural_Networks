@@ -251,9 +251,9 @@ class DayTradingRNNModelCreator:
             model.add(LSTM(n_neurons, activation=inner_activation))  # Another LSTM layer without return_sequences
             model.add(Dropout(dropout_rate))  # Dropout layer with 20% dropout rate
             model.add(BatchNormalization())
-            model.add(Dense(3, activation='softmax',
+            model.add(Dense(2, activation='softmax',
                             kernel_regularizer=tensorflow.keras.regularizers.l2(
-                                reg_rate)))  # Three classes: LONG, SHORT, FLAT
+                                reg_rate)))  # Three classes: LONG, SHORT
 
             # Adjust the learning rate here
             learning_rate = learning_rate  # You can experiment with this value
@@ -369,7 +369,8 @@ class DayTradingRNNModelCreator:
         # Convert predictions to actions (LONG, SHORT, FLAT)
         actions = np.argmax(predictions, axis=1)
 
-        action_labels = {0: "LONG", 1: "SHORT", 2: "FLAT"}
+        #action_labels = {0: "LONG", 1: "SHORT", 2: "FLAT"}
+        action_labels = {0: "LONG", 1: "SHORT"}
         action_series = pd.Series(actions).map(action_labels)
 
         # Adjust the DataFrame to match the length of the predictions

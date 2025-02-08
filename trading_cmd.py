@@ -37,7 +37,7 @@ def show_commands():
     print("#13-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [grouping_unit] [algo_params*]")
     print("#14-BacktestSlopeModel [symbol] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#15-BacktestSlopeModelOnCustomETF [ETF_path] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
-    print("#16-CreateSintheticIndicator [Comp_path] [model_candle] [from] [to]")
+    print("#16-CreateSintheticIndicator [comp_path] [model_candle] [from] [to] [slope_units]")
 
     #TrainNeuralNetworkAlgo
     print("#n-Exit")

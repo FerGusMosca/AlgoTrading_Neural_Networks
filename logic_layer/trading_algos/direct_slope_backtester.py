@@ -15,16 +15,19 @@ class DirectSlopeBacktester(SlopeBacktester):
         pass
 
 
-    def long_signal(self,slope):
-        return slope>0
+    def long_signal(self,current_value,current_slope):
+        return current_slope>0
 
-    def close_long_signal(self,slope):
-        return  slope<0
+    def close_long_signal(self,current_value,current_slope):
+        return  current_slope<0
+
+    def get_algo_name(self):
+        return "direct_slope"
 
     def backtest_slope(self,series_df,indicator,portf_size,n_algo_param_dict,etf_comp_dto_arr=None):
 
         series_df=SlopeCalculator.calculate_indicator_slope(series_df,
-                                                            int(n_algo_param_dict[DirectSlopeBacktester._SLOPE_UNITS_COL]),
+                                                            int(n_algo_param_dict[BaseClassDailyTradingBacktester._SLOPE_UNITS_COL]),
                                                             indicator)
         if sum(col.startswith(ColumnsPrefix.CLOSE_PREFIX.value) for col in series_df.columns)<=1:
             trading_summary_df = self.__run_trades_single_pos__(series_df, portf_size, indicator, n_algo_param_dict)
