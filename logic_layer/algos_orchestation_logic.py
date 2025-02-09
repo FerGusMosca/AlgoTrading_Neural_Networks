@@ -1052,6 +1052,7 @@ class AlgosOrchestationLogic:
                                                                           interval=DataSetBuilder._1_DAY_INTERVAL,
                                                                           output_col=["symbol", "date", "open",
                                                                                           "high", "low", "close"])
+        variables_series_df=self.data_set_builder.shift_dates(variables_series_df,n_algo_params)
 
         #4- We merge them
         training_series_df_arr={}
@@ -1075,8 +1076,9 @@ class AlgosOrchestationLogic:
                                                                           "date")
 
         #6- We drop weekends and holidays
-        merged_training_series_df= self.data_set_builder.drop_NaN_for_prefix(merged_training_series_df,
-                                                                             ColumnsPrefix.CLOSE_PREFIX.value)
+        merged_training_series_df=self.data_set_builder.preformat_df_rows(merged_training_series_df,
+                                                                          ColumnsPrefix.CLOSE_PREFIX.value,
+                                                                          n_algo_params)
 
         #7- We run the backtest
         portf_summary = PortfSummary(symbols_csv, portf_size, p_trade_comm=0,p_trading_algo=trading_algo, p_algo_params=n_algo_params)

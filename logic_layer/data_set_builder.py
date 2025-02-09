@@ -145,6 +145,18 @@ class DataSetBuilder():
 
         return  df
 
+    def shift_dates(self,df,n_algo_params=None):
+        if n_algo_params is not None and "days_to_add_to_date" in n_algo_params:
+            days_to_add_to_date=int(n_algo_params["days_to_add_to_date"])
+            df['date'] = df['date'] + pd.to_timedelta(days_to_add_to_date,unit='D')
+
+        return df
+
+    def preformat_df_rows(self,df, col_prefix=ColumnsPrefix.CLOSE_PREFIX.value,n_algo_params=None):
+        df=self.drop_NaN_for_prefix(df)
+
+        return df
+
     def drop_NaN_for_prefix(self,df, col_prefix=ColumnsPrefix.CLOSE_PREFIX.value):
         """
         Removes rows where all columns starting with a specific prefix (e.g., "close_") are NaN.

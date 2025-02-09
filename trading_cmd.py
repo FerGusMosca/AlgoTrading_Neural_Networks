@@ -195,6 +195,8 @@ def process_backtest_slope_model_on_custom_etf(cmd):
     trade_comm = __get_param__(cmd, "trade_comm", optional=True, def_value=0)
     trade_comm_pct = __get_param__(cmd, "trade_comm_pct", optional=True, def_value=0)
 
+    days_to_add_to_date = __get_param__(cmd, "days_to_add_to_date", optional=True, def_value=None)
+
     cmd_param_dict = {}
     if candle_slope is not None:
         cmd_param_dict["candle_slope"]=candle_slope
@@ -207,6 +209,9 @@ def process_backtest_slope_model_on_custom_etf(cmd):
 
     if trade_comm_pct is not None:
         cmd_param_dict["trade_comm_pct"]=trade_comm_pct
+
+    if days_to_add_to_date is not None:
+        cmd_param_dict["days_to_add_to_date"]=days_to_add_to_date
 
     process_backtest_slope_model_on_custom_etf_logic(etf_path,model_candle=model_candle,d_from=d_from,d_to=d_to,
                                                     portf_size=portf_size,
