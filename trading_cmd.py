@@ -11,6 +11,7 @@ from IPython.display import display
 import pandas as pd
 
 from logic_layer.data_set_builder import DataSetBuilder
+from logic_layer.web_manager_logic import WebManagerLogic
 
 _DATE_FORMAT = "%m/%d/%Y"
 _TIMESTAMP_FORMAT='%m/%d/%Yt%H:%M:%S'
@@ -38,7 +39,8 @@ def show_commands():
     print("#14-BacktestSlopeModel [symbol] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#15-BacktestSlopeModelOnCustomETF [ETF_path] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#16-CreateSintheticIndicator [comp_path] [model_candle] [from] [to] [slope_units]")
-
+    print("======================== UI ========================")
+    print("#30-DisplayOrderRoutingScreen")
     #TrainNeuralNetworkAlgo
     print("#n-Exit")
 
@@ -162,6 +164,24 @@ def process_backtest_slope_model(cmd):
                                         trading_algo=trading_algo,algo_params=cmd_param_dict)
 
     print(f"Test Backtest Slope Model finished...")
+
+
+def process_display_order_routing_screen(cmd):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    #loader user to load settings
+    config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+    ib_prod_ws=config_settings["IB_PROD_WS"]
+    primary_prod_ws = config_settings["PRIMARY_PROD_WS"]
+    ib_dev_ws = config_settings["IB_DEV_WS"]
+
+
+    wml= WebManagerLogic(logger,ib_prod_ws,primary_prod_ws,ib_dev_ws)
+
+    wml.display_order_routing_screen()
+    print(f"Web Manager Logic successfully shown...")
 
 
 def process_create_sinthetic_indicator(cmd):
@@ -831,6 +851,10 @@ def process_commands(cmd):
 
     elif cmd_param_list[0] == "CreateSintheticIndicator":
         process_create_sinthetic_indicator(cmd)
+    elif cmd_param_list[0] == "DisplayOrderRoutingScreen":
+        process_display_order_routing_screen(cmd)
+    #
+
 
     #TestDailyLSTM
 

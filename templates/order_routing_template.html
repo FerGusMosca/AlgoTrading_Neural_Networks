@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bias Fund - Order Routing Screen</title>
+    <script src="https://unpkg.com/htmx.org@1.9.4"></script>
+    <script>
+        function updateFields() {
+            let side = document.getElementById("side").value;
+            let cashQty = document.getElementById("cash_qty");
+            let nomQty = document.getElementById("nom_qty");
+
+            if (side === "Buy") {
+                cashQty.disabled = false;
+                nomQty.disabled = false;
+            } else if (side === "Sell") {
+                cashQty.value = "";
+                cashQty.disabled = true;
+                nomQty.disabled = false;
+            }
+        }
+
+        function updateBrokerRelatedFields() {
+            let broker = document.getElementById("broker").value;
+            let currency = document.getElementById("currency");
+            let exchange = document.getElementById("exchange");
+            let account = document.getElementById("account");
+
+            if (broker.startsWith("IB")) {
+                currency.value = "USD";
+                exchange.value = "SMART";
+                account.innerHTML = '<option value="-">-Default-</option>';
+            } else if (broker === "BYMA_PROD") {
+                currency.value = "ARS";
+                exchange.value = "BUE";
+                account.innerHTML = '<option value="10262">20262 - Fernando M.</option>';
+            }
+        }
+
+        function formatCurrency(input) {
+            let value = input.value.replace(/[^\d.]/g, '');
+            if (!isNaN(value) && value !== "") {
+                input.value = "$" + Number(value).toLocaleString("en-US");
+            }
+        }
+
+        function confirmOrder(event) {
+            event.preventDefault();
+
+            let side = document.getElementById("side").value;
+            let cashQty = document.getElementById("cash_qty").value.replace(/[^0-9.]/g, '');
+            let nomQty = document.getElementById("nom_qty").value;
+            let broker = document.getElementById("broker").selectedOptions[0].text;
+
+            if (cashQty && nomQty) {
+                alert("You must specify whether you want to route a cash or nominal quantity.");
+                return;
+            }
+
+            let qtyType = cashQty ? "Cash Qty" : "Nom. Qty";
+            let amount = cashQty || nomQty;
+
+            if (!amount) {
+                alert("Error: Please enter a valid quantity.");
+                return;
+            }
+
+            let message = `You are about to send a ${side} order type of ${qtyType} amount to ${broker} broker. Are you sure?`;
+
+            if (confirm(message)) {
+                document.getElementById("orderForm").submit();
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0D1117;
+            color: #e0e0e0;
+            margin: 20px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+        }
+
+        .left-panel {
+            flex: 1;
+            background: #161B22;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .right-panel {
+            flex: 2;
+            background: #0D1117;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #58A6FF;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: bold;
+            display: block;
+            margin: 8px 0 4px;
+        }
+
+        input, select, button {
+            width: calc(100% - 16px);
+            padding: 10px;
+            margin-bottom: 12px;
+            background: #21262D;
+            border: 1px solid #444;
+            color: #ffffff;
+            border-radius: 4px;
+            font-size: 14px;
+            display: block;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        .execution-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .execution-table th, .execution-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #444;
+        }
+
+        .execution-table th {
+            background: #21262D;
+            color: #58A6FF;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Left Panel - Order Routing Form -->
+        <div class="left-panel">
+            <h2>Bias Fund - Order Routing Screen</h2>
+
+            {% if errors %}
+                <div class="error">
+                    <ul>
+                        {% for error in errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            {% if success %}
+                <div class="success">{{ success }}</div>
+            {% endif %}
+
+            <form id="orderForm" hx-post="/submit" hx-target="body" hx-swap="outerHTML" onsubmit="confirmOrder(event)">
+                <label for="symbol">Symbol:</label>
+                <input type="text" id="symbol" name="symbol" maxlength="10" required>
+
+                <label for="side">Side:</label>
+                <select id="side" name="side" required onchange="updateFields()">
+                    <option value="">Select</option>
+                    <option value="Buy">Buy</option>
+                    <option value="Sell">Sell</option>
+                </select>
+
+                <label for="cash_qty">Cash Qty:</label>
+                <input type="text" id="cash_qty" name="cash_qty" oninput="formatCurrency(this)" disabled>
+
+                <label for="nom_qty">Nom. Qty:</label>
+                <input type="number" id="nom_qty" name="nom_qty" min="1" step="1" disabled>
+
+                <label for="broker">Broker:</label>
+                <select id="broker" name="broker" required onchange="updateBrokerRelatedFields()">
+                    <option value="IB_PROD">Interactive Broker - PROD</option>
+                    <option value="IB_PAPER">Interactive Broker - PAPER</option>
+                    <option value="BYMA_PROD">BYMA - PROD</option>
+                </select>
+
+                <label for="currency">Currency:</label>
+                <input type="text" id="currency" name="currency" value="USD" readonly>
+
+                <label for="exchange">Exchange:</label>
+                <input type="text" id="exchange" name="exchange" value="SMART" readonly>
+
+                <label for="account">Account:</label>
+                <select id="account" name="account">
+                    <option value="-">-Default-</option>
+                </select>
+
+                <button type="submit">Submit Order</button>
+            </form>
+        </div>
+
+        <!-- Right Panel - Execution Reports Table -->
+        <div class="right-panel">
+            <h2>Execution Reports</h2>
+            <table class="execution-table">
+                <thead>
+                    <tr>
+                        <th>ClOrdID</th>
+                        <th>Symbol</th>
+                        <th>Side</th>
+                        <th>Nom. Qty.</th>
+                        <th>Exec. Status</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        function confirmOrder(event) {
+            event.preventDefault();
+    
+            let symbol = document.getElementById("symbol").value;
+            let side = document.getElementById("side").value;
+            let cashQty = document.getElementById("cash_qty").value.replace(/[^0-9.]/g, '') || null;
+            let nomQty = document.getElementById("nom_qty").value || null;
+            let broker = document.getElementById("broker").value;
+            let currency = document.getElementById("currency").value;
+            let exchange = document.getElementById("exchange").value;
+            let account = document.getElementById("account").value;
+    
+            if (cashQty && nomQty) {
+                alert("You must specify whether you want to route a cash or nominal quantity.");
+                return;
+            }
+    
+            let orderData = {
+                symbol: symbol,
+                side: side,
+                cash_qty: cashQty ? parseFloat(cashQty) : null,
+                nom_qty: nomQty ? parseInt(nomQty) : null,
+                broker: broker,
+                currency: currency,
+                exchange: exchange,
+                account: account
+            };
+    
+            console.log("Sending Order:", orderData);  // <-- Para depurar en consola
+    
+            fetch("http://127.0.0.1:8000/submit_order", {  
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(orderData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+            })
+            .catch(error => {
+                alert("Error submitting order.");
+                console.error(error);
+            });
+        }
+    </script>
+    
+    
+    
+</body>
+</html>
