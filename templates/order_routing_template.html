@@ -74,6 +74,30 @@
         }
     </script>
     <style>
+        .status-panel {
+            background: #161B22;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            font-size: 16px;
+            color: #e0e0e0;
+            margin-bottom: 8px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+            background-color: gray; /* Default (Unknown) */
+        }
+
         body {
             font-family: Arial, sans-serif;
             background-color: #0D1117;
@@ -161,6 +185,20 @@
 </head>
 <body>
 
+    <!-- Connection Status Indicators -->
+<div class="status-panel">
+    <h2>Connection Status</h2>
+    <div class="status-item">
+        <span class="status-dot" id="status-IB_PROD"></span> IB_PROD
+    </div>
+    <div class="status-item">
+        <span class="status-dot" id="status-PRIMARY_PROD"></span> PRIMARY_PROD
+    </div>
+    <div class="status-item">
+        <span class="status-dot" id="status-IB_DEV"></span> IB_DEV
+    </div>
+</div>
+
     <div class="container">
         <!-- Left Panel - Order Routing Form -->
         <div class="left-panel">
@@ -235,9 +273,89 @@
                 </thead>
                 <tbody></tbody>
             </table>
+            <!-- Market Data Table -->
+            <h2>Market Data</h2>
+            <table class="execution-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Exchange</th>
+                        <th>Open</th>
+                        <th>High</th>
+                        <th>Low</th>
+                        <th>Close</th>
+                        <th>Trade</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody id="market-data-table"></tbody>
+            </table>
+
         </div>
     </div>
     <script>
+
+    function updateMarketData() {
+        fetch("http://127.0.0.1:8000/get_market_data")
+        .then(response => response.json())
+        .then(data => {
+            let tableBody = document.getElementById("market-data-table");
+            tableBody.innerHTML = ""; // Clear existing data
+            
+            data.forEach(row => {
+                let tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${row.symbol}</td>
+                    <td>${row.exchange}</td>
+                    <td>${row.opening_price}</td>
+                    <td>${row.high_price}</td>
+                    <td>${row.low_price}</td>
+                    <td>${row.closing_price}</td>
+                    <td>${row.last_trade_price}</td>
+                    <td>${row.timestamp}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        })
+        .catch(error => {
+            console.error("Error fetching market data:", error);
+        });
+    }
+
+    // Fetch Market Data every 5 seconds
+    setInterval(updateMarketData, 5000);
+
+    // Fetch immediately when page loads
+    updateMarketData();
+
+    function updateConnectionStatus() {
+            fetch("http://127.0.0.1:8000/get_connection_status")
+            .then(response => response.json())
+            .then(status => {
+                updateStatusIndicator("IB_PROD", status["IB_PROD"]);
+                updateStatusIndicator("PRIMARY_PROD", status["PRIMARY_PROD"]);
+                updateStatusIndicator("IB_DEV", status["IB_DEV"]);
+            })
+            .catch(error => {
+                console.error("Error fetching connection status:", error);
+            });
+        }
+
+        function updateStatusIndicator(id, isConnected) {
+            let dot = document.getElementById(`status-${id}`);
+            if (isConnected) {
+                dot.style.backgroundColor = "green";
+            } else {
+                dot.style.backgroundColor = "red";
+            }
+        }
+
+        // Fetch status every 5 seconds
+        setInterval(updateConnectionStatus, 5000);
+
+        // Fetch immediately when page loads
+        updateConnectionStatus();
+
         function confirmOrder(event) {
             event.preventDefault();
     
