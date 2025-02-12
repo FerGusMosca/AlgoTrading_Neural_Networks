@@ -14,18 +14,26 @@ class WebSocketClient:
         self.is_connected = False
 
     async def connect(self):
-        """Establishes a WebSocket connection."""
-        try:
-            self.logger.do_log(f"Connecting to WebSocket: {self.ws_url}...", MessageType.INFO)
-            self.connection = await asyncio.wait_for(websockets.connect(self.ws_url), timeout=30)
-            self.is_connected = True
-            self.logger.do_log("Connection established.", MessageType.INFO)
+        """Establishes a WebSocket connection and ensures continuous reconnection if it fails."""
+        while not self.is_connected:
+            try:
+                self.logger.do_log(f"Connecting to WebSocket: {self.ws_url}...", MessageType.INFO)
 
-            # Start listening for messages
-            asyncio.create_task(self.listen())
-        except Exception as e:
-            self.logger.do_log(f"Failed to connect: {e}", MessageType.ERROR)
-            self.is_connected = False
+                # Attempt connection with a 30-second timeout
+                self.connection = await asyncio.wait_for(websockets.connect(self.ws_url), timeout=30)
+                self.is_connected = True
+                self.logger.do_log("Connection established.", MessageType.INFO)
+
+                # Start listening for messages after a successful connection
+                asyncio.create_task(self.listen())
+
+            except asyncio.TimeoutError:
+                self.logger.do_log(f"Connection to {self.ws_url} timed out. Retrying in 5 seconds...",
+                                   MessageType.ERROR)
+                await asyncio.sleep(5)  # Wait before retrying
+            except Exception as e:
+                self.logger.do_log(f"Failed to connect: {e}. Retrying in 5 seconds...", MessageType.ERROR)
+                await asyncio.sleep(5)  # Wait before retrying
 
     async def disconnect(self):
         """Closes the WebSocket connection."""
@@ -35,13 +43,21 @@ class WebSocketClient:
             self.is_connected = False
 
     async def listen(self):
-        """Listens for incoming messages and processes market data."""
-        try:
-            async for message in self.connection:
-                self.process_message(message)
-        except websockets.exceptions.ConnectionClosed:
-            self.logger.do_log("WebSocket connection lost.", MessageType.WARNING)
-            self.is_connected = False
+        """Continuously listens for incoming messages and ensures automatic reconnection."""
+        while True:  # Infinite loop to keep listening
+            try:
+                async for message in self.connection:
+                    self.process_message(message)  # Process received message
+
+            except websockets.exceptions.ConnectionClosed:
+                self.logger.do_log("WebSocket connection lost. Reconnecting in 5 seconds...", MessageType.WARNING)
+                self.is_connected = False
+                await asyncio.sleep(5)  # Wait before retrying
+                await self.connect()  # Attempt reconnection
+
+            except Exception as e:
+                self.logger.do_log(f"Unexpected error in listen(): {e}", MessageType.ERROR)
+                await asyncio.sleep(5)  # Prevents an infinite loop of errors
 
     def process_message(self, message):
         """Parses the incoming message and converts it into MarketDataDTO."""
@@ -49,18 +65,19 @@ class WebSocketClient:
             data = json.loads(message)
             if "Msg" in data and data["Msg"] == "MarketDataMsg":
                 market_data = MarketDataDTO(
-                    symbol=data["Symbol"],
-                    exchange=data["BestBidExch"],
-                    opening_price=data["OpeningPrice"],
-                    high_price=data["TradingSessionHighPrice"],
-                    low_price=data["TradingSessionLowPrice"],
-                    closing_price=data["ClosingPrice"],
-                    last_trade_price=data["Trade"],
-                    timestamp=data["MDEntryDate"]
+                    symbol=data.get("Symbol", "UNKNOWN"),
+                    exchange=data.get("Security", {}).get("Exchange", "UNKNOWN"),  # Maneja Exchange faltante
+                    opening_price=data.get("OpeningPrice", 0.0),
+                    high_price=data.get("TradingSessionHighPrice", 0.0),
+                    low_price=data.get("TradingSessionLowPrice", 0.0),
+                    closing_price=data.get("ClosingPrice", 0.0),
+                    last_trade_price=data.get("Trade", 0.0),
+                    trade_volume=data.get("TradeVolume", 0.0),
+                    timestamp=data.get("MDEntryDate", "UNKNOWN")
                 )
                 self.data_callback(market_data)
         except Exception as e:
-            self.logger.do_log(f"Error processing message: {e}", MessageType.ERROR)
+            self.logger.do_log(f"Error processing message: {e} - Message: {message}", MessageType.ERROR)
 
     def get_status(self):
         """Returns the current connection status (True if connected, False otherwise)."""
