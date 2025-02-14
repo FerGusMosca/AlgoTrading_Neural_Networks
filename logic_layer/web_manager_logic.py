@@ -10,20 +10,13 @@ import json
 
 from starlette.responses import JSONResponse
 
+from common.dto.websocket_conn.client_messages.new_order_req import NewOrderReq
 from common.dto.websocket_conn.market_data_dto import MarketDataDTO
+from common.dto.websocket_conn.order_dto import OrderDTO
 from framework.common.logger.message_type import MessageType
 from service_layer.websocket_client import WebSocketClient
 
 
-class OrderDTO(BaseModel):
-    symbol: str
-    side: str
-    cash_qty: float | None
-    nom_qty: int | None
-    broker: str
-    currency: str
-    exchange: str
-    account: str
 
 class WebManagerLogic:
     def __init__(self, logger, ib_prod_ws, primary_prod_ws, ib_dev_ws):
@@ -98,10 +91,22 @@ class WebManagerLogic:
         """Returns the latest market data as JSON."""
         return JSONResponse(content=list(self.market_data.values()))
 
-    async def submit_order(self, order: OrderDTO = Body(...)):
-        """Recibe la orden y la procesa correctamente como JSON"""
+    async def submit_order(self, order: "OrderDTO" = Body(...)):
+        """Receives an order and processes it correctly as JSON"""
+
         self.logger.do_log(f"New Order Received: {order}", MessageType.INFO)
-        return {"status": "success", "message": "Order received successfully!"}
+
+        # If the broker is IB_PROD_WS, transform the order into NewOrderReq
+        if order.broker == "IB_PROD":
+            new_order = NewOrderReq.from_order_dto(order)
+            self.logger.do_log(f"Transformed Order for IB_PROD_WS: {new_order.json()}", MessageType.INFO)
+
+            # Here, you would send the JSON message via WebSocket to IB_PROD_WS
+            await self.ws_prod_client.send_message(new_order.json())
+
+            return {"status": "success", "message": "Order transformed and sent successfully!"}
+
+        return {"status": "success", "message": "Order received but not transformed."}
 
     def display_order_routing_screen(self, port=8000):
         """Levanta el servidor en un hilo separado"""

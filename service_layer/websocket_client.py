@@ -79,6 +79,17 @@ class WebSocketClient:
         except Exception as e:
             self.logger.do_log(f"Error processing message: {e} - Message: {message}", MessageType.ERROR)
 
+    async def send_message(self, message: str):
+        """Sends a message to the WebSocket server."""
+        if self.is_connected and self.connection:
+            try:
+                await self.connection.send(message)
+                self.logger.do_log(f"Sent message: {message}", MessageType.INFO)
+            except Exception as e:
+                self.logger.do_log(f"Error sending message: {e}", MessageType.ERROR)
+        else:
+            self.logger.do_log("Cannot send message: No active WebSocket connection.", MessageType.ERROR)
+
     def get_status(self):
         """Returns the current connection status (True if connected, False otherwise)."""
         return self.is_connected
