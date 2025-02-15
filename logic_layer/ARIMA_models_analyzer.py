@@ -15,72 +15,93 @@ class ARIMAModelsAnalyzer():
     #region privste methods
 
     def __aggregate_weekly_basis__(self,df,symbol,period):
-        df.set_index('date', inplace=True)
-        df_period = df.resample(period).mean()
-        df_period = df_period[[symbol]]
-        df_period.head()
-        return df_period
 
-    def __add_weekly_returns__(self,df_period,symbol):
+        if period is not None:
+            df.set_index('date', inplace=True)
+            df_period = df.resample(period).mean()
+            df_period = df_period[[symbol]]
+            return df_period
+        else:
+            return df[[symbol]]
+
+    def __add_weekly_returns__(self, df_period, symbol):
+        df_period = df_period.copy()  # Evita modificar el original por referencia
         df_period['period_ret'] = np.log(df_period[symbol]).diff()
-        df_period.head()
 
         # drop null rows
         df_period.dropna(inplace=True)
 
-        #En caso que lo queramos --> weekly plot
-        #df_week.weekly_ret.plot(kind='line', figsize=(12, 6))
+        # Asegurar que el índice es un DatetimeIndex
+        if not isinstance(df_period.index, pd.DatetimeIndex):
+            df_period.index = pd.to_datetime(df_period.index)
 
-        udiff = df_period.drop([symbol], axis=1)
-        udiff.head()
+        return df_period[['period_ret']]  # Devuelve el DataFrame con el índice original
 
-        return udiff
+    def __plot_rolling_mean_std_dev__(self, udiff):
+        if isinstance(udiff, pd.DataFrame):
+            udiff = udiff["period_ret"]
 
+        if not isinstance(udiff.index, pd.DatetimeIndex):
+            udiff.index = pd.date_range(start="2000-01-01", periods=len(udiff), freq="M")
 
-    def __plot_rolling_mean_std_dev__(self,udiff):
-        rolmean = udiff.rolling(20).mean()
-        rolstd = udiff.rolling(20).std()
+        rolmean = udiff.rolling(5).mean()
+        rolstd = udiff.rolling(5).std()
 
         plt.figure(figsize=(12, 6))
-        orig = plt.plot(udiff, color='blue', label='Original')
-        mean = plt.plot(rolmean, color='red', label='Rolling Mean')
-        std = plt.plot(rolstd, color='black', label='Rolling Std Deviation')
+        plt.plot(udiff, color='blue', label='Original')
+        plt.plot(rolmean, color='red', label='Rolling Mean')
+        plt.plot(rolstd, color='black', label='Rolling Std Deviation')
         plt.title('Rolling Mean & Standard Deviation')
         plt.legend(loc='best')
-        plt.show(block=False)
-
+        plt.show(block=True)
 
     #The ACF gives us a measure of how much each "y" value is correlated to the previous n "y" values prior.
     #Helps us choose the q parameter
-    def __acf_auto_corr_plot__(self,udiff):
-        fig, ax = plt.subplots(figsize=(12, 5))
-        plot_acf(udiff.values, lags=10, ax=ax)
-        plt.show(block=False)
+    def __acf_auto_corr_plot__(self, udiff):
+        if isinstance(udiff, pd.DataFrame):
+            udiff = udiff["period_ret"]
 
+        if not isinstance(udiff.index, pd.DatetimeIndex):
+            udiff.index = pd.date_range(start="2000-01-01", periods=len(udiff), freq="M")
+
+        fig, ax = plt.subplots(figsize=(12, 5))
+        plot_acf(udiff.dropna(), lags=10, ax=ax)  # Evitar valores NaN en ACF
+        plt.show(block=True)
 
     #he PACF is the partial correlation function gives us (a sample of) the amount of correlation between two "y" values
     # separated by n lags excluding the impact of all the "y" values in between them.
     # Helps us chose the p parameter
-    def __pacf_auto_corr_plot__(self,udiff):
+    def __pacf_auto_corr_plot__(self, udiff):
+        if isinstance(udiff, pd.DataFrame):
+            udiff = udiff["period_ret"]
+
+        if not isinstance(udiff.index, pd.DatetimeIndex):
+            udiff.index = pd.date_range(start="2000-01-01", periods=len(udiff), freq="M")
+
         fig, ax = plt.subplots(figsize=(12, 5))
-        plot_pacf(udiff.values, lags=10, ax=ax)
-        plt.show(block=False)
+        plot_pacf(udiff.dropna(), lags=10, ax=ax)  # Evitar valores NaN en PACF
+        plt.show(block=True)
 
-
-
-    def __perf_dickey_fuller_test__(self,udiff):
-        # Perform Dickey-Fuller test
+    def __perf_dickey_fuller_test__(self, udiff):
+        # Realizar el test de Dickey-Fuller
         dftest = sm.tsa.adfuller(udiff.period_ret, autolag='AIC')
+
+        # Extraer los resultados
         dfoutput = pd.Series(dftest[0:4],
                              index=['Test Statistic', 'p-value', '#Lags Used', 'Number of Observations Used'])
 
-        dickey_fuller_test_dict={}
-        for key, value in dftest[4].items():
-            dickey_fuller_test_dict[key]=value
+        # Guardar valores críticos
+        dickey_fuller_test_dict = {key: value for key, value in dftest[4].items()}
 
+        # Incluir el estadístico en el output
+        dickey_fuller_test_dict['Test Statistic'] = dftest[0]  # Agregar el estadístico de prueba
+        dickey_fuller_test_dict['p-value'] = dftest[1]  # Agregar el p-valor
 
-        return  dickey_fuller_test_dict
+        print("\n======= Showing Dickey-Fuller Test after building ARIMA =======")
+        for key, value in dickey_fuller_test_dict.items():
+            print(f"{key} = {value}")
 
+        return dickey_fuller_test_dict
 
     def __build_ARIMA__(self,udiff,p,d,q):
         # Notice that you have to use udiff - the differenced data rather than the original data.
@@ -106,6 +127,12 @@ class ARIMAModelsAnalyzer():
         # plt.show()
         return forecast
 
+
+    def __show_dick_fuller__(self,pred_dict):
+        print("======= Showing Dickey Fuller Test after building ARIMA======= ")
+        for key in pred_dict.keys():
+            print("{}={}".format(key, pred_dict[key]))
+
     #endregion
 
 
@@ -113,15 +140,16 @@ class ARIMAModelsAnalyzer():
         df_period=self.__aggregate_weekly_basis__(series_df,symbol,period)
         udiff=self.__add_weekly_returns__(df_period,symbol)
 
+        #Print Dickey Fuller on the Screen
+        dickey_fuller_test_dict=self.__perf_dickey_fuller_test__(udiff)
+        self.__show_dick_fuller__(dickey_fuller_test_dict)
+
         if show_graphs:
             self.__plot_rolling_mean_std_dev__(udiff)
             self.__acf_auto_corr_plot__(udiff)
             self.__pacf_auto_corr_plot__(udiff)
 
-        #Hay que poner un breakpoint para ver bien todos los gráficos!
-        #input("Presiona Enter para continuar...")
-        pass
-        dickey_fuller_test_dict=self.__perf_dickey_fuller_test__(udiff)
+
 
         return dickey_fuller_test_dict
 

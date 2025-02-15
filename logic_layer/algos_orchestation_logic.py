@@ -393,7 +393,7 @@ class AlgosOrchestationLogic:
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
 
-    def build_ARIMA(self,symbol, period, d_from, d_to):
+    def build_ARIMA(self,symbol, d_from, d_to, period=None):
         try:
             series_df = self.data_set_builder.build_daily_series_classification(symbol, d_from, d_to,
                                                                                 add_classif_col=False)
@@ -453,7 +453,7 @@ class AlgosOrchestationLogic:
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
 
-    def predict_ARIMA(self,symbol, p,d,q,d_from,d_to,period, steps):
+    def predict_ARIMA(self,symbol, p,d,q,d_from,d_to, steps,period=None):
         try:
             series_df = self.data_set_builder.build_daily_series_classification(symbol, d_from, d_to,
                                                                                 add_classif_col=False)

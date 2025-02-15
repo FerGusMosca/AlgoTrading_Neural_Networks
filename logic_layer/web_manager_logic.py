@@ -125,6 +125,6 @@ class WebManagerLogic:
         """Levanta el servidor en un hilo separado"""
         def run():
             self.logger.do_log(f"Starting Order Routing Screen on port {port}...", MessageType.INFO)
-            uvicorn.run(self.app, host="127.0.0.1", port=port)
+            uvicorn.run(self.app, host="0.0.0.0", port=port)
 
         threading.Thread(target=run, daemon=True).start()

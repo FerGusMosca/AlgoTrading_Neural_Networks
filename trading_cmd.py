@@ -398,20 +398,26 @@ def process_run_predictions_last_model(cmd_param_list, str_from, str_to, classif
         logger.print("CRITICAL ERROR bootstrapping the system:{}".format(str(e)), MessageType.ERROR)
 
 
-def process_eval_ARIMA(symbol, period, str_from, str_to):
+def process_eval_ARIMA_cmd(cmd):
+    symbol = __get_param__(cmd, "symbol")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    period = __get_param__(cmd, "period",optional=True,def_value=None)
+
+    process_eval_ARIMA(symbol,d_from,d_to,period)
+
+def process_eval_ARIMA(symbol, d_from, d_to, period=None):
     loader = MLSettingsLoader()
     logger = Logger()
     try:
-        logger.print("Building ARIMA model for {} (period {}) from {} to {}".format(symbol, period, str_from, str_to),
+        logger.print("Building ARIMA model for {} (period {}) from {} to {}".format(symbol, period, d_from, d_to),
                      MessageType.INFO)
 
         config_settings = loader.load_settings("./configs/commands_mgr.ini")
 
         dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
                                          config_settings["classification_map_key"], logger)
-        pred_dict = dataMgm.build_ARIMA(symbol, period,
-                                        DateHandler.convert_str_date(str_from, _DATE_FORMAT),
-                                        DateHandler.convert_str_date(str_to, _DATE_FORMAT))
+        pred_dict = dataMgm.build_ARIMA(symbol,d_from,d_to, period)
 
         print("======= Showing Dickey Fuller Test after building ARIMA======= ")
         for key in pred_dict.keys():
@@ -483,27 +489,40 @@ def process_eval_ml_biased_algo(symbol, indicator, seriesCSV, str_from, str_to, 
         logger.print("CRITICAL ERROR bootstrapping the system:{}".format(str(e)), MessageType.ERROR)
 
 
-def process_predict_ARIMA(symbol, p, d, q, str_from, str_to, period, step):
+def process_predict_ARIMA_cmd(cmd):
+    symbol = __get_param__(cmd, "symbol")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    p = __get_param__(cmd, "p")
+    d = __get_param__(cmd, "d")
+    q = __get_param__(cmd, "q")
+    step = __get_param__(cmd, "step")
+    period = __get_param__(cmd, "period", optional=True, def_value=None)
+
+
+    process_predict_ARIMA(symbol,p,d,q,d_from,d_to , step,period)
+
+def process_predict_ARIMA(symbol, p, d, q, d_from, d_to, step,period=None):
     loader = MLSettingsLoader()
     logger = Logger()
     try:
         logger.print(
-            "Predicting w/last built ARIMA model for {} (period {}) from {} to {}".format(symbol, period, str_from,
-                                                                                          str_to), MessageType.INFO)
+            "Predicting w/last built ARIMA model for {} (period {}) from {} to {}".format(symbol, period, d_from,
+                                                                                          d_to), MessageType.INFO)
 
         config_settings = loader.load_settings("./configs/commands_mgr.ini")
 
         dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
                                          config_settings["classification_map_key"], logger)
         preds_list = dataMgm.predict_ARIMA(symbol, int(p), int(d), int(q),
-                                           DateHandler.convert_str_date(str_from, _DATE_FORMAT),
-                                           DateHandler.convert_str_date(str_to, _DATE_FORMAT),
-                                           period, int(step))
-        print("==== Displaying Predictions for following periods ==== ")
-        i = 1
-        for pred in preds_list:
-            print("{} --> {} %".format(period + str(i), "{:.2f}".format(pred * 100)))
-            i += 1
+                                           d_from,d_to, int(step),period)
+        # Print ARIMA forecasted log returns in a clean table format
+        print("\n📊 ARIMA Forecasted Log Returns\n")
+        print("Period | Forecast (%)")
+        print("-" * 30)
+
+        for i, pred in enumerate(preds_list, start=1):
+            print(f"{i:^8} | {pred * 100:.2f} %")
 
         pass  #brkpnt to see the graph!
 
@@ -798,12 +817,10 @@ def process_commands(cmd):
         process_biased_trading_algo(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
                                     cmd_param_list[5], cmd_param_list[6])
     elif cmd_param_list[0] == "EvaluateARIMA":
-        params_validation("EvaluateARIMA", cmd_param_list, 5)
-        process_eval_ARIMA(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4])
+        #params_validation("EvaluateARIMA", cmd_param_list, 5)
+        process_eval_ARIMA_cmd(cmd)
     elif cmd_param_list[0] == "PredictARIMA":
-        params_validation("PredictARIMA", cmd_param_list, 9)
-        process_predict_ARIMA(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                              cmd_param_list[5], cmd_param_list[6], cmd_param_list[7], cmd_param_list[8])
+        process_predict_ARIMA_cmd(cmd)
     elif cmd_param_list[0] == "EvalSingleIndicatorAlgo":
         params_validation("EvalSingleIndicatorAlgo", cmd_param_list, 7)
         process_eval_single_indicator_algo(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
