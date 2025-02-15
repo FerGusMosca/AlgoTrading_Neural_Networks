@@ -3,6 +3,11 @@ import datetime
 from pydantic import BaseModel
 from typing import Optional
 
+from common.enums.platform_ord_type import PlatformOrdType
+from common.enums.platform_side import PlatformSide
+from common.enums.platform_tif import PlatformTif
+
+
 class NewOrderReq(BaseModel):
     Msg: str = "NewOrderReq"  # Static message type
     ReqId: str
@@ -30,14 +35,14 @@ class NewOrderReq(BaseModel):
             UUID=str(uuid.uuid4()),  # Generate unique UUID
             ClOrdId=str(uuid.uuid4()),  # Generate a unique Client Order ID
             Symbol=order.symbol,
-            Side="BUY" if order.side.lower() == "buy" else "SELL",
-            Qty=order.nom_qty if order.nom_qty is not None else None,  # Use whichever is provided
+            Side=PlatformSide.BUY.value if order.side.upper() == PlatformSide.BUY.value else PlatformSide.SELL.value,
+            Qty=order.nom_qty if order.nom_qty is not None else  None,  # Use whichever is provided
             CashQty= order.cash_qty if order.cash_qty is not None else None,
             Account=order.account,
-            Type="MKT",  # Assuming market order for now
+            Type=PlatformOrdType.MARKET.value,  # Assuming market order for now
             Price=None,  # No price specified for market order
             Currency=order.currency,
             Exchange=order.exchange,
-            TimeInForce="DAY",  # Assuming DAY order for now
+            TimeInForce=PlatformTif.DAY.value,  # Assuming DAY order for now
             CreationTime=datetime.datetime.utcnow().isoformat()  # ISO 8601 timestamp
         )

@@ -13,6 +13,7 @@ from starlette.responses import JSONResponse
 from common.dto.websocket_conn.client_messages.new_order_req import NewOrderReq
 from common.dto.websocket_conn.market_data_dto import MarketDataDTO
 from common.dto.websocket_conn.order_dto import OrderDTO
+from common.enums.brokers import Brokers
 from framework.common.logger.message_type import MessageType
 from service_layer.websocket_client import WebSocketClient
 
@@ -25,8 +26,8 @@ class WebManagerLogic:
         self.primary_prod_ws = primary_prod_ws
         self.ib_dev_ws = ib_dev_ws
 
-        self.ws_prod_client=None
-        self.ws_dev_client=None
+        self.ws_ib_prod_client=None
+        self.ws_ib_dev_client=None
         self.ws_primary_client=None
 
         self.market_data = {}
@@ -48,22 +49,22 @@ class WebManagerLogic:
         asyncio.run(self.evaluate_connections())
 
     async def evaluate_connections(self):
-        self.ws_prod_client = WebSocketClient(self.ib_prod_ws, self.logger,self.store_market_data)
-        self.ws_dev_client = WebSocketClient(self.ib_dev_ws, self.logger,self.store_market_data)
+        self.ws_ib_prod_client = WebSocketClient(self.ib_prod_ws, self.logger, self.store_market_data)
+        self.ws_ib_dev_client = WebSocketClient(self.ib_dev_ws, self.logger, self.store_market_data)
         self.ws_primary_client = WebSocketClient(self.primary_prod_ws, self.logger,self.store_market_data)
 
         # Dictionary to store connection results
         self.connection_status = {
-            "IB_PROD": False,
-            "IB_DEV": False,
-            "PRIMARY_PROD": False
+            Brokers.IB_PROD.value: False,
+            Brokers.IB_DEV.value: False,
+            Brokers.PRIMARY_PROD.value: False
         }
 
         # Attempt to connect to each WebSocket
         await asyncio.gather(
-            self._connect_and_store_status("IB_PROD", self.ws_prod_client),
-            self._connect_and_store_status("IB_DEV", self.ws_dev_client),
-            self._connect_and_store_status("PRIMARY_PROD", self.ws_primary_client)
+            self._connect_and_store_status(Brokers.IB_PROD.value, self.ws_ib_prod_client),
+            self._connect_and_store_status(Brokers.IB_DEV.value, self.ws_ib_dev_client),
+            self._connect_and_store_status(Brokers.PRIMARY_PROD.value, self.ws_primary_client)
         )
 
         # Log results
@@ -95,16 +96,28 @@ class WebManagerLogic:
         """Receives an order and processes it correctly as JSON"""
 
         self.logger.do_log(f"New Order Received: {order}", MessageType.INFO)
-
+        new_order = NewOrderReq.from_order_dto(order)
         # If the broker is IB_PROD_WS, transform the order into NewOrderReq
-        if order.broker == "IB_PROD":
-            new_order = NewOrderReq.from_order_dto(order)
+        if order.broker == Brokers.IB_PROD.value:
+
             self.logger.do_log(f"Transformed Order for IB_PROD_WS: {new_order.json()}", MessageType.INFO)
-
             # Here, you would send the JSON message via WebSocket to IB_PROD_WS
-            await self.ws_prod_client.send_message(new_order.json())
+            await self.ws_ib_prod_client.send_message(new_order.json())
 
-            return {"status": "success", "message": "Order transformed and sent successfully!"}
+            return {"status": "success", "message": "Order transformed and sent successfully to IB_PROD!!"}
+
+        elif order.broker == Brokers.IB_DEV.value:
+            self.logger.do_log(f"Transformed Order for IB_DEV_WS: {new_order.json()}", MessageType.INFO)
+            # Here, you would send the JSON message via WebSocket to IB_DEV_WS
+            await self.ws_ib_dev_client.send_message(new_order.json())
+
+            return {"status": "success", "message": "Order transformed and sent successfully to IB_DEV!!"}
+        elif order.broker == Brokers.PRIMARY_PROD.value:
+            self.logger.do_log(f"Transformed Order for PRIMARY_PROD_WS: {new_order.json()}", MessageType.INFO)
+            # Here, you would send the JSON message via WebSocket to IB_DEV_WS
+            await self.ws_primary_client.send_message(new_order.json())
+
+            return {"status": "success", "message": "Order transformed and sent successfully to PRIMARY_PROD!!"}
 
         return {"status": "success", "message": "Order received but not transformed."}
 
