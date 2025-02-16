@@ -4,6 +4,7 @@ from scipy.stats import linregress
 
 from business_entities.portf_position import PortfolioPosition
 from common.enums.columns_prefix import ColumnsPrefix
+from common.util.dataframe_filler import DataframeFiller
 from common.util.slope_calculator import SlopeCalculator
 from logic_layer.trading_algos.base_class_daily_trading_backtester import BaseClassDailyTradingBacktester
 from logic_layer.trading_algos.slope_backtester import SlopeBacktester
@@ -23,7 +24,5 @@ class InvSlopeBacktester(SlopeBacktester):
 
     def get_algo_name(self):
         return "inv_slope"
-
-
 
 

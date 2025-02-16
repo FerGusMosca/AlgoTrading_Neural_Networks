@@ -6,6 +6,10 @@ from statsmodels.graphics.tsaplots import plot_acf
 from statsmodels.graphics.tsaplots import plot_pacf
 from statsmodels.tsa.arima.model import ARIMA
 import pandas as pd
+
+from common.enums.on_off_indicator_values import OnOffIndicatorValue
+
+
 class ARIMAModelsAnalyzer():
     def __init__(self, p_logger):
         self.logger = p_logger
@@ -164,3 +168,27 @@ class ARIMAModelsAnalyzer():
         forecast_list = preds.tolist()
 
         return forecast_list
+
+
+    def eval_still_on_indicator(self,preds,step,inv_steps):
+
+        if inv_steps>step:
+            raise (f"Cannot evaluate {inv_steps} steps when we only have {step} in the predictions ")
+
+        loop_sign=None
+        for i, pred in enumerate(preds):
+            if i >= inv_steps:
+                break  #Cut inv_steps
+            loop_sign_curr=  OnOffIndicatorValue.ON_NUMERIC.value if pred>0 else  OnOffIndicatorValue.OFF_NUMERIC.value
+
+            if loop_sign is not None and loop_sign!=loop_sign_curr:
+                return loop_sign_curr
+
+            loop_sign=loop_sign_curr
+
+
+        return loop_sign ==  OnOffIndicatorValue.ON_NUMERIC.value
+
+
+
+

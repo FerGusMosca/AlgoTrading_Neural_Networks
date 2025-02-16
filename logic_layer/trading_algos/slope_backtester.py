@@ -2,6 +2,7 @@ import pandas as pd
 
 from business_entities.portf_position import PortfolioPosition
 from common.enums.columns_prefix import ColumnsPrefix
+from common.util.dataframe_filler import DataframeFiller
 from common.util.slope_calculator import SlopeCalculator
 from logic_layer.trading_algos.base_class_daily_trading_backtester import BaseClassDailyTradingBacktester
 
@@ -152,26 +153,32 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
                 else:
                     portf_pos.calculate_and_append_MTM(row, current_date,error_if_missing=False)
 
-            # Handle closing positions at the end of the day
-            if index == len(predictions_df) - 1:
-                if portf_pos is not None:
-                    final_MTM = portf_pos.calculate_and_append_MTM(row,current_date)
-                    last_portf_size = final_MTM - net_commissions
-                    trading_summary_df = self.__close_portf_position__(portf_pos, current_date, final_MTM,
-                                                                       new_portf_size, net_commissions,
-                                                                       trading_summary_df,
-                                                                       last_portf_size=last_portf_size)
-                    portf_pos = None
+        # Close all the open positions
+        if portf_pos is not None:
+            final_MTM = portf_pos.calculate_and_append_MTM(row, current_date)
+            last_portf_size = final_MTM - net_commissions
+            trading_summary_df = self.__close_portf_position__(portf_pos, current_date, final_MTM,
+                                                               new_portf_size, net_commissions,
+                                                               trading_summary_df,
+                                                               last_portf_size=last_portf_size)
+            portf_pos = None
 
         return trading_summary_df
 
-    def backtest_slope(self,series_df,indicator,portf_size,n_algo_param_dict,etf_comp_dto_arr=None):
+    def backtest(self,series_df,indicator,portf_size,n_algo_param_dict,etf_comp_dto_arr=None):
 
-        slope_units= int(n_algo_param_dict[BaseClassDailyTradingBacktester._SLOPE_UNITS_COL]) if BaseClassDailyTradingBacktester._SLOPE_UNITS_COL in n_algo_param_dict else 5
-
+        # 1-We calculate the slope value
         series_df=SlopeCalculator.calculate_indicator_slope(series_df,
-                                                            slope_units,
+                                                            int(n_algo_param_dict[BaseClassDailyTradingBacktester._SLOPE_UNITS_COL]),
                                                             indicator)
+
+        #2-Expand and repeat the prev values for missing values
+        series_df = DataframeFiller.fill_missing_values(series_df,col=indicator)  # We fill missing values with the last one
+
+        #3- We drop weekends and holidays
+        series_df = series_df.dropna(how='all', subset=[col for col in series_df.columns if
+                                                        col.startswith(ColumnsPrefix.CLOSE_PREFIX.value)])
+
 
         if sum(col.startswith(ColumnsPrefix.CLOSE_PREFIX.value) for col in series_df.columns)<=1:
             trading_summary_df = self.__run_trades_single_pos__(series_df, portf_size, indicator, n_algo_param_dict)

@@ -6,7 +6,7 @@ class DataframeFiller:
 
 
     @staticmethod
-    def fill_missing_values(series_df):
+    def fill_missing_values(series_df, col=None):
         """
         Fill missing values in the DataFrame by carrying forward the last available value.
         If no previous value is available, fill with the next available value if it's within 60 days.
@@ -30,6 +30,8 @@ class DataframeFiller:
         # Loop through each column to handle NaN values
         for column in series_df.columns:
             if column == 'date':
+                continue
+            if col is not None and col!=column:
                 continue
 
             # Fill forward with the last available value

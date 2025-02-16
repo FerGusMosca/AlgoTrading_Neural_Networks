@@ -216,27 +216,24 @@ class AlgosOrchestationLogic:
         else:
             raise Exception(f"NOT RECOGNIZED trading algo {portf_summary.trading_algo}")
 
-    def __backtest_slope_strategy__(self, series_df,indicator,portf_size,
+    def __backtest_strategy__(self, series_df,indicator,portf_size,
                                     n_algo_params,portf_summary,
                                     etf_comp_dto_arr=None):
 
         if tas(portf_summary.trading_algo) == tas.RAW_INV_SLOPE:
-            on_off_backtester=InvSlopeBacktester()
-            return on_off_backtester.backtest_slope(series_df, indicator, portf_size,
-                                                    n_algo_params,
-                                                    etf_comp_dto_arr=etf_comp_dto_arr)
+            backtester=InvSlopeBacktester()
+            return backtester.backtest(series_df, indicator, portf_size, n_algo_params,
+                                       etf_comp_dto_arr=etf_comp_dto_arr)
 
         elif tas(portf_summary.trading_algo) == tas.RAW_DIRECT_SLOPE:
-            on_off_backtester=DirectSlopeBacktester()
-            return on_off_backtester.backtest_slope(series_df, indicator, portf_size,
-                                                    n_algo_params,
-                                                    etf_comp_dto_arr=etf_comp_dto_arr)
+            backtester=DirectSlopeBacktester()
+            return backtester.backtest(series_df, indicator, portf_size, n_algo_params,
+                                       etf_comp_dto_arr=etf_comp_dto_arr)
 
         elif tas(portf_summary.trading_algo) == tas.RAW_ON_OFF_VALUE:
-            on_off_backtester=OnOffBacktester()
-            return on_off_backtester.backtest_slope(series_df, indicator, portf_size,
-                                                    n_algo_params,
-                                                    etf_comp_dto_arr=etf_comp_dto_arr)
+            backtester=OnOffBacktester()
+            return backtester.backtest(series_df, indicator, portf_size, n_algo_params,
+                                       etf_comp_dto_arr=etf_comp_dto_arr)
 
 
         else:
@@ -984,11 +981,8 @@ class AlgosOrchestationLogic:
         portf_summary = PortfSummary(symbol, portf_size, p_trade_comm=0,
                                      p_trading_algo=trading_algo, p_algo_params=n_algo_params)
 
-        summary_dto= self.__backtest_slope_strategy__(  training_series_df,
-                                                        model_candle,
-                                                        portf_size,
-                                                        n_algo_params,
-                                                        portf_summary=portf_summary)
+        summary_dto= self.__backtest_strategy__(training_series_df, model_candle, portf_size, n_algo_params,
+                                                portf_summary=portf_summary)
 
 
         self.__log_scalping_trading_results__(summary_dto)
@@ -1017,7 +1011,7 @@ class AlgosOrchestationLogic:
         indicator_type_arr= IndicatorTypeDTO.load_indicator_type_data(indicators_csv,indicator_types)
 
         #4- Build and create the indicator
-        ind_creator = SintheticIndicatorCreator()
+        ind_creator = SintheticIndicatorCreator(self.logger)
         indicators_series_df=ind_creator.build_sinthetic_indicator(indicators_series_df,indicator_type_arr,algo_params)
 
         #4- We persist the newly created indicator
@@ -1074,20 +1068,13 @@ class AlgosOrchestationLogic:
             else:
                 merged_training_series_df=self.data_set_builder.merge_dataframes(training_series_df,merged_training_series_df,
                                                                           "date")
+        merged_training_series_df = merged_training_series_df.drop(columns=['trading_symbol'], errors='ignore')
 
-        #6- We drop weekends and holidays
-        merged_training_series_df=self.data_set_builder.preformat_df_rows(merged_training_series_df,
-                                                                          ColumnsPrefix.CLOSE_PREFIX.value,
-                                                                          n_algo_params)
 
-        #7- We run the backtest
+        #6- We run the backtest
         portf_summary = PortfSummary(symbols_csv, portf_size, p_trade_comm=0,p_trading_algo=trading_algo, p_algo_params=n_algo_params)
-        summ_dto= self.__backtest_slope_strategy__(
-                                                    merged_training_series_df,
-                                                    model_candle, portf_size,
-                                                    n_algo_params,
-                                                    portf_summary=portf_summary,
-                                                    etf_comp_dto_arr=etf_comp_dto_arr)
+        summ_dto= self.__backtest_strategy__(merged_training_series_df, model_candle, portf_size, n_algo_params,
+                                             portf_summary=portf_summary, etf_comp_dto_arr=etf_comp_dto_arr)
 
 
         self.__log_scalping_trading_results__(summ_dto)

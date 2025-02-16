@@ -190,12 +190,39 @@ def process_create_sinthetic_indicator(cmd):
     d_from = __get_param__(cmd, "from")
     d_to = __get_param__(cmd, "to")
 
+    #DIRECT/INV SLOPE
     slope_units = __get_param__(cmd, "slope_units", True, None)
+
+    #ARIMA
+    p = __get_param__(cmd, "p", True, None)
+    d = __get_param__(cmd, "d", True, None)
+    q = __get_param__(cmd, "q", True, None)
+    step = __get_param__(cmd, "step", True, None)
+    inv_steps = __get_param__(cmd, "inv_steps", True, None)
+    min_units_to_pred = __get_param__(cmd, "min_units_to_pred", True, None)
 
     cmd_param_dict = {}
 
     if slope_units is not None:
         cmd_param_dict["slope_units"] = slope_units
+
+    if p is not None:
+        cmd_param_dict["p"] = p
+
+    if d is not None:
+        cmd_param_dict["d"] = d
+
+    if q is not None:
+        cmd_param_dict["q"] = q
+
+    if step is not None:
+        cmd_param_dict["step"] = step
+
+    if inv_steps is not None:
+        cmd_param_dict["inv_steps"] = inv_steps
+
+    if min_units_to_pred is not None:
+        cmd_param_dict["min_units_to_pred"] = min_units_to_pred
 
     process_create_sinthetic_indicator_logic(comp_apth, model_candle=model_candle, d_from=d_from, d_to=d_to,
                                             algo_params=cmd_param_dict)
