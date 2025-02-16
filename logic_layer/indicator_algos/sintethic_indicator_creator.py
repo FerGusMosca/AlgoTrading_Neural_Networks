@@ -39,7 +39,7 @@ class SintheticIndicatorCreator():
         return all_on_ind
 
 
-    def __process_arima_indicator__(self,indicators_series_df,row,indicator,n_algo_param_dict):
+    def __process_arima_indicator__(self,indicators_series_df,row,indicator,n_algo_param_dict, inv_ind=False):
         arima_Analyzer = ARIMAModelsAnalyzer(self.logger)
 
         date=row["date"]
@@ -66,10 +66,10 @@ class SintheticIndicatorCreator():
                                                                   f"{ColumnsPrefix.CLOSE_PREFIX.value}{indicator.indicator}",
                                                                   p, d, q, period, step)
             all_on_ind= arima_Analyzer.eval_still_on_indicator(preds, inv_steps,inv_steps )
+            active_ind= all_on_ind if not inv_ind else not all_on_ind
+            self.logger.do_log(f"Predictions for {date} for indicator {indicator.indicator} successfully processed: ON --> {active_ind}", MessageType.INFO)
 
-            self.logger.do_log(f"Predictions for {date} for indicator {indicator.indicator} successfully processed: ON --> {all_on_ind}",MessageType.INFO)
-
-            return  all_on_ind
+            return  active_ind
 
     def build_sinthetic_indicator(self,indicators_series_df,indicator_type_arr,n_algo_param_dict):
 
@@ -91,7 +91,10 @@ class SintheticIndicatorCreator():
                     all_on_ind = self.__proces__inv_slope__indicator__(row, indicator, all_on_ind)
                 elif indicator.type == IndicatorType.ARIMA.value:
                     all_on_ind=self.__process_arima_indicator__(indicators_series_df, row, indicator,
-                                                                n_algo_param_dict)
+                                                                n_algo_param_dict,inv_ind=False)
+                elif indicator.type == IndicatorType.INV_ARIMA.value:
+                    all_on_ind=self.__process_arima_indicator__(indicators_series_df, row, indicator,
+                                                                n_algo_param_dict,inv_ind=True)
                 else:
                     raise Exception(f"Could not recognize indicator type {indicator.type}")
 
