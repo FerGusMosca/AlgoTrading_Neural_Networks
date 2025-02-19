@@ -311,7 +311,11 @@
                                     <th>ClOrdID</th>
                                     <th>Symbol</th>
                                     <th>Side</th>
-                                    <th>Nom. Qty.</th>
+                                    <th>Ord.Type</th>
+                                    <th>Price</th>
+                                    <th>Currency</th>
+                                    <th>Ord. Qty.</th>
+                                    <th>Cum. Qty.</th>
                                     <th>Exec. Status</th>
                                     <th>Timestamp</th>
                                 </tr>
@@ -348,6 +352,41 @@
         </div>
     </div>
     <script>
+
+    function updateExecutionReports() {
+        fetch("http://127.0.0.1:8000/get_execution_reports")
+        .then(response => response.json())
+        .then(data => {
+            let tableBody = document.querySelector(".execution-table tbody");
+            tableBody.innerHTML = ""; // Clear existing data
+
+            data.forEach(row => {
+                let tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${row.cl_ord_id}</td>
+                    <td>${row.symbol}</td>
+                    <td>${row.side}</td>
+                    <td>${row.ord_type}</td>
+                    <td>${row.price}</td>
+                    <td>${row.currency}</td>
+                    <td>${row.order_qty}</td>
+                    <td>${row.cum_qty}</td>
+                    <td>${row.status}</td>
+                    <td>${row.transact_time}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        })
+        .catch(error => {
+            console.error("Error fetching execution reports:", error);
+        });
+    }
+
+    // Fetch Execution Reports every 5 seconds
+    setInterval(updateExecutionReports, 5000);
+
+    // Fetch immediately when page loads
+    updateExecutionReports();
 
     function updateMarketData() {
         fetch("http://127.0.0.1:8000/get_market_data")

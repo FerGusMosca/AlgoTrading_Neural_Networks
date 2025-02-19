@@ -5,3 +5,4 @@ class Side(Enum):
     Unknown = '0'
     SellShort='s'
     BuyToClose='c'
+

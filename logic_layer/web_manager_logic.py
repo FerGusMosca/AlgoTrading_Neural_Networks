@@ -1,4 +1,5 @@
 import asyncio
+from typing import Dict
 
 from fastapi import FastAPI, WebSocket, Request, Body
 from fastapi.responses import HTMLResponse
@@ -11,6 +12,7 @@ import json
 from starlette.responses import JSONResponse
 
 from common.dto.websocket_conn.client_messages.new_order_req import NewOrderReq
+from common.dto.websocket_conn.execution_report_dto import ExecutionReportDTO
 from common.dto.websocket_conn.market_data_dto import MarketDataDTO
 from common.dto.websocket_conn.order_dto import OrderDTO
 from common.enums.brokers import Brokers
@@ -31,6 +33,7 @@ class WebManagerLogic:
         self.ws_primary_client=None
 
         self.market_data = {}
+        self.execution_reports={}
 
         # Start evaluating connections in a separate thread
         threading.Thread(target=self._run_async_evaluation, daemon=True).start()
@@ -43,15 +46,16 @@ class WebManagerLogic:
         self.app.post("/submit_order")(self.submit_order)
         self.app.get("/get_connection_status")(self.get_connection_status)  # Register route
         self.app.get("/get_market_data")(self.get_market_data)
+        self.app.get("/get_execution_reports")(self.get_execution_reports)
 
     def _run_async_evaluation(self):
         """Runs evaluate_connections in an independent event loop."""
         asyncio.run(self.evaluate_connections())
 
     async def evaluate_connections(self):
-        self.ws_ib_prod_client = WebSocketClient(self.ib_prod_ws, self.logger, self.store_market_data)
-        self.ws_ib_dev_client = WebSocketClient(self.ib_dev_ws, self.logger, self.store_market_data)
-        self.ws_primary_client = WebSocketClient(self.primary_prod_ws, self.logger,self.store_market_data)
+        self.ws_ib_prod_client = WebSocketClient(self.ib_prod_ws, self.logger, self.store_market_data,self.store_execution_report)
+        self.ws_ib_dev_client = WebSocketClient(self.ib_dev_ws, self.logger, self.store_market_data,self.store_execution_report)
+        self.ws_primary_client = WebSocketClient(self.primary_prod_ws, self.logger, self.store_market_data,self.store_execution_report)
 
         # Dictionary to store connection results
         self.connection_status = {
@@ -80,9 +84,20 @@ class WebManagerLogic:
         """Renderiza la página principal"""
         return self.templates.TemplateResponse("order_routing_template.html", {"request": request})
 
+    def store_execution_report(self, execution_report: ExecutionReportDTO):
+        """Stores the latest execution report for each ClOrdId."""
+        key=execution_report.cl_ord_id[:-8]
+        self.execution_reports[key] = execution_report.dict()
+
     def store_market_data(self, market_data: MarketDataDTO):
         """Stores the latest market data for each symbol."""
         self.market_data[market_data.symbol] = market_data.dict()
+
+    from typing import List
+
+    def get_execution_reports(self) -> List[dict]:
+        """Returns all stored execution reports as a list."""
+        return list(self.execution_reports.values())
 
     def get_connection_status(self):
         """Returns the connection status as JSON."""

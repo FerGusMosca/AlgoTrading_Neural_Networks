@@ -1,15 +1,18 @@
 import asyncio
 import websockets
 import json
+
+from common.dto.websocket_conn.execution_report_dto import ExecutionReportDTO
 from framework.common.logger.message_type import MessageType
 from common.dto.websocket_conn.market_data_dto import  MarketDataDTO
 
 class WebSocketClient:
-    def __init__(self, ws_url, logger, data_callback):
+    def __init__(self, ws_url, logger, market_data_callback,execution_report_callback):
         """Initializes the WebSocket client with a given URL, logger, and callback function."""
         self.ws_url = ws_url
         self.logger = logger
-        self.data_callback = data_callback  # Function to send processed data
+        self.market_data_callback = market_data_callback  # Function to send processed data
+        self.execution_report_callback=execution_report_callback
         self.connection = None
         self.is_connected = False
 
@@ -75,7 +78,13 @@ class WebSocketClient:
                     trade_volume=data.get("TradeVolume", 0.0),
                     timestamp=data.get("MDEntryDate", "UNKNOWN")
                 )
-                self.data_callback(market_data)
+                self.market_data_callback(market_data)
+            elif "Msg" in data and data["Msg"] == "ExecutionReportMsg":
+                execution_report = ExecutionReportDTO.from_execution_report(data)
+                self.logger.do_log(f"Received Execution Report: {execution_report}", MessageType.INFO)
+                self.execution_report_callback(execution_report)
+            else:
+                self.logger.do_log(f"Received unknown msg {data['Msg']}",MessageType.DEBUG)
         except Exception as e:
             self.logger.do_log(f"Error processing message: {e} - Message: {message}", MessageType.ERROR)
 
@@ -86,7 +95,9 @@ class WebSocketClient:
                 await self.connection.send(message)
                 self.logger.do_log(f"Sent message: {message}", MessageType.INFO)
             except Exception as e:
-                self.logger.do_log(f"Error sending message: {e}", MessageType.ERROR)
+                msg=f"Error sending message: {e}"
+                self.logger.do_log(msg, MessageType.ERROR)
+                raise Exception(e)
         else:
             self.logger.do_log("Cannot send message: No active WebSocket connection.", MessageType.ERROR)
 
