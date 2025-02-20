@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
+from framework.common.enums.OrdStatus import OrdStatus
 from framework.common.enums.OrdType import OrdType
 from framework.common.enums.Side import Side
 
@@ -15,7 +16,7 @@ class ExecutionReportDTO(BaseModel):
     status: str
     transact_time: str
     exec_type: int
-    ord_status: int
+    ord_status: str
     order_qty: float
     price:float
     avg_px: float
@@ -23,6 +24,12 @@ class ExecutionReportDTO(BaseModel):
     leaves_qty: float
     last_px: float
     currency: str
+
+
+    @staticmethod
+    def get_execution_report_key(cl_ord_id):
+        key = cl_ord_id[:-8]
+        return key
 
 
     @staticmethod
@@ -50,6 +57,20 @@ class ExecutionReportDTO(BaseModel):
         except ValueError:
             return OrdType.Market.name
 
+
+    @staticmethod
+    def parse_ord_status(value):
+        """Castea el valor de Side del JSON al Enum Side."""
+        try:
+            if isinstance(value, int):  # Si el valor es un número (como 49)
+                value = chr(value)  # Convierte el número ASCII al carácter correspondiente
+
+            ord_status= OrdStatus(str(value))
+            return ord_status.name
+        except ValueError:
+            return OrdStatus.Undefined.name
+
+
     @staticmethod
     def from_execution_report(data: dict) -> "ExecutionReportDTO":
         """
@@ -69,7 +90,7 @@ class ExecutionReportDTO(BaseModel):
             status=data.get("Status", "UNKNOWN"),
             transact_time=data.get("TransactTime", "UNKNOWN"),
             exec_type=data.get("ExecType", 0),
-            ord_status=data.get("OrdStatus", 0),
+            ord_status=ExecutionReportDTO.parse_ord_status(data.get("OrdStatus", 0)),
             avg_px=data.get("AvgPx", 0.0),
             cum_qty=data.get("CumQty", 0.0),
             leaves_qty=data.get("LeavesQty", 0.0),

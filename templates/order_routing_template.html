@@ -75,6 +75,19 @@
     </script>
     <style>
 
+        .cancel-button {
+            background: none;
+            border: none;
+            color: red;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .cancel-button:hover {
+            color: darkred;
+        }
+
+
         .tables-container {
             display: flex;
             flex-direction: column; /* Apila los elementos en una sola columna */
@@ -233,7 +246,7 @@
         <span class="status-dot" id="status-IB_PROD"></span> IB_PROD
     </div>
     <div class="status-item">
-        <span class="status-dot" id="status-PRIMARY_PROD"></span> PRIMARY_PROD
+        <span class="status-dot" id="status-BYMA_PROD"></span> BYMA_PROD
     </div>
     <div class="status-item">
         <span class="status-dot" id="status-IB_DEV"></span> IB_DEV
@@ -259,7 +272,8 @@
                 <div class="success">{{ success }}</div>
             {% endif %}
 
-            <form id="orderForm" hx-post="/submit" hx-target="body" hx-swap="outerHTML" onsubmit="confirmOrder(event)">
+            <form id="orderForm" onsubmit="confirmOrder(event)">
+
                 <label for="symbol">Symbol:</label>
                 <input type="text" id="symbol" name="symbol" maxlength="10" required>
 
@@ -305,26 +319,25 @@
                 <div class="table-wrapper">
                     <h2>Execution Reports</h2>
                     <div class="scrollable-table">
-                        <table class="execution-table">
-                            <thead>
-                                <tr>
-                                    <th>ClOrdID</th>
-                                    <th>Symbol</th>
-                                    <th>Side</th>
-                                    <th>Ord.Type</th>
-                                    <th>Price</th>
-                                    <th>Currency</th>
-                                    <th>Ord. Qty.</th>
-                                    <th>Cum. Qty.</th>
-                                    <th>Exec. Status</th>
-                                    <th>Timestamp</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
+                         <table class="execution-table">
+            <thead>
+                <tr>
+                    <th>ClOrdID</th>
+                    <th>Symbol</th>
+                    <th>Side</th>
+                    <th>Nom. Qty.</th>
+                    <th>Exec. Status</th>
+                    <th>Timestamp</th>
+                    <th>Action</th> <!-- Nueva columna para el botón de cancelación -->
+                </tr>
+            </thead>
+            <tbody id="execution-reports-table">
+                <!-- Las filas se llenarán dinámicamente con JavaScript -->
+            </tbody>
+        </table>
                     </div>
                 </div>
-            
+
                 <!-- Market Data Table -->
                 <div class="table-wrapper">
                     <h2>Market Data</h2>
@@ -347,18 +360,19 @@
                     </div>
                 </div>
             </div>
-            
-            
+
+
         </div>
     </div>
     <script>
 
-    function updateExecutionReports() {
+   function updateExecutionReports() {
         fetch("http://127.0.0.1:8000/get_execution_reports")
         .then(response => response.json())
         .then(data => {
-            let tableBody = document.querySelector(".execution-table tbody");
-            tableBody.innerHTML = ""; // Clear existing data
+            let tableBody = document.getElementById("execution-reports-table");  //
+
+            tableBody.innerHTML = ""; // Limpiar datos anteriores
 
             data.forEach(row => {
                 let tr = document.createElement("tr");
@@ -366,13 +380,13 @@
                     <td>${row.cl_ord_id}</td>
                     <td>${row.symbol}</td>
                     <td>${row.side}</td>
-                    <td>${row.ord_type}</td>
-                    <td>${row.price}</td>
-                    <td>${row.currency}</td>
-                    <td>${row.order_qty}</td>
                     <td>${row.cum_qty}</td>
-                    <td>${row.status}</td>
+                    <td>${row.ord_status}</td>
                     <td>${row.transact_time}</td>
+                    <td>
+                        <button onclick="confirmCancelOrder('${row.cl_ord_id}', '${row.symbol}')"
+                                class="cancel-button">❌</button>
+                    </td>
                 `;
                 tableBody.appendChild(tr);
             });
@@ -382,11 +396,39 @@
         });
     }
 
-    // Fetch Execution Reports every 5 seconds
+    // Fetch Execution Reports cada 5 segundos
     setInterval(updateExecutionReports, 5000);
-
-    // Fetch immediately when page loads
     updateExecutionReports();
+
+    function confirmCancelOrder(clOrdId, symbol) {
+        let message = `Are you sure that you want to cancel order ${clOrdId} of symbol ${symbol}?`;
+
+        if (confirm(message)) {
+            cancelOrder(clOrdId);
+        }
+    }
+
+    function cancelOrder(clOrdId) {
+        fetch("http://127.0.0.1:8000/cancel_order", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ cl_ord_id: clOrdId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            updateExecutionReports(); // ✅ Se ejecuta solo después de que el backend responde
+        })
+        .catch(error => {
+            alert("Error canceling order.");
+            console.error(error);
+        });
+    }
+
+
+
 
     function updateMarketData() {
         fetch("http://127.0.0.1:8000/get_market_data")
@@ -426,7 +468,7 @@
             .then(response => response.json())
             .then(status => {
                 updateStatusIndicator("IB_PROD", status["IB_PROD"]);
-                updateStatusIndicator("PRIMARY_PROD", status["PRIMARY_PROD"]);
+                updateStatusIndicator("BYMA_PROD", status["BYMA_PROD"]);
                 updateStatusIndicator("IB_DEV", status["IB_DEV"]);
             })
             .catch(error => {
@@ -451,50 +493,68 @@
 
         function confirmOrder(event) {
             event.preventDefault();
-    
-            let symbol = document.getElementById("symbol").value;
+
             let side = document.getElementById("side").value;
+            let symbol = document.getElementById("symbol").value;
             let cashQty = document.getElementById("cash_qty").value.replace(/[^0-9.]/g, '') || null;
             let nomQty = document.getElementById("nom_qty").value || null;
-            let broker = document.getElementById("broker").value;
-            let currency = document.getElementById("currency").value;
-            let exchange = document.getElementById("exchange").value;
-            let account = document.getElementById("account").value;
-    
+
+            if (!side || !symbol) {
+                alert("Error: Side and Symbol are required.");
+                return;
+            }
+
             if (cashQty && nomQty) {
                 alert("You must specify whether you want to route a cash or nominal quantity.");
                 return;
             }
-    
-            let orderData = {
-                symbol: symbol,
-                side: side,
-                cash_qty: cashQty ? parseFloat(cashQty) : null,
-                nom_qty: nomQty ? parseInt(nomQty) : null,
-                broker: broker,
-                currency: currency,
-                exchange: exchange,
-                account: account
-            };
-    
-            console.log("Sending Order:", orderData);  // <-- Para depurar en consola
-    
-            fetch("http://127.0.0.1:8000/submit_order", {  
+
+            let qty = cashQty ? cashQty : nomQty;
+            let qtyType = cashQty ? "Cash Qty" : "Nom. Qty";
+
+            if (!qty) {
+                alert("Error: Please enter a valid quantity.");
+                return;
+            }
+
+            // ✅ Mensaje de confirmación personalizado
+            let message = `Are you sure that you want to send a ${side} order for security ${symbol} of ${qty} units?`;
+
+            if (confirm(message)) {
+                sendOrder(symbol, side, cashQty, nomQty);
+            }
+
+        }
+
+        function sendOrder(symbol, side, cashQty, nomQty) {
+            fetch("http://127.0.0.1:8000/submit_order", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify(orderData)
+                body: JSON.stringify({
+                    symbol: symbol,
+                    side: side,
+                    cash_qty: cashQty ? parseFloat(cashQty) : null,
+                    nom_qty: nomQty ? parseInt(nomQty) : null,
+                    broker: document.getElementById("broker").value,
+                    currency: document.getElementById("currency").value,
+                    exchange: document.getElementById("exchange").value,
+                    account: document.getElementById("account").value
+                })
             })
             .then(response => response.json())
             .then(data => {
                 alert(data.message);
+                updateExecutionReports();  // ✅ Refresca la tabla
             })
             .catch(error => {
                 alert("Error submitting order.");
                 console.error(error);
             });
         }
+
+
     </script>
     
     

@@ -1,4 +1,5 @@
 import asyncio
+from http.client import HTTPException
 from typing import Dict
 
 from fastapi import FastAPI, WebSocket, Request, Body
@@ -11,6 +12,8 @@ import json
 
 from starlette.responses import JSONResponse
 
+from common.dto.websocket_conn.cancel_order_dto import CancelOrderDTO
+from common.dto.websocket_conn.client_messages.cancel_order_req import CancelOrderReq
 from common.dto.websocket_conn.client_messages.new_order_req import NewOrderReq
 from common.dto.websocket_conn.execution_report_dto import ExecutionReportDTO
 from common.dto.websocket_conn.market_data_dto import MarketDataDTO
@@ -34,6 +37,7 @@ class WebManagerLogic:
 
         self.market_data = {}
         self.execution_reports={}
+        self.order_broker={}
 
         # Start evaluating connections in a separate thread
         threading.Thread(target=self._run_async_evaluation, daemon=True).start()
@@ -44,6 +48,7 @@ class WebManagerLogic:
         # Rutas en FastAPI
         self.app.get("/", response_class=HTMLResponse)(self.read_root)
         self.app.post("/submit_order")(self.submit_order)
+        self.app.post("/cancel_order")(self.cancel_order)
         self.app.get("/get_connection_status")(self.get_connection_status)  # Register route
         self.app.get("/get_market_data")(self.get_market_data)
         self.app.get("/get_execution_reports")(self.get_execution_reports)
@@ -61,14 +66,14 @@ class WebManagerLogic:
         self.connection_status = {
             Brokers.IB_PROD.value: False,
             Brokers.IB_DEV.value: False,
-            Brokers.PRIMARY_PROD.value: False
+            Brokers.BYMA_PROD.value: False
         }
 
         # Attempt to connect to each WebSocket
         await asyncio.gather(
             self._connect_and_store_status(Brokers.IB_PROD.value, self.ws_ib_prod_client),
             self._connect_and_store_status(Brokers.IB_DEV.value, self.ws_ib_dev_client),
-            self._connect_and_store_status(Brokers.PRIMARY_PROD.value, self.ws_primary_client)
+            self._connect_and_store_status(Brokers.BYMA_PROD.value, self.ws_primary_client)
         )
 
         # Log results
@@ -86,7 +91,7 @@ class WebManagerLogic:
 
     def store_execution_report(self, execution_report: ExecutionReportDTO):
         """Stores the latest execution report for each ClOrdId."""
-        key=execution_report.cl_ord_id[:-8]
+        key=ExecutionReportDTO.get_execution_report_key(execution_report.cl_ord_id)
         self.execution_reports[key] = execution_report.dict()
 
     def store_market_data(self, market_data: MarketDataDTO):
@@ -107,6 +112,16 @@ class WebManagerLogic:
         """Returns the latest market data as JSON."""
         return JSONResponse(content=list(self.market_data.values()))
 
+    async def send_to_broker(self,json,broker):
+        if broker == Brokers.IB_PROD.value:
+            await self.ws_ib_prod_client.send_message(json)
+        elif broker==Brokers.IB_DEV.value:
+            await self.ws_ib_dev_client.send_message(json)
+        elif broker==Brokers.BYMA_PROD.value:
+            await self.ws_primary_client.send_message(json)
+        else:
+            raise Exception(f"Unknown broker {broker} to send message!")
+
     async def submit_order(self, order: "OrderDTO" = Body(...)):
         """Receives an order and processes it correctly as JSON"""
 
@@ -116,25 +131,40 @@ class WebManagerLogic:
         if order.broker == Brokers.IB_PROD.value:
 
             self.logger.do_log(f"Transformed Order for IB_PROD_WS: {new_order.json()}", MessageType.INFO)
-            # Here, you would send the JSON message via WebSocket to IB_PROD_WS
-            await self.ws_ib_prod_client.send_message(new_order.json())
-
+            self.order_broker[new_order.ClOrdId]=Brokers.IB_PROD.value
+            await self.send_to_broker(new_order.json(),Brokers.IB_PROD.value)
             return {"status": "success", "message": "Order transformed and sent successfully to IB_PROD!!"}
 
         elif order.broker == Brokers.IB_DEV.value:
             self.logger.do_log(f"Transformed Order for IB_DEV_WS: {new_order.json()}", MessageType.INFO)
             # Here, you would send the JSON message via WebSocket to IB_DEV_WS
-            await self.ws_ib_dev_client.send_message(new_order.json())
-
+            self.order_broker[new_order.ClOrdId] = Brokers.IB_DEV.value
+            await self.send_to_broker(new_order.json(), Brokers.IB_DEV.value)
             return {"status": "success", "message": "Order transformed and sent successfully to IB_DEV!!"}
-        elif order.broker == Brokers.PRIMARY_PROD.value:
+
+        elif order.broker == Brokers.BYMA_PROD.value:
             self.logger.do_log(f"Transformed Order for PRIMARY_PROD_WS: {new_order.json()}", MessageType.INFO)
             # Here, you would send the JSON message via WebSocket to IB_DEV_WS
-            await self.ws_primary_client.send_message(new_order.json())
-
-            return {"status": "success", "message": "Order transformed and sent successfully to PRIMARY_PROD!!"}
+            self.order_broker[new_order.ClOrdId] = Brokers.BYMA_PROD.value
+            await self.send_to_broker(new_order.json(), Brokers.BYMA_PROD.value)
+            return {"status": "success", "message": "Order transformed and sent successfully to BYMA_PROD!!"}
 
         return {"status": "success", "message": "Order received but not transformed."}
+
+
+    async def cancel_order(self, cancel_request: CancelOrderDTO):
+        """Cancela una orden si existe en execution_reports."""
+        cl_ord_id = cancel_request.cl_ord_id
+        key = ExecutionReportDTO.get_execution_report_key(cl_ord_id)
+        if key in self.execution_reports and key in self.order_broker:
+            key=ExecutionReportDTO.get_execution_report_key(cl_ord_id)
+            broker=self.order_broker[key]
+            cancel_req = CancelOrderReq.from_cl_ord_id(cl_ord_id)
+            await self.send_to_broker( cancel_req.model_dump_json(),broker)
+            self.logger.do_log(f"Order {cl_ord_id} canceled.", MessageType.INFO)
+            return {"status": "success", "message": f"Order {cl_ord_id} canceled."}
+        else:
+            raise HTTPException(status_code=404, detail="Order not found.")
 
     def display_order_routing_screen(self, port=8000):
         """Levanta el servidor en un hilo separado"""
