@@ -1,17 +1,16 @@
-import re
 import traceback
-from datetime import datetime
 
 from common.util.date_handler import DateHandler
 from common.util.logger import Logger
 from common.util.ml_settings_loader import MLSettingsLoader
+from controllers.main_dashboard_controller import MainDashboardController
 from framework.common.logger.message_type import MessageType
 from logic_layer.algos_orchestation_logic import AlgosOrchestationLogic
 from IPython.display import display
 import pandas as pd
 
 from logic_layer.data_set_builder import DataSetBuilder
-from logic_layer.web_manager_logic import WebManagerLogic
+from controllers.routing_dashboard_controller import RoutingDashboardController
 
 _DATE_FORMAT = "%m/%d/%Y"
 _TIMESTAMP_FORMAT='%m/%d/%Yt%H:%M:%S'
@@ -40,7 +39,8 @@ def show_commands():
     print("#15-BacktestSlopeModelOnCustomETF [ETF_path] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#16-CreateSintheticIndicator [comp_path] [model_candle] [from] [to] [slope_units]")
     print("======================== UI ========================")
-    print("#30-DisplayOrderRoutingScreen")
+    print("#30-BiasMainLandingPage")
+    print("#31-DisplayOrderRoutingScreen")
     #TrainNeuralNetworkAlgo
     print("#n-Exit")
 
@@ -166,6 +166,18 @@ def process_backtest_slope_model(cmd):
     print(f"Test Backtest Slope Model finished...")
 
 
+def process_bias_main_landing_page(cmd):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    # loader user to load settings
+    config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+    main_dash_contr = MainDashboardController(logger, config_settings)
+    main_dash_contr.display()
+    print(f"Main Dashboard successfully shown...")
+
+
 def process_display_order_routing_screen(cmd):
     loader = MLSettingsLoader()
     logger = Logger()
@@ -178,9 +190,9 @@ def process_display_order_routing_screen(cmd):
     ib_dev_ws = config_settings["IB_DEV_WS"]
 
 
-    wml= WebManagerLogic(logger,ib_prod_ws,primary_prod_ws,ib_dev_ws)
+    wmc= RoutingDashboardController(logger, ib_prod_ws, primary_prod_ws, ib_dev_ws)
 
-    wml.display_order_routing_screen()
+    wmc.display_order_routing_screen()
     print(f"Web Manager Logic successfully shown...")
 
 
@@ -897,6 +909,9 @@ def process_commands(cmd):
         process_create_sinthetic_indicator(cmd)
     elif cmd_param_list[0] == "DisplayOrderRoutingScreen":
         process_display_order_routing_screen(cmd)
+    elif cmd_param_list[0] == "BiasMainLandingPage":
+        process_bias_main_landing_page(cmd)
+
     #
 
 

@@ -2,7 +2,7 @@ import asyncio
 from http.client import HTTPException
 from typing import Dict
 
-from fastapi import FastAPI, WebSocket, Request, Body
+from fastapi import FastAPI, WebSocket, Request, Body, APIRouter
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -24,35 +24,40 @@ from service_layer.websocket_client import WebSocketClient
 
 
 
-class WebManagerLogic:
+class RoutingDashboardController:
     def __init__(self, logger, ib_prod_ws, primary_prod_ws, ib_dev_ws):
         self.logger = logger
         self.ib_prod_ws = ib_prod_ws
         self.primary_prod_ws = primary_prod_ws
         self.ib_dev_ws = ib_dev_ws
 
-        self.ws_ib_prod_client=None
-        self.ws_ib_dev_client=None
-        self.ws_primary_client=None
+        self.ws_ib_prod_client = None
+        self.ws_ib_dev_client = None
+        self.ws_primary_client = None
 
         self.market_data = {}
-        self.execution_reports={}
-        self.order_broker={}
+        self.execution_reports = {}
+        self.order_broker = {}
 
         # Start evaluating connections in a separate thread
         threading.Thread(target=self._run_async_evaluation, daemon=True).start()
 
-        self.app = FastAPI()
+        # ✅ Use APIRouter instead of FastAPI
+        self.router = APIRouter()
+
         self.templates = Jinja2Templates(directory="templates")
 
-        # Rutas en FastAPI
-        self.app.get("/", response_class=HTMLResponse)(self.read_root)
-        self.app.post("/submit_order")(self.submit_order)
-        self.app.post("/cancel_order")(self.cancel_order)
-        self.app.get("/get_connection_status")(self.get_connection_status)  # Register route
-        self.app.get("/get_market_data")(self.get_market_data)
-        self.app.get("/get_execution_reports")(self.get_execution_reports)
+        # ✅ Register routes properly in the router
+        self.router.get("/", response_class=HTMLResponse)(self.read_root)
+        self.router.post("/submit_order")(self.submit_order)
+        self.router.post("/cancel_order")(self.cancel_order)
+        self.router.get("/get_connection_status")(self.get_connection_status)
+        self.router.get("/get_market_data")(self.get_market_data)
+        self.router.get("/get_execution_reports")(self.get_execution_reports)
 
+    async def read_root(self, request: Request):
+        """Serves the Routing Dashboard HTML page."""
+        return self.templates.TemplateResponse("order_routing_template.html", {"request": request})
     def _run_async_evaluation(self):
         """Runs evaluate_connections in an independent event loop."""
         asyncio.run(self.evaluate_connections())

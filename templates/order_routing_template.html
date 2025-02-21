@@ -366,8 +366,11 @@
     </div>
     <script>
 
+
+
+
    function updateExecutionReports() {
-        fetch("http://127.0.0.1:8000/get_execution_reports")
+        fetch("/routing_dashboard/get_execution_reports")
         .then(response => response.json())
         .then(data => {
             let tableBody = document.getElementById("execution-reports-table");  //
@@ -409,7 +412,7 @@
     }
 
     function cancelOrder(clOrdId) {
-        fetch("http://127.0.0.1:8000/cancel_order", {
+        fetch("/routing_dashboard/cancel_order", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -431,7 +434,7 @@
 
 
     function updateMarketData() {
-        fetch("http://127.0.0.1:8000/get_market_data")
+        fetch("/routing_dashboard/get_market_data")
         .then(response => response.json())
         .then(data => {
             let tableBody = document.getElementById("market-data-table");
@@ -464,7 +467,7 @@
     updateMarketData();
 
     function updateConnectionStatus() {
-            fetch("http://127.0.0.1:8000/get_connection_status")
+            fetch("/routing_dashboard/get_connection_status")
             .then(response => response.json())
             .then(status => {
                 updateStatusIndicator("IB_PROD", status["IB_PROD"]);
@@ -527,7 +530,7 @@
         }
 
         function sendOrder(symbol, side, cashQty, nomQty) {
-            fetch("http://127.0.0.1:8000/submit_order", {
+            fetch("/routing_dashboard/submit_order", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
