@@ -1,5 +1,7 @@
 import pandas as pd
 
+from business_entities.detailed_MTM import DetailedMTM
+
 
 class PortfolioPosition():
 
@@ -21,6 +23,7 @@ class PortfolioPosition():
         self.date_close=None
         self.price_close=None
         self.daily_MTMs=[]
+        self.detailed_MTMs=[]
 
 
     def open_pos(self,side,date,price,units=None):
@@ -34,6 +37,7 @@ class PortfolioPosition():
             self.price_open=float(price)
         if self.units is not None:
             self.daily_MTMs.append(price*units)
+            self.detailed_MTMs.append(DetailedMTM(date,price*units))
 
     def close_pos(self,date,price):
 
@@ -45,12 +49,14 @@ class PortfolioPosition():
             self.price_close=float(price)
         if self.units is not None:
             self.daily_MTMs.append(price * self.units)
+            self.detailed_MTMs.append(DetailedMTM(date,price*self.units))
 
 
-    def calculate_and_append_MTM(self,price):
+    def calculate_and_append_MTM(self,date,price):
 
         if price is not None and self.units is not None:
             self.daily_MTMs.append(price*self.units)
+            self.detailed_MTMs.append(DetailedMTM(date, price * self.units))
 
         return price
 

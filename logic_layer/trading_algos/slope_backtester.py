@@ -71,7 +71,7 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
             else: #Position Closed
 
                 if self.close_long_signal(current_value,current_slope):
-                    final_MTM = portf_pos.calculate_and_append_MTM(current_price)
+                    final_MTM = portf_pos.calculate_and_append_MTM(current_date,current_price)
                     last_portf_size = final_MTM - net_commissions
 
                     trading_summary_df = self.__close_portf_position__(portf_pos, current_date, current_price,
@@ -80,7 +80,7 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
 
                     portf_pos = None
                 else:
-                    portf_pos.calculate_and_append_MTM(current_price)
+                    portf_pos.calculate_and_append_MTM(current_date,current_price)
 
             # Handle closing positions at the end of the day
             if index == len(predictions_df) - 1:

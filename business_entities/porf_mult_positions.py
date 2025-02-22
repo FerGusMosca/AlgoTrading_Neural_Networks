@@ -1,5 +1,6 @@
 import numpy as np
 
+from business_entities.detailed_MTM import DetailedMTM
 from common.enums.columns_prefix import ColumnsPrefix
 
 
@@ -12,6 +13,7 @@ class PortfMultPositions():
         self.price_open=round(init_MTM,2)
         self.init_MTM=init_MTM
         self.daily_MTMs = [init_MTM]
+        self.detailed_MTMS=[DetailedMTM(date,init_MTM)]
 
 
     def calculate_and_append_MTM(self,prices_row,date,error_if_missing=True):
@@ -30,9 +32,10 @@ class PortfMultPositions():
                 final_MTM+=curr_price*portf_position.units
 
         if final_MTM is not None:
-            self.append_today_MTM(final_MTM)
+            self.append_today_MTM(date,final_MTM)
 
         return final_MTM
 
-    def append_today_MTM(self,today_MTM):
+    def append_today_MTM(self,date,today_MTM):
         self.daily_MTMs.append(today_MTM)
+        self.detailed_MTMS.append(DetailedMTM(date,today_MTM))

@@ -191,6 +191,43 @@ class DataSetBuilder():
 
         return merged_df
 
+    def merge_multiple_series(self,training_series_df_arr, date_col="date"):
+        """
+        Merges multiple DataFrames containing price data (open, high, low, close) for different symbols.
+
+        Parameters:
+        - training_series_df_arr: List of DataFrames, each containing columns ['date', 'symbol', 'open', 'high', 'low', 'close']
+        - date_col: The name of the column representing the date in each DataFrame.
+
+        Returns:
+        - A single DataFrame with columns:
+          ['date', 'open_symbol1', 'high_symbol1', ..., 'close_symbol1', 'open_symbol2', ..., 'close_symbolN']
+        """
+
+        merged_df = None  # Initialize an empty DataFrame
+
+        for df in training_series_df_arr:
+            # Ensure the DataFrame has the required columns
+            if not {'symbol', date_col, 'open', 'high', 'low', 'close'}.issubset(df.columns):
+                raise ValueError("Each DataFrame must contain 'symbol', 'date', 'open', 'high', 'low', 'close' columns")
+
+            # Pivot the DataFrame to reshape from (date, symbol, price columns) to (date, symbol-specific columns)
+            pivoted_df = df.pivot(index=date_col, columns='symbol', values=['open', 'high', 'low', 'close'])
+
+            # Flatten the column names to format: 'open_symbol1', 'high_symbol1', etc.
+            pivoted_df.columns = [f"{col}_{symbol}" for col, symbol in pivoted_df.columns]
+
+            # Reset index to keep 'date' as a normal column
+            pivoted_df = pivoted_df.reset_index()
+
+            # Merge with the main DataFrame
+            if merged_df is None:
+                merged_df = pivoted_df  # If first DataFrame, initialize merged_df
+            else:
+                merged_df = pd.merge(merged_df, pivoted_df, on=date_col, how='outer')  # Merge on date
+
+        return merged_df
+
     def merge_series(sel,symbol_min_series_df,variables_min_series_df,symbol_col,date_col, symbol):
         # Step 1: Pivot the variables_min_series_df to turn 'symbol_col' values into columns
         variables_pivot_df = variables_min_series_df.pivot(index=date_col, columns=symbol_col, values='open')

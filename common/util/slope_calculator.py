@@ -1,8 +1,10 @@
 import numpy as np
 from scipy.stats import linregress
 
+from common.enums.columns_prefix import ColumnsPrefix
 from common.enums.on_off_indicator_values import OnOffIndicatorValue
 from logic_layer.trading_algos.base_class_daily_trading_backtester import BaseClassDailyTradingBacktester
+
 
 
 class SlopeCalculator(BaseClassDailyTradingBacktester):
@@ -10,6 +12,11 @@ class SlopeCalculator(BaseClassDailyTradingBacktester):
     def __init__(self):
         pass
 
+
+    @staticmethod
+    def set_def_value(series_df,col_prefix,def_value):
+        series_df[col_prefix] = def_value
+        return series_df
 
     @staticmethod
     def calculate_indicator_slope(series_df, slope_units, indicator):
@@ -28,7 +35,7 @@ class SlopeCalculator(BaseClassDailyTradingBacktester):
         series_df = series_df.sort_values(by=SlopeCalculator._DATE_COL).reset_index(drop=True)
 
         # Initialize a new column for the slope
-        slope_column_name = f"{indicator}_Slope"
+        slope_column_name = f"{indicator}{ColumnsPrefix.SLOPE_POSFIX.value}"
         series_df[slope_column_name] = np.nan
 
         # Iterate through the DataFrame rows
@@ -69,7 +76,7 @@ class SlopeCalculator(BaseClassDailyTradingBacktester):
         series_df = series_df.sort_values(by=SlopeCalculator._DATE_COL).reset_index(drop=True)
 
         # Initialize a new column for the slope
-        slope_column_name = f"{indicator}_Slope"
+        slope_column_name = f"{indicator}{ColumnsPrefix.SLOPE_POSFIX.value}"
         series_df[slope_column_name] = np.nan
 
         # Iterate through the DataFrame rows

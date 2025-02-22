@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Custom ETF</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0D1117;
+            color: #e0e0e0;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        h2 {
+            color: #58A6FF;
+        }
+
+        .upload-container {
+            background: #161B22;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            width: 50%;
+            margin: auto;
+        }
+
+        input[type="file"] {
+            margin-top: 10px;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            font-weight: bold;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        #upload-status {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        /* ✅ Added Chart Section */
+        .chart-container {
+            margin-top: 40px;
+            width: 80%;
+            height: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            border: 1px solid #444;
+            background: #161B22;
+            padding: 15px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+     <h2>Upload Custom ETF File</h2>
+    <div class="upload-container">
+        <form id="uploadForm">
+            <label>Select a CSV file:</label>
+            <input type="file" id="custom_etf_file" name="custom_etf_file" required>
+            <button type="button" onclick="uploadETF()">Upload</button>
+        </form>
+        <p id="uploadResult"></p> <!-- ✅ Display Upload Results -->
+    </div>
+
+    <!-- ✅ Chart Section -->
+    <h2>Custom ETF Chart</h2>
+     <!-- ✅ Add this div where you want the chart to appear -->
+    <div id="chartContainer" style="width: 80%; height: 500px; margin: auto;"></div>
+
+
+    <script>
+        function uploadETF() {
+            let fileInput = document.getElementById("custom_etf_file");
+            let file = fileInput.files[0];
+
+            if (!file) {
+                alert("Please select a file before uploading.");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("file", file);
+
+            console.log("Uploading file:", file.name);  // ✅ Debugging: Check file selection
+
+            fetch("/display_custom_etf/upload_custom_etf", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => {
+                console.log("Response received:", response);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Server response:", data);
+                document.getElementById("uploadResult").innerText = data.message;
+                fetchChartData(); // ✅ Auto-refresh chart after upload
+            })
+            .catch(error => {
+                console.error("Error uploading file:", error);
+                document.getElementById("uploadResult").innerText = "Upload failed.";
+            });
+        }
+
+        function drawChart(dates, values) {
+            let chartDiv = document.getElementById("chartContainer");
+
+            if (!chartDiv) {
+                console.error("Chart container is missing!");
+                return;
+            }
+
+            let trace = {
+                x: dates,
+                y: values,
+                type: 'scatter',
+                mode: 'lines+markers',
+                marker: { color: 'blue' },
+                name: 'ETF Value'
+            };
+
+            let layout = {
+                title: 'Custom ETF Time Series',
+                xaxis: {
+                    title: 'Date',
+                    type: 'date',
+                    rangeslider: { visible: true }
+                },
+                yaxis: {
+                    title: 'Value',
+                    autorange: true
+                }
+            };
+
+            Plotly.newPlot(chartDiv, [trace], layout);
+        }
+
+
+         function fetchChartData() {
+            fetch("/display_custom_etf/get_chart_data", { method: "GET" })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Chart Data Received:", data);
+
+                if (!document.getElementById("chartContainer")) {
+                    console.error("Chart container is missing!");
+                    return;
+                }
+
+                if (!data.dates.length || !data.values.length) {
+                    console.warn("No data received for the chart.");
+                    return;
+                }
+
+                drawChart(data.dates, data.values);
+            })
+            .catch(error => {
+                console.error("Error fetching chart data:", error);
+            });
+        }
+
+
+        // Fetch data on page load
+        document.addEventListener("DOMContentLoaded", function () {
+            fetchChartData();  // ✅ Fetch chart data only when DOM is ready
+        });
+
+    </script>
+
+</body>
+</html>

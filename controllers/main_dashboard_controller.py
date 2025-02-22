@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
+from controllers.display_custom_etf_controller import DisplayCustomETFController
 from controllers.routing_dashboard_controller import RoutingDashboardController
 from framework.common.logger.message_type import MessageType
 
@@ -21,9 +22,12 @@ class MainDashboardController:
 
         # ✅ Instantiate RoutingDashboardController (WITHOUT creating another FastAPI app)
         self.routing_dashboard = RoutingDashboardController(logger, ib_prod_ws, primary_prod_ws, ib_dev_ws)
-
         # ✅ Include the router from RoutingDashboardController
         self.app.include_router(self.routing_dashboard.router, prefix="/routing_dashboard")
+
+        # 📌 Register Display Custom ETF Controller
+        self.custom_etf_controller = DisplayCustomETFController(config_settings,logger)
+        self.app.include_router(self.custom_etf_controller.router, prefix="/display_custom_etf")
 
         # ✅ Set up the templates directory
         templates_path = Path(__file__).parent.parent / "templates"

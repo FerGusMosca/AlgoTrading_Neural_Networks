@@ -5,8 +5,9 @@ from business_entities.porft_summary import PortfSummary
 from common.dto.indicator_type_dto import IndicatorTypeDTO
 from common.enums.columns_prefix import ColumnsPrefix
 from common.enums.grouping_criterias import GroupCriteria as gc
+from common.enums.parameters_keys import ParametersKeys
 from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws
-from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas
+from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas, TradingAlgoStrategy
 from common.util.dataframe_filler import DataframeFiller
 from common.util.dataframe_printer import DataframePrinter
 from common.util.etf_logic_manager import ETFLogicManager
@@ -22,6 +23,8 @@ from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
 from logic_layer.convolutional_neural_netowrk import ConvolutionalNeuralNetwork
 from logic_layer.indicator_algos.sintethic_indicator_creator import SintheticIndicatorCreator
+from logic_layer.trading_algos.base_class_daily_trading_backtester import BaseClassDailyTradingBacktester
+from logic_layer.trading_algos.buy_and_hold_backtester import BuyAndHoldBacktester
 from logic_layer.trading_algos.direct_slope_backtester import DirectSlopeBacktester
 from logic_layer.trading_algos.inv_slope_backtester import InvSlopeBacktester
 from logic_layer.trading_algos.n_min_buffer_w_flip_daily_trading_backtester import NMinBufferWFlipDailyTradingBacktester
@@ -232,6 +235,11 @@ class AlgosOrchestationLogic:
 
         elif tas(portf_summary.trading_algo) == tas.RAW_ON_OFF_VALUE:
             backtester=OnOffBacktester()
+            return backtester.backtest(series_df, indicator, portf_size, n_algo_params,
+                                       etf_comp_dto_arr=etf_comp_dto_arr)
+
+        elif tas(portf_summary.trading_algo) == tas.BUY_AND_HOLD:
+            backtester=BuyAndHoldBacktester()
             return backtester.backtest(series_df, indicator, portf_size, n_algo_params,
                                        etf_comp_dto_arr=etf_comp_dto_arr)
 
@@ -1079,3 +1087,49 @@ class AlgosOrchestationLogic:
 
         self.__log_scalping_trading_results__(summ_dto)
         return summ_dto
+
+
+    def model_custom_etf(self,weights_csv,symbols_csv):
+
+        # 🔹 Set start_of_day to January 1, 1900
+        start_of_day = datetime(1900, 1, 1)
+        # 🔹 Set end_of_day to today's date (current day at 23:59:59)
+        end_of_day = datetime.now().replace(hour=23, minute=59, second=59)
+
+        # 0- We extract the ETF composition info
+        etf_comp_dto_arr=ETFLogicManager.__extract_etf_composition_from_csv__(weights_csv,symbols_csv)
+
+        # 1- The trading symbols DF
+        symbols_series_df = self.data_set_builder.build_interval_series(symbols_csv, start_of_day, end_of_day,
+                                                                        interval=DataSetBuilder._1_DAY_INTERVAL,
+                                                                        output_col=["symbol", "date", "open",
+                                                                                    "high", "low", "close"])
+
+        # 2- We have one datafraem per symbol in the ETF
+        symbols_series_df_arr = self.data_set_builder.split_dataframe_by_symbol(symbols_series_df, "symbol")
+
+
+        # 3-We merge all the training_series_df
+        merged_training_series_df=self.data_set_builder.merge_multiple_series(symbols_series_df_arr.values(),date_col="date")
+
+        #6- We run the backtest
+        portf_size=ParametersKeys.STANDARD_PORTFOLIO.value
+        n_algo_param_dict={}
+        n_algo_param_dict[ParametersKeys.TRADE_COMM_NOM_KEY.value] = 0  # No comissions
+        portf_summary = PortfSummary(symbols_csv, portf_size, p_trade_comm=0,
+                                     p_trading_algo=TradingAlgoStrategy.BUY_AND_HOLD.name, p_algo_params={})
+        strategy_arr= self.__backtest_strategy__(merged_training_series_df, TradingAlgoStrategy.BUY_AND_HOLD.name,
+                                             portf_size,n_algo_params= n_algo_param_dict,
+                                             portf_summary=portf_summary,
+                                             etf_comp_dto_arr=etf_comp_dto_arr)
+
+
+        #4- We bould the custom ETF series
+        summary_dto = strategy_arr[0]
+        portf_pos = strategy_arr[1]
+        if len(portf_pos)<=0:
+            raise Exception("CRITICAL ERROR building MTMs portfolio! ")
+
+
+        return portf_pos[0].detailed_MTMS
+
