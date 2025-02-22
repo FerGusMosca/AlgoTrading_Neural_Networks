@@ -35,8 +35,8 @@ class OnOffBacktester(SlopeBacktester):
                                                         col.startswith(ColumnsPrefix.CLOSE_PREFIX.value)])
 
         if sum(col.startswith(ColumnsPrefix.CLOSE_PREFIX.value) for col in series_df.columns)<=1:
-            trading_summary_df = self.__run_trades_single_pos__(series_df, portf_size, indicator, n_algo_param_dict)
-            return self.__calculate_day_trading_single_pos_summary__(self.get_algo_name(), trading_summary_df, series_df)
+            trading_summary_df,portf_positions = self.__run_trades_single_pos__(series_df, portf_size, indicator, n_algo_param_dict)
+            return self.__calculate_day_trading_single_pos_summary__(self.get_algo_name(), trading_summary_df, series_df),portf_positions
         else:
-            trading_summary_df = self.__run_trades_mult_pos__(series_df, portf_size, indicator, n_algo_param_dict,etf_comp_dto_arr)
-            return self.__calculate_day_trading_multiple_pos_summary__("mult_pos_algo",trading_summary_df)
+            trading_summary_df,portf_positions = self.__run_trades_mult_pos__(series_df, portf_size, indicator, n_algo_param_dict,etf_comp_dto_arr)
+            return self.__calculate_day_trading_multiple_pos_summary__("mult_pos_algo",trading_summary_df),portf_positions

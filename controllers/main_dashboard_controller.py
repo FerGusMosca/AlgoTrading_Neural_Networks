@@ -6,6 +6,7 @@ from pathlib import Path
 
 from controllers.display_custom_etf_controller import DisplayCustomETFController
 from controllers.routing_dashboard_controller import RoutingDashboardController
+from controllers.simulate_indicator_strategy_controller import SimulateIndicatorStrategy
 from framework.common.logger.message_type import MessageType
 
 
@@ -28,6 +29,10 @@ class MainDashboardController:
         # 📌 Register Display Custom ETF Controller
         self.custom_etf_controller = DisplayCustomETFController(config_settings,logger)
         self.app.include_router(self.custom_etf_controller.router, prefix="/display_custom_etf")
+
+        # 📌 Register Simulate Indicator Strategy Controller
+        self.simulate_indicator_strategy = SimulateIndicatorStrategy(config_settings, logger)
+        self.app.include_router(self.simulate_indicator_strategy.router, prefix="/simulate_indicator_strategy")
 
         # ✅ Set up the templates directory
         templates_path = Path(__file__).parent.parent / "templates"

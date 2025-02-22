@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import pandas as pd
 
 from business_entities.detailed_MTM import DetailedMTM
@@ -94,3 +96,45 @@ class PortfolioPosition():
             raise Exception("Cannot calculate th. nominal profit when portf_amt and positions units are NONE")
 
 
+    @staticmethod
+    def fill_missing_dates(portfolio_list: list) -> list:
+        """
+        Receives a list of PortfolioRecord objects ordered by date (ascending)
+        and returns a new list where any missing dates are filled in.
+        The missing dates are filled with the last available MTM value.
+
+        Parameters:
+            portfolio_list (list): List of PortfolioRecord objects representing active portfolio days.
+
+        Returns:
+            list: A new list of PortfolioRecord objects with consecutive dates.
+        """
+        # Ensure the list is sorted by date in ascending order
+        portfolio_list.sort(key=lambda x: x.date)
+
+        # This will hold the final list with consecutive dates
+        filled_list = []
+        last_mtm = None
+
+        # Define the date range from the first record's date to the last record's date
+        start_date = portfolio_list[0].date
+        end_date = portfolio_list[-1].date
+
+        # Initialize index for iterating through the original list
+        index = 0
+        n = len(portfolio_list)
+
+        # Iterate over each day in the date range
+        current_date = start_date
+        while current_date <= end_date:
+            # If there is a record for the current_date, use it and update last_mtm
+            if index < n and portfolio_list[index].date == current_date:
+                last_mtm = portfolio_list[index].MTM
+                filled_list.append(portfolio_list[index])
+                index += 1
+            else:
+                # If there is no record for current_date, create a new record using the last available MTM
+                filled_list.append(DetailedMTM(current_date, last_mtm))
+            current_date += timedelta(days=1)
+
+        return filled_list

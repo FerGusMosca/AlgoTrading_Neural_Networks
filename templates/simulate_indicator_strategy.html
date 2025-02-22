@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulate Indicator Strategy & Portfolio Chart</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    body {
+      background-color: #0D1117;
+      color: #e0e0e0;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    h2 {
+      color: #58A6FF;
+    }
+    .simulation-container {
+      background-color: #161B22;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      width: 80%;
+      margin: auto;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+    label {
+      margin-bottom: 5px;
+    }
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    input[type="file"] {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: #fff;
+      color: #000;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      font-weight: bold;
+      border: none;
+      padding: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 20px;
+      width: 100%;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .loader {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #3498db;
+      border-radius: 50%;
+      width: 12px;
+      height: 12px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      margin-left: 8px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    #simulateResult {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    .chart-container {
+      margin-top: 40px;
+      width: 80%;
+      height: 500px;
+      margin: auto;
+      border: 1px solid #444;
+      background-color: #161B22;
+      padding: 15px;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Simulate Indicator Strategy</h2>
+  <div class="simulation-container">
+    <form id="simulationForm">
+      <div class="form-grid">
+        <!-- First row -->
+        <div class="form-group">
+          <label for="custom_etf_file">Select a CSV file:</label>
+          <input type="file" id="custom_etf_file" name="custom_etf_file" required>
+        </div>
+        <div class="form-group">
+          <label for="indicator_name">Indicator Name:</label>
+          <input type="text" id="indicator_name" name="indicator_name" placeholder="Enter indicator name" required>
+        </div>
+        <div class="form-group">
+          <label for="trading_algo">Trading Algo:</label>
+          <input type="text" id="trading_algo" name="trading_algo" value="RAW_DIRECT_SLOPE" required>
+        </div>
+        <!-- Second row -->
+        <div class="form-group">
+          <label for="start_date">Start Date:</label>
+          <input type="date" id="start_date" name="start_date" required>
+        </div>
+        <div class="form-group">
+          <label for="end_date">End Date:</label>
+          <input type="date" id="end_date" name="end_date" required>
+        </div>
+        <div class="form-group">
+          <label for="min_units_to_pred">MinUnitsToPred:</label>
+          <input type="number" id="min_units_to_pred" name="min_units_to_pred" value="0" required>
+        </div>
+        <!-- Third row -->
+        <div class="form-group">
+          <label for="portf_size">Portf. Size:</label>
+          <input type="number" id="portf_size" name="portf_size" value="100000" step="any" required>
+        </div>
+        <div class="form-group">
+          <label for="slope_units">Slope Units:</label>
+          <input type="number" id="slope_units" name="slope_units" value="5" required>
+        </div>
+        <div class="form-group">
+          <label for="commissions">Commissions:</label>
+          <input type="number" id="commissions" name="commissions" value="5" step="any" required>
+        </div>
+      </div>
+      <!-- Single button to invoke simulate_indicator -->
+      <button type="button" id="simulateButton" onclick="simulateIndicator()">Simulate & Upload</button>
+      <p id="simulateResult"></p>
+    </form>
+  </div>
+
+  <!-- Chart container -->
+  <div id="chartContainer" class="chart-container"></div>
+
+  <script>
+    // Set default date values (last 10 years)
+    document.addEventListener("DOMContentLoaded", function () {
+      let today = new Date();
+      let tenYearsAgo = new Date();
+      tenYearsAgo.setFullYear(today.getFullYear() - 10);
+      document.getElementById("start_date").value = tenYearsAgo.toISOString().split("T")[0];
+      document.getElementById("end_date").value = today.toISOString().split("T")[0];
+      // Initially fetch chart data
+      fetchChartData();
+    });
+
+    // Function to draw the chart using Plotly
+    function drawChart(dates, values) {
+      var trace = {
+        x: dates,
+        y: values,
+        mode: 'lines',
+        line: { color: 'blue' }
+      };
+
+      var layout = {
+        title: 'Portfolio MTM Time Series',
+        xaxis: { title: 'Date' },
+        yaxis: { title: 'MTM Value' },
+        margin: { t: 50, b: 50 }
+      };
+
+      Plotly.newPlot('chartContainer', [trace], layout);
+    }
+
+    // Function to fetch chart data from the get_chart_data endpoint
+    function fetchChartData() {
+      fetch("/simulate_indicator_strategy/get_chart_data", { method: "GET" })
+        .then(response => response.json())
+        .then(data => {
+          console.log("Chart Data Received:", data);
+          if (data.dates && data.values && data.dates.length > 0 && data.values.length > 0) {
+            drawChart(data.dates, data.values);
+          } else {
+            console.warn("No chart data available.");
+          }
+        })
+        .catch(error => {
+          console.error("Error fetching chart data:", error);
+        });
+    }
+
+    // Function to simulate the indicator and update the chart automatically
+    function simulateIndicator() {
+      const simulateButton = document.getElementById("simulateButton");
+      const simulateResult = document.getElementById("simulateResult");
+
+      // Gather values from the form controls
+      const fileInput = document.getElementById("custom_etf_file");
+      const file = fileInput.files[0];
+      const indicator = document.getElementById("indicator_name").value;
+      const d_from = document.getElementById("start_date").value;
+      const d_to = document.getElementById("end_date").value;
+      const trading_algo = document.getElementById("trading_algo").value;
+      const portf_size = document.getElementById("portf_size").value;
+      const commissions = document.getElementById("commissions").value;
+      const min_units_to_pred = document.getElementById("min_units_to_pred").value;
+      const slope_units = document.getElementById("slope_units").value;
+
+      if (!file) {
+        alert("Please select a CSV file.");
+        return;
+      }
+
+      let formData = new FormData();
+      formData.append("file", file);
+      formData.append("indicator", indicator);
+      formData.append("d_from", d_from);
+      formData.append("d_to", d_to);
+      formData.append("trading_algo", trading_algo);
+      formData.append("portf_size", portf_size);
+      formData.append("comm", commissions);
+      formData.append("min_units_to_pred", min_units_to_pred);
+      formData.append("slope_units", slope_units);
+
+      // Disable the button and show loading effect
+      simulateButton.disabled = true;
+      simulateButton.innerHTML = 'Processing... <span class="loader"></span>';
+      simulateResult.innerText = "";
+
+      // Call the simulate_indicator endpoint
+      fetch("/simulate_indicator_strategy/simulate_indicator", {
+        method: "POST",
+        body: formData
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        simulateResult.innerText = data.message;
+        // Automatically update the chart after simulation completes
+        fetchChartData();
+      })
+      .catch(error => {
+        console.error("Error in simulation:", error);
+        simulateResult.innerText = "Simulation failed.";
+      })
+      .finally(() => {
+        simulateButton.disabled = false;
+        simulateButton.innerHTML = "Simulate & Upload";
+      });
+    }
+  </script>
+</body>
+</html>

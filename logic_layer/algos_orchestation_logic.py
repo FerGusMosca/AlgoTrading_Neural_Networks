@@ -989,7 +989,7 @@ class AlgosOrchestationLogic:
         portf_summary = PortfSummary(symbol, portf_size, p_trade_comm=0,
                                      p_trading_algo=trading_algo, p_algo_params=n_algo_params)
 
-        summary_dto= self.__backtest_strategy__(training_series_df, model_candle, portf_size, n_algo_params,
+        summary_dto,portf_positions= self.__backtest_strategy__(training_series_df, model_candle, portf_size, n_algo_params,
                                                 portf_summary=portf_summary)
 
 
@@ -1011,7 +1011,7 @@ class AlgosOrchestationLogic:
                                                                         output_col=["symbol", "date", "open",
                                                                                        "high", "low", "close"])
 
-        #2- We have one datafraem per indicator
+        #2- We have one dataframe per indicator
         indicators_series_df=self.data_set_builder.privot_and_merge_dataframes(indicators_series_df)
         indicators_series_df["indicator"]=model_candle
 
@@ -1081,12 +1081,12 @@ class AlgosOrchestationLogic:
 
         #6- We run the backtest
         portf_summary = PortfSummary(symbols_csv, portf_size, p_trade_comm=0,p_trading_algo=trading_algo, p_algo_params=n_algo_params)
-        summ_dto= self.__backtest_strategy__(merged_training_series_df, model_candle, portf_size, n_algo_params,
+        summ_dto,portf_positions= self.__backtest_strategy__(merged_training_series_df, model_candle, portf_size, n_algo_params,
                                              portf_summary=portf_summary, etf_comp_dto_arr=etf_comp_dto_arr)
 
 
         self.__log_scalping_trading_results__(summ_dto)
-        return summ_dto
+        return summ_dto,portf_positions
 
 
     def model_custom_etf(self,weights_csv,symbols_csv,start_of_day, end_of_day):
@@ -1113,18 +1113,13 @@ class AlgosOrchestationLogic:
         n_algo_param_dict[ParametersKeys.TRADE_COMM_NOM_KEY.value] = 0  # No comissions
         portf_summary = PortfSummary(symbols_csv, portf_size, p_trade_comm=0,
                                      p_trading_algo=TradingAlgoStrategy.BUY_AND_HOLD.name, p_algo_params={})
-        strategy_arr= self.__backtest_strategy__(merged_training_series_df, TradingAlgoStrategy.BUY_AND_HOLD.name,
+        summary_dto,portf_pos= self.__backtest_strategy__(merged_training_series_df, TradingAlgoStrategy.BUY_AND_HOLD.name,
                                              portf_size,n_algo_params= n_algo_param_dict,
                                              portf_summary=portf_summary,
                                              etf_comp_dto_arr=etf_comp_dto_arr)
 
 
         #4- We bould the custom ETF series
-        summary_dto = strategy_arr[0]
-        portf_pos = strategy_arr[1]
         if len(portf_pos)<=0:
             raise Exception("CRITICAL ERROR building MTMs portfolio! ")
-
-
         return portf_pos[0].detailed_MTMS
-

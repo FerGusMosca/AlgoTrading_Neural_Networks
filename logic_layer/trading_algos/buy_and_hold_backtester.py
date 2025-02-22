@@ -104,5 +104,5 @@ class BuyAndHoldBacktester(SlopeBacktester):
                                                           etf_comp_dto_arr)
         summary_dto= self.__calculate_day_trading_multiple_pos_summary__("mult_pos_algo", trading_summary_df)
 
-        return [summary_dto,portf_pos]
+        return summary_dto,portf_pos
 

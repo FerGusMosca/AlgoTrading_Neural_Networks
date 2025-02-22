@@ -42,6 +42,7 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
         last_portf_size=round(init_portf_size,2)
         net_commissions=0
         new_portf_size=init_portf_size
+        portf_positions=[]
 
         for index, row in predictions_df.iterrows():
             current_symbol = row[SlopeBacktester._TRADING_SYMBOL_COL]
@@ -77,7 +78,7 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
                     trading_summary_df = self.__close_portf_position__(portf_pos, current_date, current_price,
                                                                        new_portf_size, net_commissions,
                                                                        trading_summary_df)
-
+                    portf_positions.append(portf_pos)
                     portf_pos = None
                 else:
                     portf_pos.calculate_and_append_MTM(current_date,current_price)
@@ -88,9 +89,10 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
                     trading_summary_df = self.__close_portf_position__(portf_pos, current_date, current_price,
                                                                        new_portf_size, net_commissions,
                                                                        trading_summary_df)
+                    portf_positions.append(portf_pos)
                     portf_pos = None
 
-        return trading_summary_df
+        return trading_summary_df,portf_positions
 
 
 
@@ -116,6 +118,7 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
         last_portf_size=round(init_portf_size,2)
         trading_symbols=self.__extract_trading_symbols_from_multiple_portf__(predictions_df,ColumnsPrefix.CLOSE_PREFIX.value)
         current_symbol = ",".join(trading_symbols)
+        portf_positions=[]
 
         for index, row in predictions_df.iterrows():
             #1- We calculate the active positions for Today
@@ -149,6 +152,7 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
                                                                        new_portf_size, net_commissions,
                                                                        trading_summary_df,last_portf_size=last_portf_size)
 
+                    portf_positions.append(portf_pos)
                     portf_pos = None
                 else:
                     portf_pos.calculate_and_append_MTM(row, current_date,error_if_missing=False)
@@ -161,9 +165,10 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
                                                                new_portf_size, net_commissions,
                                                                trading_summary_df,
                                                                last_portf_size=last_portf_size)
+            portf_positions.append(portf_pos)
             portf_pos = None
 
-        return trading_summary_df
+        return trading_summary_df,portf_positions
 
     def backtest(self,series_df,indicator,portf_size,n_algo_param_dict,etf_comp_dto_arr=None):
 
@@ -181,8 +186,8 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
 
 
         if sum(col.startswith(ColumnsPrefix.CLOSE_PREFIX.value) for col in series_df.columns)<=1:
-            trading_summary_df = self.__run_trades_single_pos__(series_df, portf_size, indicator, n_algo_param_dict)
-            return self.__calculate_day_trading_single_pos_summary__(self.get_algo_name(), trading_summary_df, series_df)
+            trading_summary_df,port_pos = self.__run_trades_single_pos__(series_df, portf_size, indicator, n_algo_param_dict)
+            return self.__calculate_day_trading_single_pos_summary__(self.get_algo_name(), trading_summary_df, series_df),port_pos
         else:
-            trading_summary_df = self.__run_trades_mult_pos__(series_df, portf_size, indicator, n_algo_param_dict,etf_comp_dto_arr)
-            return self.__calculate_day_trading_multiple_pos_summary__("mult_pos_algo",trading_summary_df)
+            trading_summary_df,port_pos = self.__run_trades_mult_pos__(series_df, portf_size, indicator, n_algo_param_dict,etf_comp_dto_arr)
+            return self.__calculate_day_trading_multiple_pos_summary__("mult_pos_algo",trading_summary_df),port_pos
