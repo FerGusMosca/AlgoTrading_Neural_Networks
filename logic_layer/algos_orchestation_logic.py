@@ -1089,12 +1089,7 @@ class AlgosOrchestationLogic:
         return summ_dto
 
 
-    def model_custom_etf(self,weights_csv,symbols_csv):
-
-        # 🔹 Set start_of_day to January 1, 1900
-        start_of_day = datetime(1900, 1, 1)
-        # 🔹 Set end_of_day to today's date (current day at 23:59:59)
-        end_of_day = datetime.now().replace(hour=23, minute=59, second=59)
+    def model_custom_etf(self,weights_csv,symbols_csv,start_of_day, end_of_day):
 
         # 0- We extract the ETF composition info
         etf_comp_dto_arr=ETFLogicManager.__extract_etf_composition_from_csv__(weights_csv,symbols_csv)

@@ -76,11 +76,15 @@ class BuyAndHoldBacktester(SlopeBacktester):
             if index == len(predictions_df) - 1:
                 if portf_pos is not None:
                     final_MTM=portf_pos.calculate_and_append_MTM(row, current_date, error_if_missing=False)
+                    if final_MTM is None:
+                        raise Exception(f"No price for ETF on date {current_date}")
+
                     trading_summary_df = self.__close_portf_position__(portf_pos, current_date, final_MTM,
                                                                        new_portf_size, net_commissions,
                                                                        trading_summary_df)
                     portf_positions.append(portf_pos)
                     portf_pos = None
+                    break
 
 
         return trading_summary_df,portf_positions

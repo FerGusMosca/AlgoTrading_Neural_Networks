@@ -6,6 +6,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Display Custom ETF</title>
     <style>
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 12px;
+            height: 12px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+
         body {
             font-family: Arial, sans-serif;
             background-color: #0D1117;
@@ -72,7 +90,15 @@
         <form id="uploadForm">
             <label>Select a CSV file:</label>
             <input type="file" id="custom_etf_file" name="custom_etf_file" required>
-            <button type="button" onclick="uploadETF()">Upload</button>
+
+            <!-- 📅 Date Selection Fields -->
+            <label for="start_date">Start Date:</label>
+            <input type="date" id="start_date" name="start_date">
+
+            <label for="end_date">End Date:</label>
+            <input type="date" id="end_date" name="end_date">
+
+            <button type="button" id="uploadButton" onclick="uploadETF()">Upload</button>
         </form>
         <p id="uploadResult"></p> <!-- ✅ Display Upload Results -->
     </div>
@@ -84,9 +110,24 @@
 
 
     <script>
+
+         // ✅ Set default date range (last 10 years)
+            document.addEventListener("DOMContentLoaded", function () {
+                let today = new Date();
+                let tenYearsAgo = new Date();
+                tenYearsAgo.setFullYear(today.getFullYear() - 10);
+
+                document.getElementById("start_date").value = tenYearsAgo.toISOString().split("T")[0];
+                document.getElementById("end_date").value = today.toISOString().split("T")[0];
+            });
+
         function uploadETF() {
             let fileInput = document.getElementById("custom_etf_file");
             let file = fileInput.files[0];
+            let startDate = document.getElementById("start_date").value;
+            let endDate = document.getElementById("end_date").value;
+            let uploadButton = document.getElementById("uploadButton");
+            let uploadResult = document.getElementById("uploadResult");
 
             if (!file) {
                 alert("Please select a file before uploading.");
@@ -95,63 +136,77 @@
 
             let formData = new FormData();
             formData.append("file", file);
+            formData.append("start_date", startDate);
+            formData.append("end_date", endDate);
 
-            console.log("Uploading file:", file.name);  // ✅ Debugging: Check file selection
+            // ✅ Disable button and show loading text
+            uploadButton.disabled = true;
+            uploadButton.innerHTML = 'Uploading... <span class="loader"></span>';
+            uploadResult.innerText = ""; // Clear previous message
 
             fetch("/display_custom_etf/upload_custom_etf", {
                 method: "POST",
                 body: formData
             })
             .then(response => {
-                console.log("Response received:", response);
                 if (!response.ok) {
                     throw new Error(`HTTP error! Status: ${response.status}`);
                 }
                 return response.json();
             })
             .then(data => {
-                console.log("Server response:", data);
-                document.getElementById("uploadResult").innerText = data.message;
-                fetchChartData(); // ✅ Auto-refresh chart after upload
+                uploadResult.innerText = data.message;
+                fetchChartData();  // ✅ Refresh chart after upload
             })
             .catch(error => {
                 console.error("Error uploading file:", error);
-                document.getElementById("uploadResult").innerText = "Upload failed.";
+                uploadResult.innerText = "Upload failed.";
+            })
+            .finally(() => {
+                // ✅ Re-enable button after upload completes
+                uploadButton.disabled = false;
+                uploadButton.innerHTML = "Upload";
             });
         }
 
+
         function drawChart(dates, values) {
-            let chartDiv = document.getElementById("chartContainer");
-
-            if (!chartDiv) {
-                console.error("Chart container is missing!");
-                return;
-            }
-
-            let trace = {
+            var trace = {
                 x: dates,
                 y: values,
-                type: 'scatter',
-                mode: 'lines+markers',
-                marker: { color: 'blue' },
-                name: 'ETF Value'
+                mode: "lines",
+                line: { color: "blue" }
             };
 
-            let layout = {
-                title: 'Custom ETF Time Series',
-                xaxis: {
-                    title: 'Date',
-                    type: 'date',
-                    rangeslider: { visible: true }
-                },
-                yaxis: {
-                    title: 'Value',
-                    autorange: true
+            var layout = {
+                title: "Custom ETF Time Series",
+                xaxis: { title: "Date" },
+                yaxis: { title: "Value", autorange: true }, // ✅ Ensure autorange is enabled
+                dragmode: "zoom",
+                margin: { t: 50, b: 50 }
+            };
+
+            Plotly.newPlot("chartContainer", [trace], layout);
+
+            // ✅ Add event listener for zoom (range selector)
+            document.getElementById("chartContainer").on("plotly_relayout", function (eventData) {
+                if (eventData["xaxis.range"]) {
+                    let [start, end] = eventData["xaxis.range"];
+
+                    // ✅ Filter data based on the selected range
+                    let filteredValues = values.filter((_, i) => dates[i] >= start && dates[i] <= end);
+
+                    if (filteredValues.length > 0) {
+                        let minY = Math.min(...filteredValues);
+                        let maxY = Math.max(...filteredValues);
+
+                        // ✅ Update y-axis range dynamically
+                        Plotly.relayout("chartContainer", { "yaxis.range": [minY, maxY] });
+                    }
                 }
-            };
-
-            Plotly.newPlot(chartDiv, [trace], layout);
+            });
         }
+
 
 
          function fetchChartData() {

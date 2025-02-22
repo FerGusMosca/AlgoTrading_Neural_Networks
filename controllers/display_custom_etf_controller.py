@@ -1,5 +1,7 @@
+from datetime import date, datetime
+
 import pandas as pd
-from fastapi import APIRouter, Request, UploadFile, File, HTTPException
+from fastapi import APIRouter, Request, UploadFile, File, HTTPException, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -34,7 +36,9 @@ class DisplayCustomETFController:
 
     from fastapi import UploadFile, File, HTTPException
 
-    async def upload_custom_etf(self, file: UploadFile = File(...)):
+    async def upload_custom_etf(self, file: UploadFile = File(...),
+                                start_date: str = Form(...),
+                                end_date: str = Form(...)):
         """Handles the file upload."""
         try:
             if not file:
@@ -51,9 +55,12 @@ class DisplayCustomETFController:
             file_content = content.decode("utf-8").splitlines()
             weights_csv = await CSVReader.extract_col_csv_from_content(file_content, 0)
             symbols_csv = await CSVReader.extract_col_csv_from_content(file_content, 1)
-            self.detailed_MTMS= aol.model_custom_etf(weights_csv,symbols_csv)
+            dstart_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            dend_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+            self.detailed_MTMS= aol.model_custom_etf(weights_csv,symbols_csv,dstart_date,dend_date)
 
             self.logger.do_log( {"message": f"File '{file.filename}' uploaded successfully"},MessageType.INFO)
+
             return {"message": f"File '{file.filename}' uploaded successfully"}
 
         except Exception as e:
@@ -83,7 +90,7 @@ class DisplayCustomETFController:
             }, status_code=200)
 
         df.sort_values(by="date", inplace=True)
-        df=df.tail(1000)
+        self.detailed_MTMS=[]#just one display
         return JSONResponse({
             "dates": df["date"].astype(str).tolist(),
             "values": df["MTM"].tolist()
