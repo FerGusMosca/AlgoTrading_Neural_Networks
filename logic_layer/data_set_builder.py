@@ -3,6 +3,7 @@ from datetime import timedelta
 import os
 from business_entities.detailed_MTM import DetailedMTM
 from common.enums.columns_prefix import ColumnsPrefix
+from common.enums.csv_delimenters import CsvDelimeters
 from common.util.csv_reader import CSVReader
 from common.util.dataframe_concat import DataframeConcat
 from common.util.economic_value_handler import EconomicValueHandler
@@ -252,13 +253,13 @@ class DataSetBuilder():
         # Return the final merged dataframe
         return merged_df
 
-    def extract_series_csv_from_etf_file(self,etf_path,col_index):
+    def extract_series_csv_from_etf_file(self,etf_path,col_index,delimeter=CsvDelimeters.COMMA.value):
         """
         Extracts unique symbols (column 2) from a given CSV file and returns them as a CSV string.
         :param file_path: Path to the input CSV file
         :return: CSV string containing unique symbols
         """
-        return  CSVReader.extract_col_csv(etf_path,col_index)
+        return  CSVReader.extract_col_csv(etf_path,col_index,delimeter)
 
 
     def privot_and_merge_dataframes(self,indicators_series_df):
