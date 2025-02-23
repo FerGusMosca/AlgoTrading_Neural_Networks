@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Load Series</title>
+    <style>
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 12px;
+            height: 12px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-left: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0D1117;
+            color: #e0e0e0;
+            text-align: center;
+            margin-top: 50px;
+        }
+        h2 {
+            color: #58A6FF;
+        }
+        .upload-container {
+            background: #161B22;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            width: 50%;
+            margin: auto;
+        }
+        input[type="file"],
+        input[type="text"] {
+            margin-top: 10px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            font-weight: bold;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #upload-status {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        .chart-container {
+            margin-top: 40px;
+            width: 80%;
+            height: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            border: 1px solid #444;
+            background: #161B22;
+            padding: 15px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Series File</h2>
+    <div class="upload-container">
+        <form id="uploadForm">
+            <label>Select a CSV file:</label>
+            <input type="file" id="series_file" name="series_file" required>
+
+            <label for="series_key">Series Key:</label>
+            <input type="text" id="series_key" name="series_key" maxlength="20" required>
+            <br>
+            <button type="button" id="uploadButton" onclick="uploadSeries()">Upload</button>
+        </form>
+        <p id="uploadResult"></p>
+    </div>
+
+    <h2>Custom Series</h2>
+    <div id="chartContainer" style="width: 80%; height: 500px; margin: auto;"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetchChartData();
+        });
+
+        function uploadSeries() {
+            let fileInput = document.getElementById("series_file");
+            let file = fileInput.files[0];
+
+            let seriesKeyInput = document.getElementById("series_key");
+            let seriesKey = seriesKeyInput.value.trim();
+
+            if (!file) {
+                alert("Please select a file before uploading.");
+                return;
+            }
+
+            if (seriesKey.length === 0) {
+                alert("Please enter a series key.");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("file", file);
+            formData.append("series_key", seriesKey);
+
+            let uploadButton = document.getElementById("uploadButton");
+            let uploadResult = document.getElementById("uploadResult");
+
+            uploadButton.disabled = true;
+            uploadButton.innerHTML = 'Uploading... <span class="loader"></span>';
+            uploadResult.innerText = "";
+
+            fetch("/load_series/upload_series", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                uploadResult.innerText = data.message;
+                fetchChartData();
+            })
+            .catch(error => {
+                console.error("Error uploading file:", error);
+                uploadResult.innerText = "Upload failed.";
+            })
+            .finally(() => {
+                uploadButton.disabled = false;
+                uploadButton.innerHTML = "Upload";
+            });
+        }
+
+        function drawChart(dates, values) {
+            var trace = {
+                x: dates,
+                y: values,
+                mode: "lines",
+                line: { color: "blue" }
+            };
+
+            var layout = {
+                title: "Time Series",
+                xaxis: { title: "Date" },
+                yaxis: { title: "Value", autorange: true },
+                dragmode: "zoom",
+                margin: { t: 50, b: 50 }
+            };
+
+            Plotly.newPlot("chartContainer", [trace], layout);
+
+            document.getElementById("chartContainer").on("plotly_relayout", function (eventData) {
+                if (eventData["xaxis.range"]) {
+                    let [start, end] = eventData["xaxis.range"];
+                    let filteredValues = values.filter((_, i) => dates[i] >= start && dates[i] <= end);
+                    if (filteredValues.length > 0) {
+                        let minY = Math.min(...filteredValues);
+                        let maxY = Math.max(...filteredValues);
+                        Plotly.relayout("chartContainer", { "yaxis.range": [minY, maxY] });
+                    }
+                }
+            });
+        }
+
+        function fetchChartData() {
+            fetch("/load_series/get_chart_data", { method: "GET" })
+            .then(response => response.json())
+            .then(data => {
+                if (!document.getElementById("chartContainer")) {
+                    console.error("Chart container is missing!");
+                    return;
+                }
+                if (!data.dates.length || !data.values.length) {
+                    console.warn("No data received for the chart.");
+                    return;
+                }
+                drawChart(data.dates, data.values);
+            })
+            .catch(error => {
+                console.error("Error fetching chart data:", error);
+            });
+        }
+    </script>
+
+</body>
+</html>

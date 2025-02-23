@@ -1,9 +1,11 @@
 import csv
 from datetime import timedelta
-
+import os
+from business_entities.detailed_MTM import DetailedMTM
 from common.enums.columns_prefix import ColumnsPrefix
 from common.util.csv_reader import CSVReader
 from common.util.dataframe_concat import DataframeConcat
+from common.util.economic_value_handler import EconomicValueHandler
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
 from data_access_layer.economic_series_manager import EconomicSeriesManager
 import pandas as pd
@@ -381,3 +383,31 @@ class DataSetBuilder():
         result_df.iloc[:grouping_mov_avg_unit - 1] = None
 
         return result_df
+
+
+    def save_time_series(self,file_path, seriesID):
+
+        econ_data_arr =EconomicValueHandler.load_economic_series(file_path,seriesID)
+
+        detailed_mtms = []
+
+        # Iterate over each economic value and persist it
+        for econ_val in econ_data_arr:
+            # Persist the economic series record; note that all price fields are the same
+            self.economic_series_mgr.persist_economic_series(
+                                                                econ_val.symbol,
+                                                                econ_val.date,
+                                                                econ_val.interval.value,
+                                                                econ_val.open
+                                                            )
+            # Build the DetailedMTM DTO for charting purposes
+            detailed_mtms.append(DetailedMTM(econ_val.date, econ_val.open))
+
+
+        file_name = os.path.basename(file_path)
+        self.logger.do_log(
+            {"message": f"File '{file_name}' uploaded successfully and persisted"},
+            MessageType.INFO
+        )
+
+        return detailed_mtms

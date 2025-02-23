@@ -5,6 +5,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 from controllers.display_custom_etf_controller import DisplayCustomETFController
+from controllers.load_series_controller import LoadSeriesController
 from controllers.routing_dashboard_controller import RoutingDashboardController
 from controllers.simulate_indicator_strategy_controller import SimulateIndicatorStrategy
 from framework.common.logger.message_type import MessageType
@@ -31,6 +32,10 @@ class MainDashboardController:
         self.app.include_router(self.custom_etf_controller.router, prefix="/display_custom_etf")
 
         # 📌 Register Simulate Indicator Strategy Controller
+        self.load_series_controller = LoadSeriesController(config_settings, logger)
+        self.app.include_router(self.load_series_controller.router, prefix="/load_series")
+
+        # 📌 Register Load Series Controller
         self.simulate_indicator_strategy = SimulateIndicatorStrategy(config_settings, logger)
         self.app.include_router(self.simulate_indicator_strategy.router, prefix="/simulate_indicator_strategy")
 

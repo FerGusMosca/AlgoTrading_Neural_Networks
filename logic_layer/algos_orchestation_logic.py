@@ -10,6 +10,7 @@ from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws
 from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas, TradingAlgoStrategy
 from common.util.dataframe_filler import DataframeFiller
 from common.util.dataframe_printer import DataframePrinter
+from common.util.economic_value_handler import EconomicValueHandler
 from common.util.etf_logic_manager import ETFLogicManager
 from common.util.graph_builder import GraphBuilder
 from common.util.image_handler import ImageHandler
@@ -1123,3 +1124,5 @@ class AlgosOrchestationLogic:
         if len(portf_pos)<=0:
             raise Exception("CRITICAL ERROR building MTMs portfolio! ")
         return portf_pos[0].detailed_MTMS
+
+

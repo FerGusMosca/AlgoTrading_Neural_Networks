@@ -6,6 +6,8 @@ from fastapi import UploadFile
 
 class CSVReader():
 
+    _DEF_SEP_DELIMETER=";"
+
     @staticmethod
     async def extract_col_csv_from_content(file_content: list, col: int):
         col_arr = []
@@ -34,12 +36,12 @@ class CSVReader():
         return cols_csv
 
     @staticmethod
-    def extract_col_csv(file_path,col):
+    def extract_col_csv(file_path,col,delimeter=_DEF_SEP_DELIMETER):
 
         col_arr=[]
 
         with open(file_path, mode='r', newline='', encoding='utf-8') as file:
-            reader = csv.reader(file)  # Create a CSV reader object
+            reader = csv.reader(file, delimiter=delimeter)  # Create a CSV reader object
             next(reader)  # Skip the header row
 
             for row in reader:
@@ -49,3 +51,15 @@ class CSVReader():
         cols_csv = ",".join(col_arr)  # Convert to CSV string
 
         return cols_csv
+
+    @staticmethod
+    def extract_col_arr(file_path, col):
+        import csv
+        col_arr = []
+        with open(file_path, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.reader(file, delimiter=';')  # Using ';' as delimiter
+            next(reader)  # Skip the header row
+            for row in reader:
+                if len(row) > col:
+                    col_arr.append(row[col])
+        return col_arr
