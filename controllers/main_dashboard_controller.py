@@ -5,6 +5,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 from controllers.display_custom_etf_controller import DisplayCustomETFController
+from controllers.display_series_controller import DisplaySeriesController
 from controllers.load_series_controller import LoadSeriesController
 from controllers.routing_dashboard_controller import RoutingDashboardController
 from controllers.simulate_indicator_strategy_controller import SimulateIndicatorStrategy
@@ -38,6 +39,10 @@ class MainDashboardController:
         # 📌 Register Load Series Controller
         self.simulate_indicator_strategy = SimulateIndicatorStrategy(config_settings, logger)
         self.app.include_router(self.simulate_indicator_strategy.router, prefix="/simulate_indicator_strategy")
+
+        # 📌 Register Display Series Controller
+        self.display_series_controller = DisplaySeriesController(config_settings, logger)
+        self.app.include_router(self.display_series_controller.router, prefix="/display_series")
 
         # ✅ Set up the templates directory
         templates_path = Path(__file__).parent.parent / "templates"

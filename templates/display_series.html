@@ -4,7 +4,7 @@
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Load Series</title>
+    <title>Display Series</title>
     <style>
         .loader {
             border: 3px solid #f3f3f3;
@@ -74,19 +74,29 @@
 </head>
 <body>
 
-    <h2>Series File</h2>
-    <div class="upload-container">
-        <form id="uploadForm">
-            <label>Select a CSV file:</label>
-            <input type="file" id="series_file" name="series_file" required>
-
+  <h2>Series Filters</h2>
+    <div class="display-container">
+        <form id="displayForm">
             <label for="series_key">Series Key:</label>
             <input type="text" id="series_key" name="series_key" maxlength="50" required>
+
+            <label for="start_date">Start Date:</label>
+            <input type="date" id="start_date" name="start_date" required>
+
+            <label for="end_date">End Date:</label>
+            <input type="date" id="end_date" name="end_date" required>
+
+            <label for="time_interval">Time Interval:</label>
+            <select id="time_interval" name="time_interval" required>
+                <option value="1 day">Daily</option>
+                <option value="1 min">Min</option>
+            </select>
             <br>
-            <button type="button" id="uploadButton" onclick="uploadSeries()">Upload</button>
+            <button type="button" id="displayButton" onclick="displaySeries()">Display</button>
         </form>
-        <p id="uploadResult"></p>
+        <p id="displayResult"></p>
     </div>
+
 
     <h2>Custom Series</h2>
     <div id="chartContainer" style="width: 80%; height: 500px; margin: auto;"></div>
@@ -96,35 +106,42 @@
             fetchChartData();
         });
 
-        function uploadSeries() {
-            let fileInput = document.getElementById("series_file");
-            let file = fileInput.files[0];
-
+      function displaySeries() {
             let seriesKeyInput = document.getElementById("series_key");
             let seriesKey = seriesKeyInput.value.trim();
-
-            if (!file) {
-                alert("Please select a file before uploading.");
-                return;
-            }
 
             if (seriesKey.length === 0) {
                 alert("Please enter a series key.");
                 return;
             }
 
+            let startDateInput = document.getElementById("start_date");
+            let endDateInput = document.getElementById("end_date");
+            let timeIntervalSelect = document.getElementById("time_interval");
+
+            let startDate = startDateInput.value;
+            let endDate = endDateInput.value;
+            let timeInterval = timeIntervalSelect.value;
+
+            if (!startDate || !endDate) {
+                alert("Please select both start and end dates.");
+                return;
+            }
+
             let formData = new FormData();
-            formData.append("file", file);
             formData.append("series_key", seriesKey);
+            formData.append("start_date", startDate);
+            formData.append("end_date", endDate);
+            formData.append("time_interval", timeInterval);
 
-            let uploadButton = document.getElementById("uploadButton");
-            let uploadResult = document.getElementById("uploadResult");
+            let displayButton = document.getElementById("displayButton");
+            let displayResult = document.getElementById("displayResult");
 
-            uploadButton.disabled = true;
-            uploadButton.innerHTML = 'Uploading... <span class="loader"></span>';
-            uploadResult.innerText = "";
+            displayButton.disabled = true;
+            displayButton.innerHTML = 'Displaying... <span class="loader"></span>';
+            displayResult.innerText = "";
 
-            fetch("/load_series/upload_series", {
+            fetch("/display_series/do_display", {
                 method: "POST",
                 body: formData
             })
@@ -135,18 +152,19 @@
                 return response.json();
             })
             .then(data => {
-                uploadResult.innerText = data.message;
+                displayResult.innerText = data.message;
                 fetchChartData();
             })
             .catch(error => {
-                console.error("Error uploading file:", error);
-                uploadResult.innerText = "Upload failed.";
+                console.error("Error displaying series:", error);
+                displayResult.innerText = "Display failed.";
             })
             .finally(() => {
-                uploadButton.disabled = false;
-                uploadButton.innerHTML = "Upload";
+                displayButton.disabled = false;
+                displayButton.innerHTML = "Display";
             });
         }
+
 
         function drawChart(dates, values) {
             var trace = {
@@ -180,7 +198,7 @@
         }
 
         function fetchChartData() {
-            fetch("/load_series/get_chart_data", { method: "GET" })
+            fetch("/display_series/get_chart_data", { method: "GET" })
             .then(response => response.json())
             .then(data => {
                 if (!document.getElementById("chartContainer")) {

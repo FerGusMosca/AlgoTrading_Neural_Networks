@@ -9,16 +9,16 @@ from pathlib import Path
 from starlette.responses import JSONResponse
 
 from common.util.csv_reader import CSVReader
+from controllers.base_controller import BaseController
 from framework.common.logger.message_type import MessageType
 from logic_layer.algos_orchestation_logic import AlgosOrchestationLogic
 router = APIRouter()
 
-class DisplayCustomETFController:
+class DisplayCustomETFController(BaseController):
     def __init__(self,config_settings,logger):
-
+        super().__init__()
         self.config_settings=config_settings
         self.logger=logger
-        self.detailed_MTMS=[]
 
         # 📌 Create an APIRouter instead of FastAPI instance
         self.router = APIRouter()
@@ -69,30 +69,4 @@ class DisplayCustomETFController:
             self.logger.do_log(error_message,MessageType.ERROR)  # Mostrar error detallado en la terminal
             raise HTTPException(status_code=500, detail=error_message)
 
-
-    async def get_chart_data(self):
-        """Returns ETF data in JSON format for the chart. Handles empty dataset gracefully."""
-
-        if not self.detailed_MTMS:
-            return JSONResponse({
-                "dates": [],
-                "values": [],
-                "message": "No ETF data available. Please upload a file first."
-            }, status_code=200)
-
-        df = pd.DataFrame([{"date": obj.date, "MTM": obj.MTM} for obj in self.detailed_MTMS])
-
-        if df.empty:
-            return JSONResponse({
-                "dates": [],
-                "values": [],
-                "message": "ETF data is empty after processing. Check the uploaded file."
-            }, status_code=200)
-
-        df.sort_values(by="date", inplace=True)
-        self.detailed_MTMS=[]#just one display
-        return JSONResponse({
-            "dates": df["date"].astype(str).tolist(),
-            "values": df["MTM"].tolist()
-        })
 

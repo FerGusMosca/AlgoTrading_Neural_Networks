@@ -303,6 +303,10 @@ class DataSetBuilder():
 
         return separated_dataframes
 
+
+    def get_economic_values(self,serieID,d_from,d_to,interval=None, output_col=None):
+        economic_values = self.economic_series_mgr.get_economic_values(serieID, interval, d_from, d_to)
+        return economic_values
     def build_interval_series(self,series_csv,d_from,d_to,interval=None, output_col=None):
 
         if interval is None:
