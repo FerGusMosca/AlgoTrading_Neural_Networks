@@ -11,11 +11,13 @@ from starlette.responses import JSONResponse
 from business_entities.detailed_MTM import DetailedMTM
 from common.util.csv_reader import CSVReader
 from common.util.file_writer import FileWriter
+from common.util.slope_calculator import SlopeCalculator
 from controllers.base_controller import BaseController
 from framework.common.logger.message_type import MessageType
 from logic_layer.algos_orchestation_logic import AlgosOrchestationLogic
 from logic_layer.data_set_builder import DataSetBuilder
-
+from scipy.stats import linregress
+import numpy as np
 router = APIRouter()
 
 
@@ -37,6 +39,7 @@ class DisplaySeriesController(BaseController):
         self.router.post("/do_display")(self.do_display)
         self.router.get("/get_chart_data")(self.get_chart_data)
         self.router.post("/add_data")(self.add_data)
+        self.router.post("/calculate_new_slope")(self.calculate_new_slope)
 
     async def add_data(self,date: str = Form(...), value: float = Form(...)):
         """
@@ -104,6 +107,35 @@ class DisplaySeriesController(BaseController):
             error_message = f"❌ Error processing series {series_key}: {str(e)}\n{traceback.format_exc()}"
             self.logger.do_log(error_message, MessageType.ERROR)  # Mostrar error detallado en la terminal
             raise HTTPException(status_code=500, detail=error_message)
+
+    async def calculate_new_slope(self, slope_units: int = Form(...), new_value: float = Form(None)):
+        """
+        Calculates the regression slope for a given number of data points.
+
+        Parameters:
+            slope_units (int): The number of recent points to use for slope calculation.
+            new_value (float, optional): A hypothetical new value to include in the slope calculation.
+
+        Returns:
+            JSONResponse: The calculated slope or an error message.
+        """
+        try:
+            if not self.detailed_MTMS or len(self.detailed_MTMS) < slope_units:
+                return JSONResponse(content={"message": "Not enough data points for regression."}, status_code=400)
+
+            # Get last 'slope_units' values
+            recent_data = self.detailed_MTMS[-slope_units:]
+            values = np.array([item.MTM for item in recent_data])
+
+            if new_value is not None:
+                values = np.append(values[1:], new_value)  # Replace first value with new_value
+
+            slope=SlopeCalculator.calculate_slope(values)
+
+            return JSONResponse(content={"slope": round(slope, 5)}, status_code=200)
+
+        except Exception as e:
+            return JSONResponse(content={"message": f"Error calculating slope: {str(e)}"}, status_code=500)
 
 
 

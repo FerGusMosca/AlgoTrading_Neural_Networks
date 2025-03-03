@@ -169,6 +169,18 @@
                 <input type="number" id="newValue" step="0.01" placeholder="Value" required>
                 <button onclick="addNewPoint()">Add</button>
             </div>
+            <h2>Calculate Regression Slope</h2>
+            <div class="regression-container">
+                <label for="slope_units">Slope (integer, required):</label>
+                <input type="number" id="slope_units" name="slope_units" min="1" required>
+                <br>
+                <label for="new_value">New Value (optional, decimal):</label>
+                <input type="number" id="new_value" name="new_value" step="0.01">
+
+                <button type="button" id="calculateSlopeButton" onclick="calculateSlope()">Calculate Slope</button>
+
+                <p id="slopeResult" style="color: red; font-weight: bold;"></p>
+            </div>
         </div>
     </div>
 
@@ -176,6 +188,13 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             fetchChartData();
+
+            let today = new Date();
+            let pastDate = new Date();
+            pastDate.setFullYear(today.getFullYear() - 10);
+
+            document.getElementById("start_date").value = pastDate.toISOString().split("T")[0];
+            document.getElementById("end_date").value = today.toISOString().split("T")[0];
         });
 
         function displaySeries() {
@@ -311,6 +330,36 @@
                 alert("Error adding data: " + error.message); // ✅ Muestra un alert en caso de error
             });
 
+        }
+
+         function calculateSlope() {
+            let slopeUnits = document.getElementById("slope_units").value;
+            let newValue = document.getElementById("new_value").value;
+            let slopeResult = document.getElementById("slopeResult");
+
+            if (!slopeUnits || slopeUnits < 1) {
+                alert("Please enter a valid integer for Slope.");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("slope_units", slopeUnits);
+            if (newValue) {
+                formData.append("new_value", newValue);
+            }
+
+            fetch("/display_series/calculate_new_slope", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                slopeResult.innerText = `The slope for the values provided is ${data.slope}`;
+            })
+            .catch(error => {
+                console.error("Error calculating slope:", error);
+                slopeResult.innerText = "Error calculating slope.";
+            });
         }
 
 

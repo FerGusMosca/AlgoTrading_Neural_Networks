@@ -18,6 +18,16 @@ class SlopeCalculator(BaseClassDailyTradingBacktester):
         series_df[col_prefix] = def_value
         return series_df
 
+
+    @staticmethod
+    def calculate_slope(values):
+        # Calculate linear regression slope
+        x = np.arange(len(values))
+        slope, _, _, _, _ = linregress(x, values)
+
+        return slope
+
+
     @staticmethod
     def calculate_indicator_slope(series_df, slope_units, indicator):
         """
