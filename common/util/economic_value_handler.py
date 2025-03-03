@@ -1,7 +1,8 @@
 from business_entities.economic_value import EconomicValue
 from common.enums.intervals import Intervals
 from common.util.csv_reader import CSVReader
-
+from datetime import datetime, timedelta
+import calendar
 
 class EconomicValueHandler:
 
@@ -46,7 +47,33 @@ class EconomicValueHandler:
         return None
 
     @staticmethod
-    def load_economic_series(file_path, symbol,delimeter=';'):
+    def __adjust_date__(parsed_date: datetime, add_days: int) -> datetime:
+        """
+        Adjusts the given date based on the `add_days` parameter.
+
+        - If `add_days == 30`, it sets the date to the last day of the month.
+        - Otherwise, it simply adds the given number of days.
+
+        Args:
+            parsed_date (datetime): The initial parsed date.
+            add_days (int): The number of days to add or adjust.
+
+        Returns:
+            datetime: The adjusted date.
+        """
+        if not parsed_date:
+            return None  # Handle invalid dates gracefully
+
+        if add_days == 30:
+            # Set to the last day of the month
+            last_day = calendar.monthrange(parsed_date.year, parsed_date.month)[1]
+            return parsed_date.replace(day=last_day)
+
+        # Otherwise, add the given number of days
+        return parsed_date + timedelta(days=add_days)
+
+    @staticmethod
+    def load_economic_series(file_path, symbol,delimeter=';',add_days=0):
         """
         Loads an economic series from a CSV file and returns a list of EconomicValue objects.
         The CSV file should have two columns: Date and Value.
@@ -66,6 +93,7 @@ class EconomicValueHandler:
 
         for date_str, value_str in zip(dates_csv, values_csv):
             parsed_date = EconomicValueHandler.__parse_date(date_str)
+            parsed_date=EconomicValueHandler.__adjust_date__(parsed_date,add_days=add_days)
 
             try:
                 numeric_value = float(value_str)

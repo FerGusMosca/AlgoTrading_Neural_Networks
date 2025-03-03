@@ -6,6 +6,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Load Series</title>
     <style>
+
+        .upload-container {
+            background: #161B22;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            width: 60%;
+            margin: auto;
+            text-align: center;
+        }
+
+        .form-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .form-row label {
+            font-weight: bold;
+            color: #e0e0e0;
+        }
+
+        input[type="file"],
+        input[type="text"],
+        input[type="number"] {
+            flex: 1;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #222;
+            color: white;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            font-weight: bold;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
         .loader {
             border: 3px solid #f3f3f3;
             border-top: 3px solid #3498db;
@@ -74,19 +124,28 @@
 </head>
 <body>
 
-    <h2>Series File</h2>
+   <h2>Series File</h2>
     <div class="upload-container">
         <form id="uploadForm">
-            <label>Select a CSV file:</label>
-            <input type="file" id="series_file" name="series_file" required>
+            <div class="form-row">
+                <label for="series_file">Select a CSV file:</label>
+                <input type="file" id="series_file" name="series_file" required>
+            </div>
 
-            <label for="series_key">Series Key:</label>
-            <input type="text" id="series_key" name="series_key" maxlength="50" required>
-            <br>
+            <div class="form-row">
+                <label for="series_key">Series Key:</label>
+                <input type="text" id="series_key" name="series_key" maxlength="50" required>
+
+                <label for="add_days">Add Days:</label>
+                <input type="number" id="add_days" name="add_days" min="1" max="31" required value="1">
+            </div>
+
             <button type="button" id="uploadButton" onclick="uploadSeries()">Upload</button>
         </form>
         <p id="uploadResult"></p>
     </div>
+
+
 
     <h2>Custom Series</h2>
     <div id="chartContainer" style="width: 80%; height: 500px; margin: auto;"></div>
@@ -103,6 +162,9 @@
             let seriesKeyInput = document.getElementById("series_key");
             let seriesKey = seriesKeyInput.value.trim();
 
+            let addDaysInput = document.getElementById("add_days");
+            let addDays = parseInt(addDaysInput.value, 10);
+
             if (!file) {
                 alert("Please select a file before uploading.");
                 return;
@@ -113,9 +175,15 @@
                 return;
             }
 
+            if (isNaN(addDays) || addDays < 1 || addDays > 31) {
+                alert("Please enter a valid day (between 1 and 31).");
+                return;
+            }
+
             let formData = new FormData();
             formData.append("file", file);
             formData.append("series_key", seriesKey);
+            formData.append("add_days", addDays); // ✅ Send add_days value
 
             let uploadButton = document.getElementById("uploadButton");
             let uploadResult = document.getElementById("uploadResult");
@@ -147,6 +215,7 @@
                 uploadButton.innerHTML = "Upload";
             });
         }
+
 
         function drawChart(dates, values) {
             var trace = {

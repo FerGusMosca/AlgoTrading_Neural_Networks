@@ -40,7 +40,7 @@ class LoadSeriesController(BaseController):
 
     from fastapi import UploadFile, File, HTTPException
 
-    async def upload_series(self, file: UploadFile = File(...), series_key: str = Form(...)):
+    async def upload_series(self, file: UploadFile = File(...), series_key: str = Form(...), add_days: int = Form(...)):
         """Handles the file upload."""
         try:
             if not file:
@@ -54,7 +54,8 @@ class LoadSeriesController(BaseController):
                                         None, self.logger)
             file_path = await FileWriter.dump_on_path(file)
 
-            self.detailed_MTMS=ds_builder.save_time_series(file_path, series_key,",")
+            self.detailed_MTMS=ds_builder.save_time_series(file_path, series_key,",",
+                                                           add_days=add_days)
 
             self.logger.do_log( {"message": f"File '{file.filename}' uploaded successfully and persisted"},MessageType.INFO)
 
