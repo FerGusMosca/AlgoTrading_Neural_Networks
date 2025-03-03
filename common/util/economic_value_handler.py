@@ -9,32 +9,66 @@ class EconomicValueHandler:
     @staticmethod
     def __parse_date__(date_str):
         """
-        Converts a date string like '17-Dec' into a datetime object like 2017-12-01.
+        Converts a date string into a datetime object with multiple supported formats.
 
-        Format:
+        Formats:
             - 'DD-MMM' → YYYY-MM-01 (e.g., '17-Dec' → 2017-12-01)
+            - 'MMM-DD' → YYYY-MM-01 (e.g., 'Dec-17' → 2017-12-01)
+            - 'MMM-YY' → YYYY-MM-01 (e.g., 'Mar-93' → 1993-03-01)
+            - 'YY-MMM' → YYYY-MM-01 (e.g., '93-Mar' → 1993-03-01)
         """
         from datetime import datetime
 
         try:
-            # Split the string into number and month (e.g., "17-Dec" → "17" and "Dec")
-            day_str, month_str = date_str.split('-')
+            # Split the string into two parts using '-'
+            parts = date_str.split('-')
 
-            # Convert the number part to an integer (e.g., "17" → 17)
-            day = int(day_str)
+            if len(parts) != 2:
+                raise ValueError("Invalid format: date must contain exactly one '-'")
 
-            # Convert the abbreviated month to a number (e.g., "Dec" → 12)
+            # Determine the format by checking which part looks like a month
+            month_str, year_str = None, None
+
+            # Check if the first part is a month (MMM) and the second is a number (DD or YY)
+            if len(parts[0]) <= 3 and parts[0].isalpha():  # First part is likely a month (e.g., 'Mar', 'Dec')
+                month_str = parts[0]
+                year_str = parts[1]
+            # Check if the second part is a month (MMM) and the first is a number (DD or YY)
+            elif len(parts[1]) <= 3 and parts[1].isalpha():  # Second part is likely a month (e.g., 'Mar', 'Dec')
+                year_str = parts[0]
+                month_str = parts[1]
+            else:
+                raise ValueError("Invalid format: month must be an abbreviated month (e.g., 'Mar', 'Dec')")
+
+            # Convert the number part to an integer (e.g., "17" → 17, "93" → 93)
+            year = int(year_str)
+
+            # Convert the abbreviated month to a number (e.g., "Mar" → 3, "Dec" → 12)
             month = datetime.strptime(month_str, "%b").month
 
-            # Assume the year is 2000 + the number (e.g., 17 → 2017)
-            year = 2000 + day
+            # Determine the century based on the year format
+            if len(year_str) == 2:  # Two-digit year (e.g., '93', '17')
+                if 0 <= year <= 99:  # Validate two-digit year
+                    if year >= 0 and year <= 30:  # Years 00-30 → 2000-2030
+                        year = 2000 + year
+                    elif year >= 31 and year <= 99:  # Years 31-99 → 1900-1999
+                        year = 1900 + year
+                    else:
+                        raise ValueError("Year out of valid range (00-99)")
+                else:
+                    raise ValueError("Invalid two-digit year format")
+            elif len(year_str) > 2:  # Four-digit year (optional, though not in your examples)
+                if not (1900 <= year <= 2100):  # Restrict to reasonable years
+                    raise ValueError("Year out of valid range (1900-2100)")
+            else:
+                raise ValueError("Invalid year format")
 
             # Return a datetime object with day fixed to 1
             return datetime(year, month, 1)
-        except (ValueError, IndexError):
+        except (ValueError, IndexError) as e:
             # Handle invalid formats or parsing errors
-            print(f"⚠ Warning: Date format for '{date_str}' not recognized. Expected format: 'DD-MMM' (e.g., '17-Dec')")
-            return None
+            raise Exception(
+                f"⚠ Warning: Date format for '{date_str}' not recognized. Expected formats: 'DD-MMM' (e.g., '17-Dec'), 'MMM-DD' (e.g., 'Dec-17'), 'MMM-YY' (e.g., 'Mar-93'), or 'YY-MMM' (e.g., '93-Mar')")
 
     @staticmethod
     def __adjust_date__(parsed_date: datetime, add_days: int) -> datetime:

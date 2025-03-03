@@ -64,7 +64,7 @@ class MainDashboardController:
         def run():
             self.logger.do_log(f"Starting Main Dashboard on port {port}...", MessageType.INFO)
             import uvicorn
-            uvicorn.run(self.app, host="127.0.0.1", port=port)
+            uvicorn.run(self.app, host="0.0.0.0", port=port)
 
         import threading
         threading.Thread(target=run, daemon=True).start()
