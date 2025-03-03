@@ -285,7 +285,7 @@
             let newValue = document.getElementById("newValue").value;
 
             if (!newDate || !newValue) {
-                alert("Por favor, ingrese una fecha y un valor válido.");
+                alert("Please enter a valid date and value.");
                 return;
             }
 
@@ -293,19 +293,26 @@
             formData.append("date", newDate);
             formData.append("value", newValue);
 
-            fetch("/display_series/add_data", {
+          fetch("/display_series/add_data", {
                 method: "POST",
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
-                alert(data.message);
-                fetchChartData(); // ✅ Refrescar el gráfico y la lista de últimos datos
+                alert(data.message); // ✅ Muestra el mensaje del backend como una alerta
             })
             .catch(error => {
                 console.error("Error adding data:", error);
+                alert("Error adding data: " + error.message); // ✅ Muestra un alert en caso de error
             });
+
         }
+
 
     </script>
 

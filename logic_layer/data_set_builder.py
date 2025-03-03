@@ -2,8 +2,10 @@ import csv
 from datetime import timedelta
 import os
 from business_entities.detailed_MTM import DetailedMTM
+from business_entities.economic_value import EconomicValue
 from common.enums.columns_prefix import ColumnsPrefix
 from common.enums.csv_delimenters import CsvDelimeters
+from common.enums.intervals import Intervals
 from common.util.csv_reader import CSVReader
 from common.util.dataframe_concat import DataframeConcat
 from common.util.economic_value_handler import EconomicValueHandler
@@ -388,6 +390,12 @@ class DataSetBuilder():
         result_df.iloc[:grouping_mov_avg_unit - 1] = None
 
         return result_df
+
+    def save_time_series_value(self,symbol,date, value,interval=Intervals.DAY):
+
+        self.economic_series_mgr.persist_economic_series(symbol,date,interval,value)
+
+        return  True
 
 
     def save_time_series(self,file_path, seriesID,delimeter=';',add_days=0):

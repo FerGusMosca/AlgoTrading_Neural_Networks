@@ -36,12 +36,6 @@ class EconomicValueHandler:
             print(f"⚠ Warning: Date format for '{date_str}' not recognized. Expected format: 'DD-MMM' (e.g., '17-Dec')")
             return None
 
-    # Test cases
-    test_dates = ['17-Dec', '23-Mar', '24-Jan', '15-Feb']
-    for date in test_dates:
-        result = __parse_date__(date)
-        print(f"{date} → {result}")
-
     @staticmethod
     def __adjust_date__(parsed_date: datetime, add_days: int) -> datetime:
         """

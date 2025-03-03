@@ -24,6 +24,8 @@ class DisplaySeriesController(BaseController):
         super().__init__()
         self.config_settings = config_settings
         self.logger = logger
+        self.last_series_key=None
+        self.last_interval=None
 
         # 📌 Create an APIRouter instead of FastAPI instance
         self.router = APIRouter()
@@ -34,7 +36,7 @@ class DisplaySeriesController(BaseController):
         self.router.get("/", response_class=HTMLResponse)(self.display_page)
         self.router.post("/do_display")(self.do_display)
         self.router.get("/get_chart_data")(self.get_chart_data)
-        self.router.get("/add_data")(self.add_data)
+        self.router.post("/add_data")(self.add_data)
 
     async def add_data(self,date: str = Form(...), value: float = Form(...)):
         """
@@ -49,11 +51,18 @@ class DisplaySeriesController(BaseController):
         """
 
         try:
-            # TODO: Implement database insertion logic here
+            if self.last_interval is None or self.last_series_key is None:
+                raise Exception(f"You must first load the series to be displayed")
+
             new_data = DetailedMTM(date, value)  # Create a new data object
             self.detailed_MTMS.append(new_data)  # Simulated insertion into the dataset
 
-            return JSONResponse(content={"message": "Data point added successfully"}, status_code=200)
+            ds_builder = DataSetBuilder(self.config_settings["hist_data_conn_str"],
+                                        self.config_settings["ml_reports_conn_str"],
+                                        None, self.logger)
+            ds_builder.save_time_series_value(self.last_series_key,date,value,self.last_interval)
+
+            return JSONResponse(content={"message": "Data point added successfully. Press Display to Refresh"}, status_code=200)
 
         except Exception as e:
             # Return an error response if something goes wrong
@@ -78,6 +87,9 @@ class DisplaySeriesController(BaseController):
             ds_builder = DataSetBuilder(self.config_settings["hist_data_conn_str"],
                                         self.config_settings["ml_reports_conn_str"],
                                         None, self.logger)
+
+            self.last_series_key=series_key
+            self.last_interval=time_interval
 
             econ_val_arr = ds_builder.get_economic_values(series_key, start_date, end_date, time_interval)
 
