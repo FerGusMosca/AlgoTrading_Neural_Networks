@@ -8,28 +8,37 @@ class EconomicValueHandler:
     @staticmethod
     def __parse_date(date_str):
         """
-        Attempts to parse the date string and returns a date set to the last day of the month.
-        First, it tries the format '%b-%y' (e.g., Mar-03). If unsuccessful, it tries additional formats.
+        Attempts to parse the date string and returns a date set to the 1st day of the month.
+        Handles formats like:
+            - 'Mar-23'  →  2023-03-01
+            - '23-Mar'  →  2023-03-01
+            - '03/2023' →  2023-03-01
+            - Other common formats ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y")
         """
         import calendar
         from datetime import datetime
 
-        # Attempt using the expected format: 'Mar-03'
-        try:
-            dt = datetime.strptime(date_str, "%b-%y")
-            # Set the day to the last day of the month
-            last_day = calendar.monthrange(dt.year, dt.month)[1]
-            return dt.replace(day=last_day)
-        except ValueError:
-            pass
+        # Define possible date formats
+        date_formats = [
+            ("%b-%y", True),  # "Mar-23" → Assume day = 1st
+            ("%d-%b", False),  # "23-Mar" → Assume day = 1st, infer year as current
+            ("%m/%Y", True),  # "03/2023" → Assume day = 1st
+            ("%d/%m/%Y", None),  # Standard formats
+            ("%Y-%m-%d", None),
+            ("%d-%m-%Y", None)
+        ]
 
-        # Try other date formats
-        date_formats = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"]
-        for fmt in date_formats:
+        for fmt, force_first_day in date_formats:
             try:
                 dt = datetime.strptime(date_str, fmt)
-                last_day = calendar.monthrange(dt.year, dt.month)[1]
-                return dt.replace(day=last_day)
+                year = dt.year
+                month = dt.month
+
+                # If format only provides month & year, or if it's a "23-Mar" case, assume the 1st day
+                if force_first_day is not None:
+                    return datetime(year, month, 1)
+
+                return dt  # Return as is for full date formats
             except ValueError:
                 continue
 
@@ -37,7 +46,7 @@ class EconomicValueHandler:
         return None
 
     @staticmethod
-    def load_economic_series(file_path, symbol):
+    def load_economic_series(file_path, symbol,delimeter=';'):
         """
         Loads an economic series from a CSV file and returns a list of EconomicValue objects.
         The CSV file should have two columns: Date and Value.
@@ -46,8 +55,8 @@ class EconomicValueHandler:
         Volume fields are set to 0 since they do not apply.
         The interval is set to Intervals.DAY.
         """
-        dates_csv = CSVReader.extract_col_arr(file_path, 0)
-        values_csv = CSVReader.extract_col_arr(file_path, 1)
+        dates_csv = CSVReader.extract_col_arr(file_path, 0,delimeter)
+        values_csv = CSVReader.extract_col_arr(file_path, 1,delimeter)
         economic_values = []
 
         # Remove header if present

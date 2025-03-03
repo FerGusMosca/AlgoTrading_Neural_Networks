@@ -24,7 +24,6 @@ class DisplaySeriesController(BaseController):
         super().__init__()
         self.config_settings = config_settings
         self.logger = logger
-        self.detailed_MTMS = []
 
         # 📌 Create an APIRouter instead of FastAPI instance
         self.router = APIRouter()
@@ -35,6 +34,30 @@ class DisplaySeriesController(BaseController):
         self.router.get("/", response_class=HTMLResponse)(self.display_page)
         self.router.post("/do_display")(self.do_display)
         self.router.get("/get_chart_data")(self.get_chart_data)
+        self.router.get("/add_data")(self.add_data)
+
+    async def add_data(self,date: str = Form(...), value: float = Form(...)):
+        """
+        Adds a new data point to the time series.
+
+        Parameters:
+            date (str): The date of the new data point (YYYY-MM-DD format).
+            value (float): The value of the new data point.
+
+        Returns:
+            JSONResponse: A response indicating success or failure.
+        """
+
+        try:
+            # TODO: Implement database insertion logic here
+            new_data = DetailedMTM(date, value)  # Create a new data object
+            self.detailed_MTMS.append(new_data)  # Simulated insertion into the dataset
+
+            return JSONResponse(content={"message": "Data point added successfully"}, status_code=200)
+
+        except Exception as e:
+            # Return an error response if something goes wrong
+            return JSONResponse(content={"message": f"Error adding data: {str(e)}"}, status_code=500)
 
     async def display_page(self, request: Request):
         """Renders the custom ETF upload page."""
@@ -69,3 +92,6 @@ class DisplaySeriesController(BaseController):
             error_message = f"❌ Error processing series {series_key}: {str(e)}\n{traceback.format_exc()}"
             self.logger.do_log(error_message, MessageType.ERROR)  # Mostrar error detallado en la terminal
             raise HTTPException(status_code=500, detail=error_message)
+
+
+

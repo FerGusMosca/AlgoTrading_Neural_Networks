@@ -390,9 +390,9 @@ class DataSetBuilder():
         return result_df
 
 
-    def save_time_series(self,file_path, seriesID):
+    def save_time_series(self,file_path, seriesID,delimeter=';'):
 
-        econ_data_arr =EconomicValueHandler.load_economic_series(file_path,seriesID)
+        econ_data_arr =EconomicValueHandler.load_economic_series(file_path,seriesID,delimeter=delimeter)
 
         detailed_mtms = []
 

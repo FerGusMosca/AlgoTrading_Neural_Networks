@@ -54,7 +54,7 @@ class LoadSeriesController(BaseController):
                                         None, self.logger)
             file_path = await FileWriter.dump_on_path(file)
 
-            self.detailed_MTMS=ds_builder.save_time_series(file_path, series_key)
+            self.detailed_MTMS=ds_builder.save_time_series(file_path, series_key,",")
 
             self.logger.do_log( {"message": f"File '{file.filename}' uploaded successfully and persisted"},MessageType.INFO)
 

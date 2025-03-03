@@ -53,11 +53,11 @@ class CSVReader():
         return cols_csv
 
     @staticmethod
-    def extract_col_arr(file_path, col):
+    def extract_col_arr(file_path, col,delimeter=';'):
         import csv
         col_arr = []
         with open(file_path, mode='r', newline='', encoding='utf-8') as file:
-            reader = csv.reader(file, delimiter=';')  # Using ';' as delimiter
+            reader = csv.reader(file, delimiter=delimeter)  # Using ';' as delimiter
             next(reader)  # Skip the header row
             for row in reader:
                 if len(row) > col:

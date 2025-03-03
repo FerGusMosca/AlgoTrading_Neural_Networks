@@ -6,77 +6,107 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Display Series</title>
     <style>
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            width: 12px;
-            height: 12px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            margin-left: 8px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        /* Set a dark background for the entire page */
         body {
-            font-family: Arial, sans-serif;
             background-color: #0D1117;
             color: #e0e0e0;
-            text-align: center;
-            margin-top: 50px;
+            font-family: Arial, sans-serif;
         }
-        h2 {
-            color: #58A6FF;
+
+        /* Adjust container for better spacing */
+        .container {
+            display: flex;
+            width: 95%;
+            max-width: 1400px;
+            justify-content: space-between;
+            align-items: stretch;
+            gap: 30px;
+            margin: auto;
         }
-        .upload-container {
+
+        .chart-container {
+            flex: 4; /* Increase width */
+            height: 600px; /* Increase height */
             background: #161B22;
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-            width: 50%;
-            margin: auto;
         }
-        input[type="file"],
-        input[type="text"] {
+
+
+        .sidebar {
+            flex: 1.5;
+            background: #161B22;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: left;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+
+
+        /* Header styles */
+        h2 {
+            color: #58A6FF;
+            text-align: center;
+        }
+
+        /* Align inputs and button in the same row */
+        .input-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
             margin-top: 10px;
         }
+
+        /* Make input fields and button smaller */
+        .input-row input, .input-row button {
+            flex: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #222;
+            color: white;
+            font-size: 14px;
+        }
+
+        /* Adjust button styles */
         button {
             background: #4CAF50;
-            color: white;
+            cursor: pointer;
             font-weight: bold;
             border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 10px;
         }
+
         button:hover {
             background: #45a049;
         }
-        #upload-status {
-            margin-top: 15px;
-            font-weight: bold;
-        }
-        .chart-container {
-            margin-top: 40px;
-            width: 80%;
-            height: 500px;
-            margin-left: auto;
-            margin-right: auto;
-            border: 1px solid #444;
-            background: #161B22;
-            padding: 15px;
-            border-radius: 10px;
-        }
-    </style>
-</head>
-<body>
 
-  <h2>Series Filters</h2>
-    <div class="display-container">
-        <form id="displayForm">
+        /* Reduce Display button width */
+        #displayButton {
+            width: 150px; /* Smaller than before */
+        }
+
+        .filters-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap; /* Makes it responsive */
+            margin-bottom: 20px;
+        }
+
+        .filters-container input,
+        .filters-container select,
+        .filters-container button {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #222;
+            color: white;
+            font-size: 14px;
+        }
+
+        /* Reduce "Display" button width */         <h2>Series Filters</h2>
+        <div class="filters-container">
             <label for="series_key">Series Key:</label>
             <input type="text" id="series_key" name="series_key" maxlength="50" required>
 
@@ -91,40 +121,71 @@
                 <option value="1 day">Daily</option>
                 <option value="1 min">Min</option>
             </select>
-            <br>
-            <button type="button" id="displayButton" onclick="displaySeries()">Display</button>
-        </form>
-        <p id="displayResult"></p>
+
+            <button id="displayButton" onclick="displaySeries()">Display</button>
+        </div>
+
+        #displayButton {
+            width: 120px; /* More compact */
+        }
+
+
+    </style>
+</head>
+<body>
+
+
+    <h2>Series Filters</h2>
+    <div class="filters-container">
+        <label for="series_key">Series Key:</label>
+        <input type="text" id="series_key" name="series_key" maxlength="50" required>
+
+        <label for="start_date">Start Date:</label>
+        <input type="date" id="start_date" name="start_date" required>
+
+        <label for="end_date">End Date:</label>
+        <input type="date" id="end_date" name="end_date" required>
+
+        <label for="time_interval">Time Interval:</label>
+        <select id="time_interval" name="time_interval" required>
+            <option value="1 day">Daily</option>
+            <option value="1 min">Min</option>
+        </select>
+
+        <button id="displayButton" onclick="displaySeries()">Display</button>
     </div>
 
+   <h2>Custom Series</h2>
+    <div class="container">
+        <div class="chart-container" id="chartContainer"></div>
 
-    <h2>Custom Series</h2>
-    <div id="chartContainer" style="width: 80%; height: 500px; margin: auto;"></div>
+        <div class="sidebar">
+            <h3>Last 5 Data Points</h3>
+            <ul id="dataList" class="data-list"></ul>
+
+            <h3>Add Data Point</h3>
+            <div class="input-row">
+                <input type="date" id="newDate" required>
+                <input type="number" id="newValue" step="0.01" placeholder="Value" required>
+                <button onclick="addNewPoint()">Add</button>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             fetchChartData();
         });
 
-      function displaySeries() {
-            let seriesKeyInput = document.getElementById("series_key");
-            let seriesKey = seriesKeyInput.value.trim();
+        function displaySeries() {
+            let seriesKey = document.getElementById("series_key").value.trim();
+            let startDate = document.getElementById("start_date").value;
+            let endDate = document.getElementById("end_date").value;
+            let timeInterval = document.getElementById("time_interval").value;
 
-            if (seriesKey.length === 0) {
-                alert("Please enter a series key.");
-                return;
-            }
-
-            let startDateInput = document.getElementById("start_date");
-            let endDateInput = document.getElementById("end_date");
-            let timeIntervalSelect = document.getElementById("time_interval");
-
-            let startDate = startDateInput.value;
-            let endDate = endDateInput.value;
-            let timeInterval = timeIntervalSelect.value;
-
-            if (!startDate || !endDate) {
-                alert("Please select both start and end dates.");
+            if (!seriesKey || !startDate || !endDate) {
+                alert("Please enter a Series Key and select start/end dates.");
                 return;
             }
 
@@ -135,36 +196,26 @@
             formData.append("time_interval", timeInterval);
 
             let displayButton = document.getElementById("displayButton");
-            let displayResult = document.getElementById("displayResult");
-
             displayButton.disabled = true;
-            displayButton.innerHTML = 'Displaying... <span class="loader"></span>';
-            displayResult.innerText = "";
+            displayButton.innerHTML = 'Loading...';
 
             fetch("/display_series/do_display", {
                 method: "POST",
                 body: formData
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                displayResult.innerText = data.message;
-                fetchChartData();
+                alert(data.message); // Optional: Notify the user
+                fetchChartData();  // ✅ Immediately fetch updated chart data
             })
             .catch(error => {
                 console.error("Error displaying series:", error);
-                displayResult.innerText = "Display failed.";
             })
             .finally(() => {
                 displayButton.disabled = false;
                 displayButton.innerHTML = "Display";
             });
         }
-
 
         function drawChart(dates, values) {
             var trace = {
@@ -198,23 +249,64 @@
         }
 
         function fetchChartData() {
-            fetch("/display_series/get_chart_data", { method: "GET" })
+            fetch("/display_series/get_chart_data")
             .then(response => response.json())
             .then(data => {
-                if (!document.getElementById("chartContainer")) {
-                    console.error("Chart container is missing!");
-                    return;
-                }
                 if (!data.dates.length || !data.values.length) {
-                    console.warn("No data received for the chart.");
+                    console.warn("No data available.");
                     return;
                 }
                 drawChart(data.dates, data.values);
+                updateRecentData(data.dates, data.values); // ✅ Agregar actualización de la lista lateral
             })
             .catch(error => {
-                console.error("Error fetching chart data:", error);
+                console.error("Error fetching data:", error);
             });
         }
+
+        function updateRecentData(dates, values) {
+            let dataList = document.getElementById("dataList");
+            dataList.innerHTML = "";
+
+            let recentData = dates.map((date, index) => ({ date, value: values[index] }))
+                                 .slice(-5)
+                                 .reverse();
+
+            recentData.forEach(data => {
+                let li = document.createElement("li");
+                li.innerText = `Date: ${data.date}, Value: ${data.value}`;
+                dataList.appendChild(li);
+            });
+        }
+
+
+        function addNewPoint() {
+            let newDate = document.getElementById("newDate").value;
+            let newValue = document.getElementById("newValue").value;
+
+            if (!newDate || !newValue) {
+                alert("Por favor, ingrese una fecha y un valor válido.");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("date", newDate);
+            formData.append("value", newValue);
+
+            fetch("/display_series/add_data", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                fetchChartData(); // ✅ Refrescar el gráfico y la lista de últimos datos
+            })
+            .catch(error => {
+                console.error("Error adding data:", error);
+            });
+        }
+
     </script>
 
 </body>
