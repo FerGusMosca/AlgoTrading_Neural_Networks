@@ -7,44 +7,40 @@ import calendar
 class EconomicValueHandler:
 
     @staticmethod
-    def __parse_date(date_str):
+    def __parse_date__(date_str):
         """
-        Attempts to parse the date string and returns a date set to the 1st day of the month.
-        Handles formats like:
-            - 'Mar-23'  →  2023-03-01
-            - '23-Mar'  →  2023-03-01
-            - '03/2023' →  2023-03-01
-            - Other common formats ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y")
+        Converts a date string like '17-Dec' into a datetime object like 2017-12-01.
+
+        Format:
+            - 'DD-MMM' → YYYY-MM-01 (e.g., '17-Dec' → 2017-12-01)
         """
-        import calendar
         from datetime import datetime
 
-        # Define possible date formats
-        date_formats = [
-            ("%b-%y", True),  # "Mar-23" → Assume day = 1st
-            ("%d-%b", False),  # "23-Mar" → Assume day = 1st, infer year as current
-            ("%m/%Y", True),  # "03/2023" → Assume day = 1st
-            ("%d/%m/%Y", None),  # Standard formats
-            ("%Y-%m-%d", None),
-            ("%d-%m-%Y", None)
-        ]
+        try:
+            # Split the string into number and month (e.g., "17-Dec" → "17" and "Dec")
+            day_str, month_str = date_str.split('-')
 
-        for fmt, force_first_day in date_formats:
-            try:
-                dt = datetime.strptime(date_str, fmt)
-                year = dt.year
-                month = dt.month
+            # Convert the number part to an integer (e.g., "17" → 17)
+            day = int(day_str)
 
-                # If format only provides month & year, or if it's a "23-Mar" case, assume the 1st day
-                if force_first_day is not None:
-                    return datetime(year, month, 1)
+            # Convert the abbreviated month to a number (e.g., "Dec" → 12)
+            month = datetime.strptime(month_str, "%b").month
 
-                return dt  # Return as is for full date formats
-            except ValueError:
-                continue
+            # Assume the year is 2000 + the number (e.g., 17 → 2017)
+            year = 2000 + day
 
-        print(f"Warning: Date format for '{date_str}' not recognized.")
-        return None
+            # Return a datetime object with day fixed to 1
+            return datetime(year, month, 1)
+        except (ValueError, IndexError):
+            # Handle invalid formats or parsing errors
+            print(f"⚠ Warning: Date format for '{date_str}' not recognized. Expected format: 'DD-MMM' (e.g., '17-Dec')")
+            return None
+
+    # Test cases
+    test_dates = ['17-Dec', '23-Mar', '24-Jan', '15-Feb']
+    for date in test_dates:
+        result = __parse_date__(date)
+        print(f"{date} → {result}")
 
     @staticmethod
     def __adjust_date__(parsed_date: datetime, add_days: int) -> datetime:
@@ -62,7 +58,13 @@ class EconomicValueHandler:
             datetime: The adjusted date.
         """
         if not parsed_date:
-            return None  # Handle invalid dates gracefully
+            print("⚠ Warning: Parsed date is None, cannot adjust.")
+            return None  # Prevents errors when date is missing
+
+        # Ensure the parsed date is in a valid range (avoid 1900s default)
+        if parsed_date.year < 1950:
+            print(f"⚠ Warning: Year {parsed_date.year} is too old, setting default year to current.")
+            parsed_date = parsed_date.replace(year=datetime.now().year)
 
         if add_days == 30:
             # Set to the last day of the month
@@ -92,7 +94,7 @@ class EconomicValueHandler:
             values_csv = values_csv[1:]
 
         for date_str, value_str in zip(dates_csv, values_csv):
-            parsed_date = EconomicValueHandler.__parse_date(date_str)
+            parsed_date = EconomicValueHandler.__parse_date__(date_str)
             parsed_date=EconomicValueHandler.__adjust_date__(parsed_date,add_days=add_days)
 
             try:
