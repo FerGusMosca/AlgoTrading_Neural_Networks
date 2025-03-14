@@ -63,9 +63,12 @@ class RoutingDashboardController:
         asyncio.run(self.evaluate_connections())
 
     async def evaluate_connections(self):
-        self.ws_ib_prod_client = WebSocketClient(self.ib_prod_ws, self.logger, self.store_market_data,self.store_execution_report)
-        self.ws_ib_dev_client = WebSocketClient(self.ib_dev_ws, self.logger, self.store_market_data,self.store_execution_report)
-        self.ws_primary_client = WebSocketClient(self.primary_prod_ws, self.logger, self.store_market_data,self.store_execution_report)
+        self.ws_ib_prod_client = WebSocketClient(self.ib_prod_ws, self.logger, self.store_market_data,
+                                                 self.store_execution_report,Brokers.IB_PROD.value)
+        self.ws_ib_dev_client = WebSocketClient(self.ib_dev_ws, self.logger, self.store_market_data,
+                                                self.store_execution_report,Brokers.IB_DEV.value)
+        self.ws_primary_client = WebSocketClient(self.primary_prod_ws, self.logger, self.store_market_data,
+                                                 self.store_execution_report,Brokers.BYMA_PROD.value)
 
         # Dictionary to store connection results
         self.connection_status = {
@@ -161,13 +164,12 @@ class RoutingDashboardController:
         """Cancela una orden si existe en execution_reports."""
         cl_ord_id = cancel_request.cl_ord_id
         key = ExecutionReportDTO.get_execution_report_key(cl_ord_id)
-        if key in self.execution_reports and key in self.order_broker:
-            key=ExecutionReportDTO.get_execution_report_key(cl_ord_id)
-            broker=self.order_broker[key]
+        if key in self.execution_reports :
+            exec_report =self.execution_reports[key]
             cancel_req = CancelOrderReq.from_cl_ord_id(cl_ord_id)
-            await self.send_to_broker( cancel_req.model_dump_json(),broker)
+            await self.send_to_broker( cancel_req.model_dump_json(),exec_report["broker"])
             self.logger.do_log(f"Order {cl_ord_id} canceled.", MessageType.INFO)
-            return {"status": "success", "message": f"Order {cl_ord_id} canceled."}
+            return {"status": "success", "message": f"Order {cl_ord_id} cancelation sent!."}
         else:
             raise HTTPException(status_code=404, detail="Order not found.")
 
