@@ -27,6 +27,8 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
 import pickle
 
+from logic_layer.trading_algos.direct_prediction_backtester import DirectPredictionBacktester
+
 _OUTPUT_PATH="./output/"
 _LOGISTIC_REGRESSION_MODEL_NAME="logistic_regression"
 _SVM_MODEL_NAME="support_vector_machine"
@@ -51,35 +53,7 @@ class MLModelAnalyzer():
         model_base_name=f"{p_classif_key}_{s_from}_{s_to}_{timestamp}"
         return model_base_name,variables_def
 
-    def __eval_exists_value_on_df__(self,panda_df,key,key_val,val_col):
-        if panda_df[key] is not None:
-            row_df= panda_df[panda_df[key]==key_val]
 
-            if row_df is not None and len(row_df)>0:
-                return  True
-            else:
-                return  False
-        else:
-            return  False
-
-
-    def __extract_value_from_df__(self,panda_df,key,key_val,val_col ):
-
-        if panda_df[key] is not None:
-            row_df= panda_df[panda_df[key]==key_val]
-
-            if row_df is not None and len(row_df)>0:
-                return  row_df[val_col]
-            else:
-                raise Exception("Could not find column {} for a row with key value {}".format(val_col,key))
-        else:
-            raise Exception("Could not find row wiht key {}".format(key))
-
-    def __validate_bias__(self,side,bias):
-        if bias=="NONE":
-            return True
-        else:
-            return side==bias
 
 
     def __val_invalid_values__(self,df):
@@ -90,33 +64,6 @@ class MLModelAnalyzer():
         pass
 
 
-    def __evaluate_consecutive_days__(self,day_1, day_2):
-
-        if abs((day_2 - day_1).days) == 1:
-            return True
-        else:
-            if (abs((day_2 - day_1).days) ==3) and day_1.weekday()==4 and day_2.weekday()==0 : #Friday To Monday
-                return  True
-            else:
-                return  False
-
-    def __eval_reuse_reference_price__(self,algo,last_trading_dict,side,new_date,new_ref_price):
-        try:
-            if(last_trading_dict is not None):
-                #1- We get the last trade of the algo
-                res = last_trading_dict[algo]
-
-                sorted_positions = sorted(res.portf_pos_summary, key=lambda x: x.portf_pos.date_close, reverse=True)
-
-                if sorted_positions is not None and len(sorted_positions)>0:
-                    last_pos = sorted_positions[0]
-                    if self.__evaluate_consecutive_days__(last_pos.portf_pos.date_close,new_date) and last_pos.portf_pos.side==side:
-                        #We have to consecutive days, we can use the old ref-price as opening price
-                        return last_pos.portf_pos.price_close
-        except Exception as e:
-            raise Exception("Error evaluating previous day for algo {} for date {}:{}".format( algo,new_date,str(e)))
-
-        return  new_ref_price
 
     def __map_num_to_cat_array__(self,y_hat_num,y_mapping):
         y_hat_cat=[]
@@ -395,7 +342,7 @@ class MLModelAnalyzer():
         df_Y = series_df[[classification_col]]
 
         #STEP 2 - Transform categorical values domension + Normalize the data
-        #df_X = pd.get_dummies(df_X)  # converts the categorical values into mult. cols
+        df_X = pd.get_dummies(df_X)  # converts the categorical values into mult. cols
 
         #We map the Y categorical axis to int values
         Y,y_mapping= self.__map_categorical_Y__(df_Y, classification_col)
@@ -414,8 +361,8 @@ class MLModelAnalyzer():
         comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
         # SUPPORT VECTOR MACHINE
-        #resp_row = self.run_support_vector_machine_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
-        #comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
+        resp_row = self.run_support_vector_machine_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
+        comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
         # DECISSION TREE
         resp_row = self.run_decision_tree_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
@@ -473,7 +420,7 @@ class MLModelAnalyzer():
         df_X = series_df[features]
 
         #STEP 2 - Transform categorical values domension + Normalize the data
-        #df_X = pd.get_dummies(df_X)  # converts the categorical values into mult. cols
+        df_X = pd.get_dummies(df_X)  # converts the categorical values into mult. cols
 
         #STEP 3- Then we normalize all the numerical values of X
         X= self.__normalize_X__(df_X)
@@ -483,8 +430,8 @@ class MLModelAnalyzer():
         predictions_dict["Logistic Regression"]=y_hat_lr_df
 
         # SUPPORT VECTOR MACHINE
-        #y_hat_svm_df= self.run_predictions(X,"date",_SVM_MODEL_NAME  )
-        #predictions_dict["Support Vector Machine"] = y_hat_svm_df
+        y_hat_svm_df= self.run_predictions(X,"date",_SVM_MODEL_NAME  )
+        predictions_dict["Support Vector Machine"] = y_hat_svm_df
 
         # DECISION TREE
         y_hat_dec_tree_df= self.run_predictions(X,"date",_DECISSION_TREE_MODEL_NAME  )
@@ -497,87 +444,15 @@ class MLModelAnalyzer():
 
         return predictions_dict
 
-    def backtest_predictions(self,predictions_dic,symbol,symbol_df,bias,last_trading_dict=None):
-        portf_pos_dict = {}
-
-        for algo in predictions_dic.keys():
-            curr_portf_pos = None
-            last_side = None
-            portf_pos = []
-            predictions_df = predictions_dic[algo]
-            LightLogger.do_log("----Processing algo {}".format(algo))
-
-            for index, day in predictions_df.iterrows():
-
-                if not self.__eval_exists_value_on_df__(symbol_df, "date", day["date"], symbol):
-                    continue  # We ignore days when we have no prices
-
-                try:
-
-                    if curr_portf_pos is None and last_side is None:
-                        if self.__validate_bias__(day["Prediction"], bias):
-                            ref_price = self.__extract_value_from_df__(symbol_df, "date", day["date"], symbol)
-                            ref_price = self.__eval_reuse_reference_price__(algo, last_trading_dict, day["Prediction"],
-                                                                            day["date"], ref_price)
-                            LightLogger.do_log(
-                                "-Opening {} pos for ref_price= {} on {}".format(day["Prediction"],
-                                  float(ref_price.iloc[0]) if isinstance(ref_price, pd.Series) else float(ref_price),
-                                  day["date"].strftime("%Y-%m-%d")))
-                            curr_portf_pos = PortfolioPosition(symbol)
-
-                            curr_portf_pos.open_pos(day["Prediction"], day["date"], ref_price)
-                            last_side = day["Prediction"]
-                    elif last_side != day["Prediction"]:  # change the side
-
-                        # 1- Close the old position
-                        ref_price = self.__extract_value_from_df__(symbol_df, "date", day["date"], symbol)
-                        curr_portf_pos.close_pos(day["date"], ref_price)
-                        LightLogger.do_log(
-                            "-Closing {} pos for ref_price= {} on {} for pct profit={}% (nom. profit={})".format(
-                                curr_portf_pos.side, float(ref_price.iloc[0]), day["date"].strftime("%Y-%m-%d"),
-                                curr_portf_pos.calculate_pct_profit(), curr_portf_pos.calculate_th_nom_profit()))
-                        portf_pos.append(curr_portf_pos)
-
-                        # 2- Open the new one?
-                        if self.__validate_bias__(day["Prediction"], bias):
-
-                            if curr_portf_pos is not None:
-                                # 2- Open the new one
-                                curr_portf_pos = PortfolioPosition(symbol)
-                                ref_price = self.__extract_value_from_df__(symbol_df, "date", day["date"], symbol)
-                                LightLogger.do_log(
-                                    "-Opening new {} pos for ref_price= {} on {}".format(day["Prediction"],
-                                                                                         float(ref_price),
-                                                                                         day["date"].strftime(
-                                                                                             "%Y-%m-%d")))
-                                curr_portf_pos.open_pos(day["Prediction"], day["date"], ref_price)
-                                last_side = day["Prediction"]
-                        else:  # 3-We go flat
-                            curr_portf_pos = None
-                            last_side = None
-                except Exception as e:
-                    raise Exception(
-                        "Error processing day {} for algo {}:{}".format(day["date"].strftime("%Y-%m-%d"), algo,str(e)))
-
-            # We add the last position
-            if curr_portf_pos is not None:
-                last_day = predictions_dic[algo].iloc[-1]
-                ref_price = self.__extract_value_from_df__(symbol_df, "date", last_day["date"], symbol)
-                curr_portf_pos.close_pos(last_day["date"], ref_price)
-                LightLogger.do_log(
-                    "-Closing last {} pos for ref_price= {} on {}  for pct profit={}% (nom. profit={})".format(
-                        curr_portf_pos.side,ref_price.iloc[0] if isinstance(ref_price, pd.Series) else float(ref_price), last_day["date"].strftime("%Y-%m-%d"),
-                        curr_portf_pos.calculate_pct_profit(), curr_portf_pos.calculate_th_nom_profit()))
-                portf_pos.append(curr_portf_pos)
-
-            portf_pos_dict[algo] = portf_pos
-
-        return portf_pos_dict
-
-
-    def evaluate_trading_performance_last_model(self,symbol_df,symbol, series_df,bias,last_trading_dict=None):
+    def evaluate_trading_performance_last_model(self,symbol_df,symbol, series_df,bias,
+                                                last_trading_dict=None,
+                                                n_algo_param_dict={}):
         predictions_dic = self.run_predictions_last_model(series_df)
-        return  self.backtest_predictions(predictions_dic,symbol,symbol_df,bias,last_trading_dict)
+
+        direct_pred_backtester=  DirectPredictionBacktester()
+        return direct_pred_backtester.backtest(symbol,symbol_df,predictions_dic,bias,
+                                               last_trading_dict,
+                                               n_algo_param_dict=n_algo_param_dict)
 
 
 

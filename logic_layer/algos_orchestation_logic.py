@@ -305,9 +305,8 @@ class AlgosOrchestationLogic:
         symbol_df[symbol] = symbol_df['open'] #
 
         #n-We run the backtest
-        portf_pos_dict= ml_analyzer.backtest_predictions(predictions_dic=predictions_dic,
-                                         symbol_df=symbol_df, symbol=symbol, bias="NONE",
-                                         last_trading_dict=None)
+        #TODO - Properly implmeent the backetsting algo
+        raise Exception("Backtesting algo not implemented")
 
         self.logger.do_log(f"---Summarizing PORTFOLIO PERFORMANCE---", MessageType.INFO)
         self.logger.do_log(f" Total Net_Profit=${total_net_profit:.2f} Accum. Positions={accum_positions} Max. Daily Drawdown=${max_daily_drawdown:.2f} Max. Period Drawdown=${max_total_drawdown:.2f}",MessageType.INFO)
@@ -358,7 +357,8 @@ class AlgosOrchestationLogic:
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
 
-    def evaluate_trading_performance(self,symbol,series_csv,d_from,d_to,bias,last_trading_dict=None):
+    def evaluate_trading_performance(self,symbol,series_csv,d_from,d_to,bias,last_trading_dict=None,
+                                     n_algo_param_dict={}):
 
         try:
             symbol_df = self.data_set_builder.build_daily_series_classification(symbol, d_from, d_to,add_classif_col=False)
@@ -368,14 +368,17 @@ class AlgosOrchestationLogic:
             series_df = DataframeFiller.fill_missing_values(series_df)  # We fill missing values with the last one
 
             mlAnalyzer = MLModelAnalyzer(self.logger)
-            portf_pos_dict = mlAnalyzer.evaluate_trading_performance_last_model(symbol_df,symbol,series_df, bias,last_trading_dict)
+            portf_pos_dict = mlAnalyzer.evaluate_trading_performance_last_model(symbol_df,symbol,
+                                                                                series_df, bias,
+                                                                                last_trading_dict,
+                                                                                n_algo_param_dict)
 
             backtester=IndicatorBasedTradingBacktester()
 
             summary_dict={}
             for algo in portf_pos_dict.keys():
                 port_positions_arr=portf_pos_dict[algo]
-                summary= backtester.calculate_portfolio_performance(symbol,port_positions_arr)
+                summary= backtester.calculate_portfolio_performance_summary_extended(symbol,port_positions_arr)
                 summary_dict[algo]=summary
 
             return summary_dict

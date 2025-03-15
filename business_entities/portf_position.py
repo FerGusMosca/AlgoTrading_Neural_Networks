@@ -57,8 +57,10 @@ class PortfolioPosition():
     def calculate_and_append_MTM(self,date,price):
 
         if price is not None and self.units is not None:
-            self.daily_MTMs.append(price*self.units)
-            self.detailed_MTMs.append(DetailedMTM(date, price * self.units))
+            final_MTM=price*self.units
+            self.daily_MTMs.append(final_MTM)
+            self.detailed_MTMs.append(DetailedMTM(date,final_MTM))
+            return final_MTM
 
         return price
 

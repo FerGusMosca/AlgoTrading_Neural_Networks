@@ -31,6 +31,39 @@ class BaseClassDailyTradingBacktester:
     def __init__(self):
         pass
 
+    def __eval_exists_value_on_df__(self,panda_df,key,key_val,val_col):
+        if panda_df[key] is not None:
+            row_df= panda_df[panda_df[key]==key_val]
+
+            if row_df is not None and len(row_df)>0:
+                return  True
+            else:
+                return  False
+        else:
+            return  False
+    def __extract_value_from_df__(self,panda_df,key,key_val,val_col ):
+
+        if panda_df[key] is not None:
+            row_df= panda_df[panda_df[key]==key_val]
+
+            if row_df is not None and len(row_df)>0:
+                return  row_df[val_col]
+            else:
+                raise Exception("Could not find column {} for a row with key value {}".format(val_col,key))
+        else:
+            raise Exception("Could not find row wiht key {}".format(key))
+
+    def __extract_value_from_row__(self,panda_df,key,key_val,val_col ):
+
+        if panda_df[key] is not None:
+            row_df= panda_df[panda_df[key]==key_val]
+
+            if row_df is not None and len(row_df)>0:
+                return  row_df[val_col].values[0]
+            else:
+                raise Exception("Could not find column {} for a row with key value {}".format(val_col,key))
+        else:
+            raise Exception("Could not find row wiht key {}".format(key))
 
     def __initialize_dataframe__(self):
 

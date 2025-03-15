@@ -1,7 +1,12 @@
+from tensorboard import summary
+
 from business_entities.porft_summary import PortfSummary
 from business_entities.portf_position import PortfolioPosition
 from business_entities.portf_position_summary import PortfPositionSummary
 import numpy as np
+
+from common.util.financial_calculation_helper import FinancialCalculationsHelper
+
 
 class IndicatorBasedTradingBacktester:
 
@@ -90,6 +95,58 @@ class IndicatorBasedTradingBacktester:
 
 
         summary.max_drawdown=self.__calculate_max_drawdown__(portf_positions_arr)
+
+        return summary
+
+    def calculate_portfolio_performance_summary_extended(self,symbol,portf_positions_arr):
+        # Step 1: Calculate the initial and last daily MTM for profit calculation
+        # We assume daily_MTMs are consistent across positions for simplicity
+        first_pos = portf_positions_arr[0]
+        last_pos = portf_positions_arr[-1]
+
+        # Extract daily MTMs (list of values, e.g., [46.16, 47.14, ...])
+        daily_mtms = first_pos.daily_MTMs
+        if not daily_mtms or len(daily_mtms) < 2:
+            return None, None, None, None
+
+        # Get the first and last daily MTM values
+        init_daily_mtm = first_pos.daily_MTMs[0]  # First MTM value
+        last_daily_mtm = last_pos.daily_MTMs[-1]  # Last MTM value
+
+        # Calculate portfolio sizes using units (number of shares/units held)
+        init_portf_size = init_daily_mtm
+        last_portf_size = last_daily_mtm
+
+        # Calculate the percentage profit
+        profit_pct = None
+        if init_portf_size != 0:  # Avoid division by zero
+            profit_pct = str(round(((last_portf_size / init_portf_size) - 1) * 100, 2)) + " %"
+
+        # Step 2: Combine all daily MTMs into a single list
+        all_daily_mtms = []
+        for pos in portf_positions_arr:
+            if hasattr(pos, 'daily_MTMs') and pos.daily_MTMs:
+                all_daily_mtms.extend(pos.daily_MTMs)
+
+        # Step 3: Calculate the maximum drawdown
+        max_drawdown = None
+        max_drawdown_pct = None
+        if all_daily_mtms:
+            max_drawdown_pct = FinancialCalculationsHelper.max_drawdown_on_MTM(all_daily_mtms)
+            max_drawdown = str(round(max_drawdown_pct * 100, 2)) + " %"
+
+        summary = PortfSummary(symbol,last_daily_mtm)
+
+        summary.portf_pos_size=init_daily_mtm
+        summary.portf_init_MTM=init_daily_mtm
+        summary.portf_final_MTM=last_daily_mtm
+
+        summary.total_net_profit=profit_pct
+        summary.max_drawdown_on_MTM=max_drawdown
+
+
+        summary.portf_pos_summary=portf_positions_arr
+        summary.max_cum_drawdowns=[max_drawdown]
 
         return summary
 

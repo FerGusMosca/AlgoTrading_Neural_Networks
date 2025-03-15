@@ -1,5 +1,6 @@
 import traceback
 
+from business_entities.portf_position import PortfolioPosition
 from common.util.date_handler import DateHandler
 from common.util.logger import Logger
 from common.util.ml_settings_loader import MLSettingsLoader
@@ -353,7 +354,7 @@ def process_traing_LSTM_cmd(cmd,cmd_param_list):
 
 
 
-def process_train_ml_algos(cmd_param_list, str_from, str_to, classification_key=None):
+def process_train_ml_algos(cmd_param_list, d_from, d_to, classification_key=None):
     loader = MLSettingsLoader()
     logger = Logger()
     try:
@@ -365,32 +366,49 @@ def process_train_ml_algos(cmd_param_list, str_from, str_to, classification_key=
 
         dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
                                          classif_key, logger)
-        dataMgm.train_algos(cmd_param_list, DateHandler.convert_str_date(str_from, _DATE_FORMAT),
-                            DateHandler.convert_str_date(str_to, _DATE_FORMAT),
-                            classif_key)
+        dataMgm.train_algos(cmd_param_list,d_from,d_to,classif_key)
 
     except Exception as e:
         logger.print("CRITICAL ERROR bootstrapping the system:{}".format(str(e)), MessageType.ERROR)
 
 
-def process_biased_trading_algo(symbol, cmd_series_csv, str_from, str_to, bias, classification_key):
+def run_train_ml_algo(cmd):
+    series_csv = __get_param__(cmd, "series_csv")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    classif_key = __get_param__(cmd, "classif_key")
+    process_train_ml_algos(series_csv, d_from, d_to, classif_key)
+
+def run_biased_trading_algo(cmd):
+    symbol = __get_param__(cmd, "symbol")
+    series_csv = __get_param__(cmd, "series_csv")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    bias = __get_param__(cmd, "bias")
+
+    trade_comm = __get_param__(cmd, "trade_comm", optional=True, def_value=5)
+    init_portf_size=__get_param__(cmd, "init_portf_size",optional=True,def_value=PortfolioPosition._DEF_PORTF_AMT)
+
+    n_algo_param_dict = {}
+    n_algo_param_dict["trade_comm"]=trade_comm
+    n_algo_param_dict["init_portf_size"]=init_portf_size
+    process_biased_trading_algo(symbol,series_csv, d_from, d_to,bias,n_algo_param_dict)
+
+def process_biased_trading_algo(symbol, cmd_series_csv, d_from, d_to, bias,n_algo_param_dict):
     loader = MLSettingsLoader()
     logger = Logger()
     try:
         global last_trading_dict
-        logger.print("Evaluating trading performance for symbol from last model from {} to {}".format(str_from, str_to),
+        logger.print("Evaluating trading performance for symbol from last model from {} to {}".format(d_from, d_to),
                      MessageType.INFO)
 
         config_settings = loader.load_settings("./configs/commands_mgr.ini")
 
         dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
-                                         config_settings[
-                                             "classification_map_key"] if classification_key is None else classification_key,
-                                         logger)
+                                         None ,logger)
         summary_dict = dataMgm.evaluate_trading_performance(symbol, cmd_series_csv,
-                                                            DateHandler.convert_str_date(str_from, _DATE_FORMAT),
-                                                            DateHandler.convert_str_date(str_to, _DATE_FORMAT), bias,
-                                                            last_trading_dict)
+                                                            d_from,d_to, bias,last_trading_dict,
+                                                            n_algo_param_dict=n_algo_param_dict)
 
         last_trading_dict = summary_dict
 
@@ -399,10 +417,15 @@ def process_biased_trading_algo(symbol, cmd_series_csv, str_from, str_to, bias, 
         for key in summary_dict.keys():
             print("============{}============ for {}".format(key, symbol))
             summary = summary_dict[key]
-            print("From={} To={}".format(str_from, str_to))
-            print("Nom. Profit={}".format(summary.calculate_th_nom_profit()))
-            print("Pos. Size={}".format(summary.portf_pos_size))
-            print("Est. Max Drawdown={}".format(summary.max_drawdown_on_MTM))
+            print("From={} To={}".format(d_from, d_to))
+            print(f"Init Portfolio={round(summary.portf_init_MTM, 2)} $")
+            print(f"Final Portfolio={round(summary.portf_final_MTM,2)} $")
+            print(f"Pct Profit. Size={summary.total_net_profit}")
+            print(f"Est. Max Drawdown={summary.max_drawdown_on_MTM}")
+            print("     =========== Portf Positions=========== ")
+            for portf_pos in summary.portf_pos_summary:
+
+                print(f"    --Side={portf_pos.side} Open Date={portf_pos.date_open} Close Date={portf_pos.date_close} Open Price={portf_pos.price_open} Close Price={portf_pos.price_close} --> Pct. Profit={portf_pos.calculate_pct_profit()}%")
 
 
     except Exception as e:
@@ -845,16 +868,11 @@ def process_commands(cmd):
     cmd_param_list = cmd.split(" ")
 
     if cmd_param_list[0] == "TrainMLAlgos":
-        params_validation("TrainMLAlgos", cmd_param_list, 5)
-        process_train_ml_algos(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4])
-
+        run_train_ml_algo(cmd)
     elif cmd_param_list[0] == "RunPredictionsLastModel":
-        params_validation("RunPredictionsLastModel", cmd_param_list, 5)
-        process_run_predictions_last_model(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4])
+        process_run_predictions_last_model(cmd_param_list,cmd_param_list[1],cmd_param_list[2],cmd_param_list[3])
     elif cmd_param_list[0] == "EvalBiasedTradingAlgo":
-        params_validation("EvalBiasedTradingAlgo", cmd_param_list, 7)
-        process_biased_trading_algo(cmd_param_list[1], cmd_param_list[2], cmd_param_list[3], cmd_param_list[4],
-                                    cmd_param_list[5], cmd_param_list[6])
+        run_biased_trading_algo(cmd)
     elif cmd_param_list[0] == "EvaluateARIMA":
         #params_validation("EvaluateARIMA", cmd_param_list, 5)
         process_eval_ARIMA_cmd(cmd)
@@ -900,8 +918,6 @@ def process_commands(cmd):
 
     elif cmd_param_list[0] == "BacktestSlopeModelOnCustomETF":
         process_backtest_slope_model_on_custom_etf(cmd)
-
-
     elif cmd_param_list[0] == "TestDailyLSTMWithGrouping":
         process_test_LSTM_cmd(cmd)
 
@@ -911,9 +927,6 @@ def process_commands(cmd):
         process_display_order_routing_screen(cmd)
     elif cmd_param_list[0] == "BiasMainLandingPage":
         process_bias_main_landing_page(cmd)
-
-    #
-
 
     #TestDailyLSTM
 
