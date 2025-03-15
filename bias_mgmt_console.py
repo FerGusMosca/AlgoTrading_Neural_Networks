@@ -25,20 +25,21 @@ def show_commands():
     print("#1-TrainMLAlgos  [SeriesCSV] [from] [to] [classif_key]")
     print("#2-RunPredictionsLastModel [SeriesCSV] [from] [to] [classif_key]")
     print("#3-EvalBiasedTradingAlgo [Symbol] [SeriesCSV] [from] [to] [Bias] [classif_key]")
-    print("#4-EvaluateARIMA [Symbol] [Period] [from] [to]")
-    print("#5-PredictARIMA [Symbol] [p] [d] [q] [from] [to] [Period] [Step]")
-    print("#6-EvalSingleIndicatorAlgo [Symbol] [indicator] [from] [to] [inverted] [classif_key]")
-    print("#7-EvalMLBiasedAlgo [Symbol] [indicator] [SeriesCSV] [from] [to] [inverted] [classif_key]")
-    print("#8-TrainNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [depth] [learning_rate] [iterations] [model_output] [classif_key]")
-    print("#9-BacktestNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [model_to_use] [classif_key]")
-    print("#10-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [batch_size*] [inner_activation*] [make_stationary*]")
-    print("#11-TrainLSTMWithGrouping [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [grouping_unit] [grouping_classif_criteria] [batch_size*] [inner_activation*]")
+    print("#4-EvalSlidingBiasedTradingAlgo [Symbol] [SeriesCSV] [from] [to] [init_portf_size] [trade_comm] [sliding_window_years] [sliding_window_months] [classif_key] ")
+    print("#5-EvaluateARIMA [Symbol] [Period] [from] [to]")
+    print("#6-PredictARIMA [Symbol] [p] [d] [q] [from] [to] [Period] [Step]")
+    print("#7-EvalSingleIndicatorAlgo [Symbol] [indicator] [from] [to] [inverted] [classif_key]")
+    print("#8-EvalMLBiasedAlgo [Symbol] [indicator] [SeriesCSV] [from] [to] [inverted] [classif_key]")
+    print("#9-TrainNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [depth] [learning_rate] [iterations] [model_output] [classif_key]")
+    print("#10-BacktestNeuralNetworkAlgo [symbol] [variables_csv] [from] [to] [model_to_use] [classif_key]")
+    print("#11-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [batch_size*] [inner_activation*] [make_stationary*]")
+    print("#12-TrainLSTMWithGrouping [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [acc_stop] [grouping_unit] [grouping_classif_criteria] [batch_size*] [inner_activation*]")
 
-    print("#12-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
-    print("#13-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [grouping_unit] [algo_params*]")
-    print("#14-BacktestSlopeModel [symbol] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
-    print("#15-BacktestSlopeModelOnCustomETF [ETF_path] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
-    print("#16-CreateSintheticIndicator [comp_path] [model_candle] [from] [to] [slope_units]")
+    print("#13-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
+    print("#14-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [grouping_unit] [algo_params*]")
+    print("#15-BacktestSlopeModel [symbol] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
+    print("#16-BacktestSlopeModelOnCustomETF [ETF_path] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
+    print("#17-CreateSintheticIndicator [comp_path] [model_candle] [from] [to] [slope_units]")
     print("======================== UI ========================")
     print("#30-BiasMainLandingPage")
     print("#31-DisplayOrderRoutingScreen")
@@ -379,6 +380,29 @@ def run_train_ml_algo(cmd):
     classif_key = __get_param__(cmd, "classif_key")
     process_train_ml_algos(series_csv, d_from, d_to, classif_key)
 
+
+def run_sliding_biased_trading_algo(cmd):
+    symbol = __get_param__(cmd, "symbol")
+    series_csv = __get_param__(cmd, "series_csv")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    bias = __get_param__(cmd, "bias",optional=True,def_value="NONE")
+    classif_key = __get_param__(cmd, "classif_key")
+
+    trade_comm = __get_param__(cmd, "trade_comm", optional=True, def_value=5)
+    init_portf_size=__get_param__(cmd, "init_portf_size",optional=True,def_value=PortfolioPosition._DEF_PORTF_AMT)
+    sliding_window_years = __get_param__(cmd, "sliding_window_years", optional=True, def_value=2)
+    sliding_window_months = __get_param__(cmd, "sliding_window_months", optional=True, def_value=2)
+
+    n_algo_param_dict = {}
+    n_algo_param_dict["trade_comm"]=trade_comm
+    n_algo_param_dict["init_portf_size"]=init_portf_size
+    n_algo_param_dict["sliding_window_years"] = sliding_window_years
+    n_algo_param_dict["sliding_window_months"] = sliding_window_months
+    n_algo_param_dict["classif_key"] = classif_key
+
+    process_sliding_biased_trading_algo(symbol,series_csv, d_from, d_to,bias,n_algo_param_dict)
+
 def run_biased_trading_algo(cmd):
     symbol = __get_param__(cmd, "symbol")
     series_csv = __get_param__(cmd, "series_csv")
@@ -409,6 +433,44 @@ def process_biased_trading_algo(symbol, cmd_series_csv, d_from, d_to, bias,n_alg
         summary_dict = dataMgm.evaluate_trading_performance(symbol, cmd_series_csv,
                                                             d_from,d_to, bias,last_trading_dict,
                                                             n_algo_param_dict=n_algo_param_dict)
+
+        last_trading_dict = summary_dict
+
+        print("Displaying all the different models predictions for the different alogs:")
+
+        for key in summary_dict.keys():
+            print("============{}============ for {}".format(key, symbol))
+            summary = summary_dict[key]
+            print("From={} To={}".format(d_from, d_to))
+            print(f"Init Portfolio={round(summary.portf_init_MTM, 2)} $")
+            print(f"Final Portfolio={round(summary.portf_final_MTM,2)} $")
+            print(f"Pct Profit. Size={summary.total_net_profit}")
+            print(f"Est. Max Drawdown={summary.max_drawdown_on_MTM}")
+            print("     =========== Portf Positions=========== ")
+            for portf_pos in summary.portf_pos_summary:
+
+                print(f"    --Side={portf_pos.side} Open Date={portf_pos.date_open} Close Date={portf_pos.date_close} Open Price={portf_pos.price_open} Close Price={portf_pos.price_close} --> Pct. Profit={portf_pos.calculate_pct_profit()}%")
+
+
+    except Exception as e:
+        logger.print("CRITICAL ERROR bootstrapping the system:{}".format(str(e)), MessageType.ERROR)
+
+
+def process_sliding_biased_trading_algo(symbol, cmd_series_csv, d_from, d_to, bias,n_algo_param_dict):
+    loader = MLSettingsLoader()
+    logger = Logger()
+    try:
+        global last_trading_dict
+        logger.print("Evaluating trading performance for symbol from last model from {} to {}".format(d_from, d_to),
+                     MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                         n_algo_param_dict["classif_key"] ,logger)
+        summary_dict = dataMgm.sliding_train_and_evaluate_ml_performance(symbol, cmd_series_csv,
+                                                                        d_from,d_to, bias,last_trading_dict,
+                                                                        n_algo_param_dict=n_algo_param_dict)
 
         last_trading_dict = summary_dict
 
@@ -873,6 +935,8 @@ def process_commands(cmd):
         process_run_predictions_last_model(cmd_param_list,cmd_param_list[1],cmd_param_list[2],cmd_param_list[3])
     elif cmd_param_list[0] == "EvalBiasedTradingAlgo":
         run_biased_trading_algo(cmd)
+    elif cmd_param_list[0] == "EvalSlidingBiasedTradingAlgo":
+        run_sliding_biased_trading_algo(cmd)
     elif cmd_param_list[0] == "EvaluateARIMA":
         #params_validation("EvaluateARIMA", cmd_param_list, 5)
         process_eval_ARIMA_cmd(cmd)

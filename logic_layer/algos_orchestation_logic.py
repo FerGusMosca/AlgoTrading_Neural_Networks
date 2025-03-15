@@ -1,6 +1,8 @@
 import traceback
 from datetime import timedelta, datetime
 
+from dateutil.relativedelta import relativedelta
+
 from business_entities.porft_summary import PortfSummary
 from common.dto.indicator_type_dto import IndicatorTypeDTO
 from common.enums.columns_prefix import ColumnsPrefix
@@ -356,6 +358,68 @@ class AlgosOrchestationLogic:
             msg = "CRITICAL ERROR processing model @train_neural_network:{}".format(str(e))
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
+
+    def sliding_train_and_evaluate_ml_performance(self,symbol,series_csv,d_from,d_to,bias,last_trading_dict=None,
+                                                    n_algo_param_dict={}):
+        summary_dict_arr=[]
+        summary_dict=None
+        sliding_window_years=int(n_algo_param_dict["sliding_window_years"])
+        sliding_window_months = int(n_algo_param_dict["sliding_window_months"])
+        classif_key=n_algo_param_dict["classif_key"]
+
+        # Validate inputs
+        if d_from > d_to:
+            raise ValueError("d_from must be earlier than d_to.")
+        if sliding_window_years < 0 or sliding_window_months <= 0:
+            raise ValueError("sliding_window_years must be non-negative and sliding_window_months must be positive.")
+
+        # Initialize the list to store the windows
+        windows = []
+
+        # Start with the first window
+        curr_d_from = d_from
+        # Calculate the end of the first window by adding the window duration
+        curr_d_to = curr_d_from + relativedelta(years=sliding_window_years) - relativedelta(days=1)
+
+        # Ensure the first window's end does not exceed d_to
+        if curr_d_to > d_to:
+            curr_d_to = d_to
+
+        # Loop until the window's start date exceeds d_to
+        while curr_d_from <= d_to:
+            # Add the current window to the list
+            windows.append((curr_d_from, curr_d_to))
+
+            #1- We train the algos in the train window
+            self.train_algos(series_csv, curr_d_from, curr_d_to, classif_key)
+
+            eval_d_from=curr_d_to + relativedelta(days=1)
+            eval_d_to = eval_d_from + relativedelta(months=sliding_window_months)- relativedelta(days=1)
+            summary_dict = self.evaluate_trading_performance(symbol, series_csv, eval_d_from, eval_d_to
+                                                             , last_trading_dict=summary_dict,
+                                                             bias=bias,
+                                                             n_algo_param_dict=n_algo_param_dict)
+            summary_dict_arr.append(summary_dict)
+
+
+            # Slide the window forward by sliding_window_months
+            curr_d_from = curr_d_from + relativedelta(months=sliding_window_months)
+            # Recalculate the end date for the new window
+            curr_d_to = curr_d_from + relativedelta(years=sliding_window_years) - relativedelta(days=1)
+
+            # Ensure the end date does not exceed d_to
+            if curr_d_to > d_to:
+                curr_d_to = d_to
+
+            # Break if the window's end date is not advancing (i.e., we're at the end)
+            if curr_d_to <= windows[-1][1]:
+                break
+
+
+        return summary_dict_arr
+
+
+
 
     def evaluate_trading_performance(self,symbol,series_csv,d_from,d_to,bias,last_trading_dict=None,
                                      n_algo_param_dict={}):
