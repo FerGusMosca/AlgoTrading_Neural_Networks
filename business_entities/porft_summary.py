@@ -10,7 +10,9 @@ class PortfSummary:
         self.trading_algo=p_trading_algo
         self.n_algo_params=p_algo_params
         self.symbol=symbol
+
         self.total_net_profit=0
+        self.total_net_profit_str="-"
 
         self.portf_pos_summary=[]
         self.max_cum_drawdowns=[]
@@ -22,7 +24,9 @@ class PortfSummary:
         self.max_drawdown=0
         self.max_daily_drawdown=0
         self.accum_positions=0
-        self.max_drawdown_on_MTM="-"
+
+        self.max_drawdown_on_MTM_str= "-"
+        self.max_drawdown_on_MTM=0
 
         self.portf_init_MTM=0
         self.portf_final_MTM=0

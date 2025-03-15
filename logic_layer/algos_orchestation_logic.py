@@ -17,6 +17,7 @@ from common.util.etf_logic_manager import ETFLogicManager
 from common.util.graph_builder import GraphBuilder
 from common.util.image_handler import ImageHandler
 from common.util.light_logger import LightLogger
+from common.util.portfolio_summary_analyzer import PortfolioSummaryAnalyzer
 from common.util.random_walk_generator import RandomWalkGenerator
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
 from data_access_layer.economic_series_manager import EconomicSeriesManager
@@ -366,6 +367,7 @@ class AlgosOrchestationLogic:
         sliding_window_years=int(n_algo_param_dict["sliding_window_years"])
         sliding_window_months = int(n_algo_param_dict["sliding_window_months"])
         classif_key=n_algo_param_dict["classif_key"]
+        init_portf_size=n_algo_param_dict["init_portf_size"]
 
         # Validate inputs
         if d_from > d_to:
@@ -415,7 +417,7 @@ class AlgosOrchestationLogic:
             if curr_d_to <= windows[-1][1]:
                 break
 
-
+        PortfolioSummaryAnalyzer.calculate_portfolio_metrics(summary_dict_arr,init_portf_size,d_from,d_to)
         return summary_dict_arr
 
 

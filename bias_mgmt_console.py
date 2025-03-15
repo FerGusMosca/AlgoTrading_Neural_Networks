@@ -444,8 +444,8 @@ def process_biased_trading_algo(symbol, cmd_series_csv, d_from, d_to, bias,n_alg
             print("From={} To={}".format(d_from, d_to))
             print(f"Init Portfolio={round(summary.portf_init_MTM, 2)} $")
             print(f"Final Portfolio={round(summary.portf_final_MTM,2)} $")
-            print(f"Pct Profit. Size={summary.total_net_profit}")
-            print(f"Est. Max Drawdown={summary.max_drawdown_on_MTM}")
+            print(f"Pct Profit. Size={summary.total_net_profit_str}")
+            print(f"Est. Max Drawdown={summary.max_drawdown_on_MTM_str}")
             print("     =========== Portf Positions=========== ")
             for portf_pos in summary.portf_pos_summary:
 
@@ -482,8 +482,8 @@ def process_sliding_biased_trading_algo(symbol, cmd_series_csv, d_from, d_to, bi
             print("From={} To={}".format(d_from, d_to))
             print(f"Init Portfolio={round(summary.portf_init_MTM, 2)} $")
             print(f"Final Portfolio={round(summary.portf_final_MTM,2)} $")
-            print(f"Pct Profit. Size={summary.total_net_profit}")
-            print(f"Est. Max Drawdown={summary.max_drawdown_on_MTM}")
+            print(f"Pct Profit. Size={summary.total_net_profit_str}")
+            print(f"Est. Max Drawdown={summary.max_drawdown_on_MTM_str}")
             print("     =========== Portf Positions=========== ")
             for portf_pos in summary.portf_pos_summary:
 

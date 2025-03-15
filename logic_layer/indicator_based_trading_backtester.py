@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from tensorboard import summary
 
 from business_entities.porft_summary import PortfSummary
@@ -98,6 +100,7 @@ class IndicatorBasedTradingBacktester:
 
         return summary
 
+
     def calculate_portfolio_performance_summary_extended(self,symbol,portf_positions_arr):
         # Step 1: Calculate the initial and last daily MTM for profit calculation
         # We assume daily_MTMs are consistent across positions for simplicity
@@ -118,9 +121,11 @@ class IndicatorBasedTradingBacktester:
         last_portf_size = last_daily_mtm
 
         # Calculate the percentage profit
-        profit_pct = None
+        profit_pct_str = None
+        profit_pct=0
         if init_portf_size != 0:  # Avoid division by zero
-            profit_pct = str(round(((last_portf_size / init_portf_size) - 1) * 100, 2)) + " %"
+            profit_pct=round(((last_portf_size / init_portf_size) - 1) * 100, 2)
+            profit_pct_str= str(profit_pct) + " %"
 
         # Step 2: Combine all daily MTMs into a single list
         all_daily_mtms = []
@@ -142,7 +147,9 @@ class IndicatorBasedTradingBacktester:
         summary.portf_final_MTM=last_daily_mtm
 
         summary.total_net_profit=profit_pct
-        summary.max_drawdown_on_MTM=max_drawdown
+        summary.total_net_profit_str = profit_pct_str
+        summary.max_drawdown_on_MTM_str=max_drawdown
+        summary.max_drawdown_on_MTM=max_drawdown_pct
 
 
         summary.portf_pos_summary=portf_positions_arr
