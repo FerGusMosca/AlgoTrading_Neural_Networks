@@ -5,8 +5,8 @@ from common.util.financial_calculation_helper import FinancialCalculationsHelper
 
 class PortfSummary:
 
-    def __init__(self,symbol,p_portf_position_size,p_trade_comm=0,p_trading_algo=None,
-                 p_algo_params=[]):
+    def __init__(self,symbol,p_portf_position_size,p_trade_comm=0,p_trading_algo=None,p_algo_params=[],
+                 p_period=None,p_year=None):
         self.trading_algo=p_trading_algo
         self.n_algo_params=p_algo_params
         self.symbol=symbol
@@ -30,6 +30,9 @@ class PortfSummary:
 
         self.portf_init_MTM=0
         self.portf_final_MTM=0
+
+        self.period=p_period
+        self.year=p_year
 
 
     def append_position_summary(self,pos_summary):

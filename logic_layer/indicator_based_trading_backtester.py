@@ -7,6 +7,7 @@ from business_entities.portf_position import PortfolioPosition
 from business_entities.portf_position_summary import PortfPositionSummary
 import numpy as np
 
+from common.util.date_handler import DateHandler
 from common.util.financial_calculation_helper import FinancialCalculationsHelper
 
 
@@ -101,7 +102,8 @@ class IndicatorBasedTradingBacktester:
         return summary
 
 
-    def calculate_portfolio_performance_summary_extended(self,symbol,portf_positions_arr):
+    def calculate_portfolio_performance_summary_extended(self,symbol,portf_positions_arr,
+                                                         ref_date=None):
         # Step 1: Calculate the initial and last daily MTM for profit calculation
         # We assume daily_MTMs are consistent across positions for simplicity
         first_pos = portf_positions_arr[0]
@@ -124,8 +126,8 @@ class IndicatorBasedTradingBacktester:
         profit_pct_str = None
         profit_pct=0
         if init_portf_size != 0:  # Avoid division by zero
-            profit_pct=round(((last_portf_size / init_portf_size) - 1) * 100, 2)
-            profit_pct_str= str(profit_pct) + " %"
+            profit_pct=(last_portf_size / init_portf_size)-1
+            profit_pct_str= str(round(profit_pct*100,2)) + " %"
 
         # Step 2: Combine all daily MTMs into a single list
         all_daily_mtms = []
@@ -134,13 +136,20 @@ class IndicatorBasedTradingBacktester:
                 all_daily_mtms.extend(pos.daily_MTMs)
 
         # Step 3: Calculate the maximum drawdown
-        max_drawdown = None
+        max_drawdown_str = None
         max_drawdown_pct = None
         if all_daily_mtms:
             max_drawdown_pct = FinancialCalculationsHelper.max_drawdown_on_MTM(all_daily_mtms)
-            max_drawdown = str(round(max_drawdown_pct * 100, 2)) + " %"
+            max_drawdown_pct=max_drawdown_pct #we want the value in 0-1 range
+            max_drawdown_str = str(round(max_drawdown_pct * 100, 2)) + " %"
 
-        summary = PortfSummary(symbol,last_daily_mtm)
+        period=None
+        year=None
+        if ref_date is not None:
+            period=DateHandler.get_two_month_period_from_date(ref_date)
+            year=ref_date.year
+
+        summary = PortfSummary(symbol,last_daily_mtm,p_period=period,p_year=year)
 
         summary.portf_pos_size=init_daily_mtm
         summary.portf_init_MTM=init_daily_mtm
@@ -148,12 +157,12 @@ class IndicatorBasedTradingBacktester:
 
         summary.total_net_profit=profit_pct
         summary.total_net_profit_str = profit_pct_str
-        summary.max_drawdown_on_MTM_str=max_drawdown
+        summary.max_drawdown_on_MTM_str=max_drawdown_str
         summary.max_drawdown_on_MTM=max_drawdown_pct
 
 
         summary.portf_pos_summary=portf_positions_arr
-        summary.max_cum_drawdowns=[max_drawdown]
+        summary.max_cum_drawdowns=[max_drawdown_str]
 
         return summary
 

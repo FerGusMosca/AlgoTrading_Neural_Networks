@@ -1,3 +1,4 @@
+import asyncio
 import traceback
 from datetime import timedelta, datetime
 
@@ -12,6 +13,7 @@ from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws
 from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas, TradingAlgoStrategy
 from common.util.dataframe_filler import DataframeFiller
 from common.util.dataframe_printer import DataframePrinter
+from common.util.date_handler import DateHandler
 from common.util.economic_value_handler import EconomicValueHandler
 from common.util.etf_logic_manager import ETFLogicManager
 from common.util.graph_builder import GraphBuilder
@@ -360,20 +362,39 @@ class AlgosOrchestationLogic:
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
 
-    def sliding_train_and_evaluate_ml_performance(self,symbol,series_csv,d_from,d_to,bias,last_trading_dict=None,
-                                                    n_algo_param_dict={}):
-        summary_dict_arr=[]
-        summary_dict=None
-        sliding_window_years=int(n_algo_param_dict["sliding_window_years"])
+    def sliding_train_and_evaluate_ml_performance(self, symbol, series_csv, d_from, d_to, bias, last_trading_dict=None,
+                                                  n_algo_param_dict={}):
+        """
+        Train and evaluate ML performance using a sliding window approach.
+        Asynchronously invoke calculate_portfolio_metrics after each window to update results incrementally.
+
+        Args:
+            symbol (str): Symbol for trading.
+            series_csv (str): Path to the CSV file with series data.
+            d_from (datetime): Start date.
+            d_to (datetime): End date.
+            bias (float): Bias parameter.
+            last_trading_dict (dict, optional): Last trading dictionary.
+            n_algo_param_dict (dict): Parameters for the algorithm.
+
+        Returns:
+            list: List of summary dictionaries for each window.
+        """
+        summary_dict_arr = []
+        summary_dict = None
+        sliding_window_years = int(n_algo_param_dict["sliding_window_years"])
         sliding_window_months = int(n_algo_param_dict["sliding_window_months"])
-        classif_key=n_algo_param_dict["classif_key"]
-        init_portf_size=n_algo_param_dict["init_portf_size"]
+        classif_key = n_algo_param_dict["classif_key"]
+        init_portf_size = n_algo_param_dict["init_portf_size"]
 
         # Validate inputs
         if d_from > d_to:
             raise ValueError("d_from must be earlier than d_to.")
         if sliding_window_years < 0 or sliding_window_months <= 0:
             raise ValueError("sliding_window_years must be non-negative and sliding_window_months must be positive.")
+
+        # Generate a single timestamp for this run
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Initialize the list to store the windows
         windows = []
@@ -392,17 +413,21 @@ class AlgosOrchestationLogic:
             # Add the current window to the list
             windows.append((curr_d_from, curr_d_to))
 
-            #1- We train the algos in the train window
+            # 1- We train the algos in the train window
             self.train_algos(series_csv, curr_d_from, curr_d_to, classif_key)
 
-            eval_d_from=curr_d_to + relativedelta(days=1)
-            eval_d_to = eval_d_from + relativedelta(months=sliding_window_months)- relativedelta(days=1)
-            summary_dict = self.evaluate_trading_performance(symbol, series_csv, eval_d_from, eval_d_to
-                                                             , last_trading_dict=summary_dict,
-                                                             bias=bias,
-                                                             n_algo_param_dict=n_algo_param_dict)
+            eval_d_from = curr_d_to + relativedelta(days=1)
+            eval_d_to = eval_d_from + relativedelta(months=sliding_window_months) - relativedelta(days=1)
+            summary_dict = self.evaluate_trading_performance(
+                symbol, series_csv, eval_d_from, eval_d_to,
+                last_trading_dict=summary_dict,
+                bias=bias,
+                n_algo_param_dict=n_algo_param_dict
+            )
             summary_dict_arr.append(summary_dict)
 
+            # Asynchronously invoke calculate_portfolio_metrics after each window
+            PortfolioSummaryAnalyzer.calculate_portfolio_metrics(summary_dict_arr, init_portf_size, eval_d_from, eval_d_to, timestamp)
 
             # Slide the window forward by sliding_window_months
             curr_d_from = curr_d_from + relativedelta(months=sliding_window_months)
@@ -417,7 +442,6 @@ class AlgosOrchestationLogic:
             if curr_d_to <= windows[-1][1]:
                 break
 
-        PortfolioSummaryAnalyzer.calculate_portfolio_metrics(summary_dict_arr,init_portf_size,d_from,d_to)
         return summary_dict_arr
 
 
@@ -444,8 +468,16 @@ class AlgosOrchestationLogic:
             summary_dict={}
             for algo in portf_pos_dict.keys():
                 port_positions_arr=portf_pos_dict[algo]
-                summary= backtester.calculate_portfolio_performance_summary_extended(symbol,port_positions_arr)
-                summary_dict[algo]=summary
+                if len(port_positions_arr)>0:
+                    summary= backtester.calculate_portfolio_performance_summary_extended(symbol,port_positions_arr,ref_date=d_from)
+                    summary_dict[algo]=summary
+                else:
+                    summary=PortfSummary(symbol=symbol,p_portf_position_size=n_algo_param_dict["init_portf_size"],
+                                         p_trade_comm=0,p_trading_algo=algo,
+                                         p_algo_params=n_algo_param_dict["init_portf_size"],
+                                         p_period=DateHandler.get_two_month_period_from_date(d_from),
+                                         p_year=d_from.year)
+                    summary_dict[algo] = summary
 
             return summary_dict
 

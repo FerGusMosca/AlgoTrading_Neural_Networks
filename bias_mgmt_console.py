@@ -468,29 +468,36 @@ def process_sliding_biased_trading_algo(symbol, cmd_series_csv, d_from, d_to, bi
 
         dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
                                          n_algo_param_dict["classif_key"] ,logger)
-        summary_dict = dataMgm.sliding_train_and_evaluate_ml_performance(symbol, cmd_series_csv,
+        summary_dict_arr = dataMgm.sliding_train_and_evaluate_ml_performance(symbol, cmd_series_csv,
                                                                         d_from,d_to, bias,last_trading_dict,
                                                                         n_algo_param_dict=n_algo_param_dict)
 
-        last_trading_dict = summary_dict
+        last_trading_dict = summary_dict_arr[-1]
 
         print("Displaying all the different models predictions for the different alogs:")
 
-        for key in summary_dict.keys():
-            print("============{}============ for {}".format(key, symbol))
-            summary = summary_dict[key]
-            print("From={} To={}".format(d_from, d_to))
-            print(f"Init Portfolio={round(summary.portf_init_MTM, 2)} $")
-            print(f"Final Portfolio={round(summary.portf_final_MTM,2)} $")
-            print(f"Pct Profit. Size={summary.total_net_profit_str}")
-            print(f"Est. Max Drawdown={summary.max_drawdown_on_MTM_str}")
-            print("     =========== Portf Positions=========== ")
-            for portf_pos in summary.portf_pos_summary:
+        for window in summary_dict_arr:
+            for key in window.keys():
 
-                print(f"    --Side={portf_pos.side} Open Date={portf_pos.date_open} Close Date={portf_pos.date_close} Open Price={portf_pos.price_open} Close Price={portf_pos.price_close} --> Pct. Profit={portf_pos.calculate_pct_profit()}%")
+                print("============{}============ for {}".format(key, symbol))
+                summary = window[key]
+                print("From={} To={}".format(d_from, d_to))
+                print(f"Init Portfolio={round(summary.portf_init_MTM, 2)} $")
+                print(f"Final Portfolio={round(summary.portf_final_MTM,2)} $")
+                print(f"Pct Profit. Size={summary.total_net_profit_str}")
+                print(f"Est. Max Drawdown={summary.max_drawdown_on_MTM_str}")
+                print("     =========== Portf Positions=========== ")
+                for portf_pos in summary.portf_pos_summary:
+
+                    print(f"    --Side={portf_pos.side} Open Date={portf_pos.date_open} Close Date={portf_pos.date_close} Open Price={portf_pos.price_open} Close Price={portf_pos.price_close} --> Pct. Profit={portf_pos.calculate_pct_profit()}%")
 
 
     except Exception as e:
+        # Print the exception message
+        print(f"An error occurred: {str(e)}")
+        # Print the full stack trace
+        print("Stack Trace:")
+        traceback.print_exc()
         logger.print("CRITICAL ERROR bootstrapping the system:{}".format(str(e)), MessageType.ERROR)
 
 
