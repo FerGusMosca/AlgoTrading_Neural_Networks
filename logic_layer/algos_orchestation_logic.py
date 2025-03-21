@@ -8,8 +8,9 @@ from business_entities.porft_summary import PortfSummary
 from common.dto.indicator_type_dto import IndicatorTypeDTO
 from common.enums.columns_prefix import ColumnsPrefix
 from common.enums.grouping_criterias import GroupCriteria as gc
+from common.enums.intervals import Intervals
 from common.enums.parameters_keys import ParametersKeys
-from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws
+from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws, SlidingWindowStrategy
 from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas, TradingAlgoStrategy
 from common.util.dataframe_filler import DataframeFiller
 from common.util.dataframe_printer import DataframePrinter
@@ -319,13 +320,14 @@ class AlgosOrchestationLogic:
         return None
 
 
-    def train_algos(self,series_csv,d_from,d_to,p_classif_key):
+    def train_algos(self,series_csv,d_from,d_to,p_classif_key,algos_arr=None):
 
         try:
             series_df= self.data_set_builder.build_daily_series_classification(series_csv, d_from, d_to)
             mlAnalyzer=MLModelAnalyzer(self.logger)
             model_base_name,variables_def =MLModelAnalyzer.__build_model_base_name__(series_csv,d_from,d_to,p_classif_key)
-            comp_df= mlAnalyzer.fit_and_evaluate(series_df, DataSetBuilder._CLASSIFICATION_COL,model_base_name,variables_def)
+            comp_df= mlAnalyzer.fit_and_evaluate(series_df, DataSetBuilder._CLASSIFICATION_COL,model_base_name,variables_def,
+                                                 algos_arr=algos_arr)
             return comp_df
 
         except Exception as e:
@@ -387,6 +389,10 @@ class AlgosOrchestationLogic:
         classif_key = n_algo_param_dict["classif_key"]
         init_portf_size = n_algo_param_dict["init_portf_size"]
 
+        bias_df=None
+        if bias is None or bias !=SlidingWindowStrategy.NONE.value:
+            bias_df = self.data_set_builder.get_classification_df(bias,d_from,d_to)
+
         # Validate inputs
         if d_from > d_to:
             raise ValueError("d_from must be earlier than d_to.")
@@ -398,6 +404,8 @@ class AlgosOrchestationLogic:
 
         # Initialize the list to store the windows
         windows = []
+
+        algos_arr=n_algo_param_dict["algos"].split(",") if n_algo_param_dict["algos"] is not None else None
 
         # Start with the first window
         curr_d_from = d_from
@@ -414,15 +422,21 @@ class AlgosOrchestationLogic:
             windows.append((curr_d_from, curr_d_to))
 
             # 1- We train the algos in the train window
-            self.train_algos(series_csv, curr_d_from, curr_d_to, classif_key)
+            self.train_algos(series_csv, curr_d_from, curr_d_to, classif_key,algos_arr=algos_arr)
 
             eval_d_from = curr_d_to + relativedelta(days=1)
             eval_d_to = eval_d_from + relativedelta(months=sliding_window_months) - relativedelta(days=1)
+
+            if bias_df is not None:
+                bias = self.data_set_builder.get_classification_in_classif_df(bias_df,eval_d_from)
+                bias= bias  if bias is not None else SlidingWindowStrategy.NONE.value
+
             summary_dict = self.evaluate_trading_performance(
                 symbol, series_csv, eval_d_from, eval_d_to,
                 last_trading_dict=summary_dict,
                 bias=bias,
-                n_algo_param_dict=n_algo_param_dict
+                n_algo_param_dict=n_algo_param_dict,
+                algos_arr=algos_arr
             )
             summary_dict_arr.append(summary_dict)
 
@@ -448,7 +462,7 @@ class AlgosOrchestationLogic:
 
 
     def evaluate_trading_performance(self,symbol,series_csv,d_from,d_to,bias,last_trading_dict=None,
-                                     n_algo_param_dict={}):
+                                     n_algo_param_dict={},algos_arr=None):
 
         try:
             symbol_df = self.data_set_builder.build_daily_series_classification(symbol, d_from, d_to,add_classif_col=False)
@@ -461,7 +475,8 @@ class AlgosOrchestationLogic:
             portf_pos_dict = mlAnalyzer.evaluate_trading_performance_last_model(symbol_df,symbol,
                                                                                 series_df, bias,
                                                                                 last_trading_dict,
-                                                                                n_algo_param_dict)
+                                                                                n_algo_param_dict,
+                                                                                algos_arr=algos_arr)
 
             backtester=IndicatorBasedTradingBacktester()
 

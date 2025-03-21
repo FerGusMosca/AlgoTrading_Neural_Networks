@@ -97,6 +97,23 @@ class DataSetBuilder():
 
         return  classification_value.classification
 
+    def get_classification_in_classif_df(self, classif_df,date):
+
+        eval_date = pd.to_datetime(date)
+        mask = (classif_df['date_start'] <= eval_date) & (classif_df['date_end'] >= eval_date)
+        result = classif_df.loc[mask, 'classification']
+
+        if not result.empty:
+            return result.iloc[0]
+        else:
+            return None  # O un mensaje como "No classification found"
+
+    def get_classification_df(self,key,d_from,d_to):
+        indic_classif_list = self.date_range_classification_mgr.get_date_range_classification_values(key, d_from, d_to)
+        classif_df = pd.DataFrame([vars(classif) for classif in indic_classif_list])
+        return classif_df
+
+
     def load_classification_map_date_ranges(self):
         self.classification_map_values=self.date_range_classification_mgr.get_date_range_classification_values(self.classification_map_key)
         pass

@@ -15,6 +15,7 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 from business_entities.portf_position import PortfolioPosition
+from common.enums.machine_learning_algos import MachineLearningAlgos
 from common.util.dataframe_filler import DataframeFiller
 from common.util.file_writer import FileWriter
 from common.util.light_logger import LightLogger
@@ -329,7 +330,7 @@ class MLModelAnalyzer():
         return resp_row
 
 
-    def fit_and_evaluate(self,series_df,classification_col,model_base_name,variables_def):
+    def fit_and_evaluate(self,series_df,classification_col,model_base_name,variables_def,algos_arr=None):
 
         comparisson_df = pd.DataFrame(columns=['Model','Train Accuracy','Test Accuracy'])
 
@@ -356,21 +357,26 @@ class MLModelAnalyzer():
         X_train, X_test, y_train, y_test =train_test_split(X, Y,test_size=0.05,random_state=2)
         X_train, X_test, y_train, y_test =self.__clean_NaN__(X_train,X_test,y_train,y_test)
 
-        #LOGISTIC REGRESSION
-        resp_row= self.run_logistic_regression_eval(X_train, y_train,X_test,y_test,y_mapping,model_base_name,variables_def)
-        comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
+        if algos_arr is None or MachineLearningAlgos.LOGISTIC_REGRESSION.value in algos_arr:
+            #LOGISTIC REGRESSION
+            resp_row= self.run_logistic_regression_eval(X_train, y_train,X_test,y_test,y_mapping,model_base_name,variables_def)
+            comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
-        # SUPPORT VECTOR MACHINE
-        resp_row = self.run_support_vector_machine_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
-        comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
+        if algos_arr is None or MachineLearningAlgos.SVM.value in algos_arr:
+            # SUPPORT VECTOR MACHINE
+            resp_row = self.run_support_vector_machine_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
+            comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
-        # DECISSION TREE
-        resp_row = self.run_decision_tree_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
-        comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
+        if algos_arr is None or MachineLearningAlgos.DECISION_TREE.value in algos_arr:
+            # DECISSION TREE
+            resp_row = self.run_decision_tree_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
+            comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
-        # K NEAREST NEIGHBOUR
-        resp_row = self.run_k_nearest_neighbour_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
-        comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
+
+        if algos_arr is None or MachineLearningAlgos.KNN.value in algos_arr:
+            # K NEAREST NEIGHBOUR
+            resp_row = self.run_k_nearest_neighbour_eval(X_train, y_train, X_test, y_test,y_mapping,model_base_name,variables_def)
+            comparisson_df = pd.concat([comparisson_df, pd.DataFrame([resp_row])], ignore_index=True)
 
         return comparisson_df
 
@@ -410,7 +416,7 @@ class MLModelAnalyzer():
 
         return comparisson_df
 
-    def run_predictions_last_model(self,series_df):
+    def run_predictions_last_model(self,series_df,algos_arr=None):
         predictions_dict={}
 
         series_df=DataframeFiller.fill_missing_values(series_df)
@@ -425,29 +431,33 @@ class MLModelAnalyzer():
         #STEP 3- Then we normalize all the numerical values of X
         X= self.__normalize_X__(df_X)
 
-        #LOGISTIC REGRESSION
-        y_hat_lr_df= self.run_predictions(X,"date",_LOGISTIC_REGRESSION_MODEL_NAME)
-        predictions_dict["Logistic Regression"]=y_hat_lr_df
+        if algos_arr is None or MachineLearningAlgos.LOGISTIC_REGRESSION.value in algos_arr:
+            #LOGISTIC REGRESSION
+            y_hat_lr_df= self.run_predictions(X,"date",_LOGISTIC_REGRESSION_MODEL_NAME)
+            predictions_dict["Logistic Regression"]=y_hat_lr_df
 
-        # SUPPORT VECTOR MACHINE
-        y_hat_svm_df= self.run_predictions(X,"date",_SVM_MODEL_NAME  )
-        predictions_dict["Support Vector Machine"] = y_hat_svm_df
+        if algos_arr is None or MachineLearningAlgos.SVM.value in algos_arr:
+            # SUPPORT VECTOR MACHINE
+            y_hat_svm_df= self.run_predictions(X,"date",_SVM_MODEL_NAME  )
+            predictions_dict["Support Vector Machine"] = y_hat_svm_df
 
-        # DECISION TREE
-        y_hat_dec_tree_df= self.run_predictions(X,"date",_DECISSION_TREE_MODEL_NAME  )
-        predictions_dict["Decision Tree"] = y_hat_dec_tree_df
+        if algos_arr is None or MachineLearningAlgos.DECISION_TREE.value in algos_arr:
+            # DECISION TREE
+            y_hat_dec_tree_df= self.run_predictions(X,"date",_DECISSION_TREE_MODEL_NAME  )
+            predictions_dict["Decision Tree"] = y_hat_dec_tree_df
 
-        # K NEAREST NEIGHBOUR
-        y_hat_K_NN_df= self.run_predictions(X,"date",_KNN_MODEL_NAME  )
-        predictions_dict["K-Nearest Neighbour"] = y_hat_K_NN_df
+        if algos_arr is None or MachineLearningAlgos.KNN.value in algos_arr:
+            # K NEAREST NEIGHBOUR
+            y_hat_K_NN_df= self.run_predictions(X,"date",_KNN_MODEL_NAME  )
+            predictions_dict["K-Nearest Neighbour"] = y_hat_K_NN_df
 
 
         return predictions_dict
 
     def evaluate_trading_performance_last_model(self,symbol_df,symbol, series_df,bias,
                                                 last_trading_dict=None,
-                                                n_algo_param_dict={}):
-        predictions_dic = self.run_predictions_last_model(series_df)
+                                                n_algo_param_dict={},algos_arr=None):
+        predictions_dic = self.run_predictions_last_model(series_df,algos_arr)
 
         direct_pred_backtester=  DirectPredictionBacktester()
         return direct_pred_backtester.backtest(symbol,symbol_df,predictions_dic,bias,

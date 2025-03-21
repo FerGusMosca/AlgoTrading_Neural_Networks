@@ -388,6 +388,7 @@ def run_sliding_biased_trading_algo(cmd):
     d_to = __get_param__(cmd, "to")
     bias = __get_param__(cmd, "bias",optional=True,def_value="NONE")
     classif_key = __get_param__(cmd, "classif_key")
+    algos = __get_param__(cmd, "algos", optional=True, def_value=None)
 
     trade_comm = __get_param__(cmd, "trade_comm", optional=True, def_value=5)
     init_portf_size=__get_param__(cmd, "init_portf_size",optional=True,def_value=PortfolioPosition._DEF_PORTF_AMT)
@@ -400,6 +401,7 @@ def run_sliding_biased_trading_algo(cmd):
     n_algo_param_dict["sliding_window_years"] = sliding_window_years
     n_algo_param_dict["sliding_window_months"] = sliding_window_months
     n_algo_param_dict["classif_key"] = classif_key
+    n_algo_param_dict["algos"]=algos
 
     process_sliding_biased_trading_algo(symbol,series_csv, d_from, d_to,bias,n_algo_param_dict)
 
