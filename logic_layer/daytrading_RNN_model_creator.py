@@ -55,15 +55,84 @@ class DayTradingRNNModelCreator:
         """
         test_series_df.dropna(inplace=True)
 
+    def __load_scaler_and_normalize__(self, X):
+        """
+        Load the saved scaler and normalize the input data.
 
-    def __load_scaler_and_normalize__(self,X):
+        Parameters:
+        X (np.ndarray): Input data to normalize.
+
+        Returns:
+        np.ndarray: Normalized data.
+        """
+        # Load the scaler
         scaler = joblib.load(f"{_OUTPUT_PATH}last_scaler.pkl")
+        print(f"Shape of X before transformation: {X.shape}")
+        print(f"Expected columns by the scaler: {scaler.n_features_in_}")
+
+        # Check for dimension mismatch
+        if X.shape[1] != scaler.n_features_in_:
+            raise ValueError(
+                f"Dimension mismatch: X has {X.shape[1]} columns, but the scaler expects {scaler.n_features_in_} columns.")
+
+        # Check for NaN or non-numeric values before transformation
+        if np.any(np.isnan(X)):
+            raise ValueError("X contains NaN values before transformation.")
+        if np.any(np.isinf(X)):
+            raise ValueError("X contains infinite values before transformation.")
+        if not np.issubdtype(X.dtype, np.number):
+            raise ValueError("X contains non-numeric values before transformation.")
+
+        # Transform the data
         X = scaler.transform(X)
+
+        # Check for NaN or infinite values after normalization
+        if np.any(np.isnan(X)):
+            raise ValueError("X contains NaN values after normalization.")
+        if np.any(np.isinf(X)):
+            raise ValueError("X contains infinite values after normalization.")
+
+        # Calculate and print mean and standard deviation for each column
+        means = np.mean(X, axis=0)
+        stds = np.std(X, axis=0)
+        print(f"Mean of each column after normalization: {means}")
+        print(f"Std of each column after normalization: {stds}")
+
         return X
-    def __normalize_and_save_scaler__(self,X):
+
+    def __normalize_and_save_scaler__(self, X):
+        """
+        Normalize the input data using StandardScaler and save the scaler.
+
+        Parameters:
+        X (np.ndarray): Input data to normalize.
+
+        Returns:
+        np.ndarray: Normalized data.
+        """
         scaler = StandardScaler()
         X = scaler.fit_transform(X)
+
+        # Check for NaN or infinite values after normalization
+        if np.any(np.isnan(X)):
+            raise ValueError("X contains NaN values after normalization.")
+        if np.any(np.isinf(X)):
+            raise ValueError("X contains infinite values after normalization.")
+
+        # Calculate and print mean and standard deviation for each column
+        means = np.mean(X, axis=0)
+        stds = np.std(X, axis=0)
+        print(f"Mean of each column after normalization: {means}")
+        print(f"Std of each column after normalization: {stds}")
+
+        # Save the scaler
         joblib.dump(scaler, f"{_OUTPUT_PATH}last_scaler.pkl")
+        print(f"Scaler saved to {_OUTPUT_PATH}last_scaler.pkl")
+
+        return X
+
+    def __normalize_and_use_scaler(self,scaler,X):
+        X = scaler.transform(X)
         return X
 
     # Function to make all numeric variables in the dataframe stationary
@@ -91,7 +160,7 @@ class DayTradingRNNModelCreator:
 
         training_series_df.dropna(inplace=True)
 
-    def __get_test_sets__(self, test_series_df, symbol_col='trading_symbol', date_col='date'):
+    def __get_test_sets__(self, test_series_df, symbol_col='trading_symbol', date_col='date', variables_csv=None):
         """
         Prepare the test set from the given DataFrame.
 
@@ -99,32 +168,40 @@ class DayTradingRNNModelCreator:
         test_series_df (pd.DataFrame): DataFrame containing the time series test data.
         symbol_col (str): The column name for the trading symbol.
         date_col (str): The column name for the date.
-        feature_columns (list of str): List of feature columns to be used, should be the same as in training.
+        variables_csv (str): Comma-separated string of variable names to use as features.
 
         Returns:
         np.ndarray: X_test (normalized test features)
         """
-        # Preprocess 'trading_symbol' column (convert to numeric using LabelEncoder)
-        if symbol_col in test_series_df.columns:
-            label_encoder_symbol = LabelEncoder()
-            test_series_df[symbol_col] = label_encoder_symbol.fit_transform(test_series_df[symbol_col])
+        # Print the columns and the first few rows of test_series_df for debugging
+        print(f"Columns in test_series_df: {test_series_df.columns.tolist()}")
+        print(f"First 5 rows of test_series_df:\n{test_series_df.head()}")
 
-        # Preprocess 'date' column (convert to timestamp)
-        if date_col in test_series_df.columns:
-            test_series_df[date_col] = pd.to_datetime(test_series_df[date_col])  # Ensure it's a datetime object
-            test_series_df[date_col] = test_series_df[date_col].map(pd.Timestamp.timestamp)  # Convert to timestamp
+        # Split variables_csv into a list of feature columns
+        if variables_csv is None:
+            raise ValueError("variables_csv must be provided to determine the feature columns.")
+        expected_features = variables_csv.split(',')
 
-        # Calculate feature columns based on training data (excluding the classification column)
-        feature_columns = [col for col in test_series_df.columns]
+        # Exclude symbol_col, date_col, and any columns not in expected_features
+        feature_columns = [col for col in test_series_df.columns if col in expected_features]
 
-        # Use the feature columns from training to ensure consistency
-        if feature_columns is not None:
-            X_test = test_series_df[feature_columns].values
-        else:
-            raise ValueError("feature_columns must be provided to match the training set.")
+        # Check for missing or extra features
+        missing_features = [col for col in expected_features if col not in feature_columns]
+        extra_features = [col for col in test_series_df.columns if
+                          col not in expected_features and col not in [symbol_col, date_col]]
+
+        if missing_features:
+            raise ValueError(f"Missing columns in test_series_df: {missing_features}")
+        if extra_features:
+            print(f"Warning: Extra columns in test_series_df that will not be used: {extra_features}")
+
+        # Create X_test with the feature columns
+        X_test = test_series_df[feature_columns].values
+        print(f"Shape of X_test before normalization: {X_test.shape}")
+        print(f"Columns in X_test: {feature_columns}")
 
         # Normalize the feature data
-        X_test= self.__load_scaler_and_normalize__(X_test)
+        X_test = self.__load_scaler_and_normalize__(X_test)
 
         return X_test
 
@@ -150,49 +227,25 @@ class DayTradingRNNModelCreator:
         else:
             raise Exception("Missing column {} in df test_series_df ".format(symbol))
 
-
-    def __get_training_sets__(self,training_series_df,symbol_col='trading_symbol',date_col='date',
-                              classif_key="classif_col"):
-        """
-            Prepare the training and test sets from the given DataFrame.
-
-            Parameters:
-            training_series_df (pd.DataFrame): DataFrame containing the time series data.
-            classif_key (str): The column name of the classification target.
-            Returns:
-            tuple: X_train, X_test, y_train, y_test
-            """
-        # Preprocess 'trading_symbol' column (convert to numeric using LabelEncoder)
-        if symbol_col in training_series_df.columns:
-            label_encoder_symbol = LabelEncoder()
-            training_series_df[symbol_col] = label_encoder_symbol.fit_transform(
-                training_series_df[symbol_col])
-
-        # Preprocess 'date' column (convert to timestamp)
-        if date_col in training_series_df.columns:
-            training_series_df[date_col] = pd.to_datetime(training_series_df[date_col])  # Ensure it's a datetime object
-            training_series_df[date_col] = training_series_df[date_col].map(pd.Timestamp.timestamp)  # Convert to timestamp
-
-        # Extract feature columns (all columns except the classification column)
-        feature_columns = [col for col in training_series_df.columns if col != classif_key]
-        X = training_series_df[feature_columns].values
-
-        # Extract target variable (classification column)
-        y = training_series_df[classif_key].values
-
-        # Normalize the feature data
-        X= self.__normalize_and_save_scaler__(X)
-
-        # Encode the target variable (classif_key) to numeric values 1, 2, 3
+    def __get_training_sets__(self, df, symbol_col, date_col, classif_key, variables_csv):
+        expected_features = variables_csv.split(',')
+        train_size = int(len(df) * 0.8)
+        train_df = df[:train_size]
+        test_df = df[train_size:]
+        columns_to_drop = [symbol_col, date_col, classif_key] + [col for col in train_df.columns if
+                                                                 col not in expected_features and col not in [
+                                                                     symbol_col, date_col, classif_key]]
+        X_train = train_df.drop(columns=columns_to_drop).values
+        y_train = train_df[classif_key].values
+        X_test = test_df.drop(columns=columns_to_drop).values
+        y_test = test_df[classif_key].values
+        print(f"Shape of X_train before normalization: {X_train.shape}")
+        print(f"Columns in X_train: {train_df.drop(columns=columns_to_drop).columns.tolist()}")
+        X_train = self.__normalize_and_save_scaler__(X_train)
+        X_test = self.__load_scaler_and_normalize__(X_test)
         label_encoder_target = LabelEncoder()
-        y_encoded = label_encoder_target.fit_transform(y)  # 0, 1, 2
-
-        # Create a time series generator for training data
-        #generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(X, y_encoded, length=safety_minutes, batch_size=1)
-
-        # Split data into training and test sets
-        X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, shuffle=False)
-
+        y_train = label_encoder_target.fit_transform(y_train)
+        y_test = label_encoder_target.transform(y_test)
         return X_train, X_test, y_train, y_test
 
     #endregion
@@ -201,8 +254,9 @@ class DayTradingRNNModelCreator:
     #region Public Methods
 
     def train_LSTM(self, training_series_df, model_output, symbol, classif_key, epochs,
-                   timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate=None,
-                              accuracy_stop=None, make_stationary=False,inner_activation='tanh',batch_size=1):
+                   timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,
+                   variables_csv,clipping_rate=None,
+                   accuracy_stop=None, make_stationary=False,inner_activation='tanh',batch_size=1):
         """
         Build and train an LSTM model on the given training data and save the model.
 
@@ -226,7 +280,8 @@ class DayTradingRNNModelCreator:
             # Get training and test sets + #3-Normalize
             X_train, X_test, y_train, y_test = self.__get_training_sets__(training_series_df,
                                                                           "trading_symbol", "date",
-                                                                          classif_key
+                                                                          classif_key,
+                                                                          variables_csv=variables_csv
                                                                           )
 
             print("X_Train: NaN={} Inf={}".format(np.isnan(X_train).sum(), np.isinf(X_train).sum()))
@@ -333,8 +388,7 @@ class DayTradingRNNModelCreator:
 
         return result_df
 
-    def test_LSTM(self,symbol,test_series_df, model_to_use,timesteps,price_to_use="close",
-                            preloaded_model=None, prev_states=None,make_stationary=True):
+    def test_LSTM(self,symbol,test_series_df, model_to_use,timesteps,price_to_use="close",variables_csv=None,preloaded_model=None, prev_states=None,make_stationary=True):
 
         #1-Stationary DF
         if make_stationary:
@@ -344,7 +398,8 @@ class DayTradingRNNModelCreator:
         self.__preformat_test_sets__(test_series_df)
 
         #Get Test Sets + #3-Normalize
-        X_test=self.__get_test_sets__(test_series_df,symbol_col="trading_symbol",date_col="date")
+        X_test=self.__get_test_sets__(test_series_df,symbol_col="trading_symbol",date_col="date",
+                                      variables_csv=variables_csv)
 
         model=None
         if(preloaded_model is None):

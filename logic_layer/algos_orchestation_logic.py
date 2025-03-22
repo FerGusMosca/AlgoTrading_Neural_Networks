@@ -758,6 +758,7 @@ class AlgosOrchestationLogic:
 
                 rnn_predictions_df_today,states = rnn_model_processer.test_LSTM(symbol, test_series_df, model_to_use,
                                                                                 timesteps, prev_states=states,
+                                                                                variables_csv=variables_csv,
                                                                                 make_stationary=make_stationary)
                 if rnn_predictions_df is None:
                     rnn_predictions_df = pd.DataFrame(columns=rnn_predictions_df_today.columns).astype(rnn_predictions_df_today.dtypes)
@@ -1039,8 +1040,8 @@ class AlgosOrchestationLogic:
             rnn_model_trainer= DayTradingRNNModelCreator()
 
             rnn_model_trainer.train_LSTM(training_series_df, model_output, symbol_min_series_df, classif_key, epochs,
-                                         timestamps, n_neurons, learning_rate, reg_rate, dropout_rate, clipping_rate,
-                                         accuracy_stop, make_stationary=make_stationary,
+                                         timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,variables_csv,
+                                         clipping_rate,accuracy_stop, make_stationary=make_stationary,
                                          inner_activation=inner_activation, batch_size=batch_size)
 
             #pd.set_option('display.max_columns', None)
