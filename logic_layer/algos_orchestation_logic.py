@@ -992,7 +992,7 @@ class AlgosOrchestationLogic:
 
     def process_train_LSTM(self,symbol,variables_csv,d_from,d_to,model_output,classif_key,
                            epochs,timestamps,n_neurons,learning_rate,reg_rate, dropout_rate,
-                           interval=DataSetBuilder._1_MIN_INTERVAL,clipping_rate=None,accuracy_stop=None,grouping_unit=None,
+                           interval=DataSetBuilder._1_MIN_INTERVAL,clipping_rate=None,threshold_stop=None,grouping_unit=None,
                            grouping_classif_criteria=None,
                            group_as_mov_avg=False,grouping_mov_avg_unit=20,
                            batch_size=1,inner_activation=None, make_stationary=False):
@@ -1040,8 +1040,8 @@ class AlgosOrchestationLogic:
             rnn_model_trainer= DayTradingRNNModelCreator()
 
             rnn_model_trainer.train_LSTM(training_series_df, model_output, symbol_min_series_df, classif_key, epochs,
-                                         timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,variables_csv,
-                                         clipping_rate,accuracy_stop, make_stationary=make_stationary,
+                                         timestamps, n_neurons, learning_rate, reg_rate, dropout_rate, variables_csv,
+                                         clipping_rate, threshold_stop, make_stationary=make_stationary,
                                          inner_activation=inner_activation, batch_size=batch_size)
 
             #pd.set_option('display.max_columns', None)

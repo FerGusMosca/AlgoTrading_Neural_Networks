@@ -1,4 +1,5 @@
 import math
+import os
 
 import joblib
 import pandas as pd
@@ -21,23 +22,47 @@ _OUTPUT_DATE_FORMAT='%m/%d/%Y %H:%M:%S'
 _OUTPUT_PATH="./output/"
 
 class CustomEarlyStopping(Callback):
-    def __init__(self, monitor_train='accuracy', monitor_val='val_accuracy', threshold=0.8):
+    def __init__(self, monitor_train='loss', monitor_val='val_loss', threshold=0.8, patience=5):
+        """
+        Custom Early Stopping callback to stop training when both training and validation metrics
+        are below (for loss) or above (for accuracy) a threshold for a number of epochs (patience).
+
+        Parameters:
+        monitor_train (str): Metric to monitor for training (e.g., 'loss', 'accuracy').
+        monitor_val (str): Metric to monitor for validation (e.g., 'val_loss', 'val_accuracy').
+        threshold (float): Threshold value to stop training.
+        patience (int): Number of epochs to wait after threshold is reached.
+        """
         super(CustomEarlyStopping, self).__init__()
         self.monitor_train = monitor_train
         self.monitor_val = monitor_val
         self.threshold = threshold
+        self.patience = patience
+        self.epochs_waited = 0
+        self.best_train = float('inf') if 'loss' in monitor_train else -float('inf')
+        self.best_val = float('inf') if 'loss' in monitor_val else -float('inf')
 
     def on_epoch_end(self, epoch, logs=None):
-        train_acc = logs.get(self.monitor_train)
-        val_acc = logs.get(self.monitor_val)
+        train_metric = logs.get(self.monitor_train)
+        val_metric = logs.get(self.monitor_val)
 
-        print(f"Evaluating early stop for accuray={train_acc} val_accuracy={val_acc}")
-        # Check both accuracies bigger than threshold
-        if train_acc is not None and val_acc is not None:
-            if train_acc >= self.threshold and val_acc >= self.threshold:
-                print(f"\nThreshold reached: {self.monitor_train} = {train_acc:.4f}, {self.monitor_val} = {val_acc:.4f}, stopping training.")
-                self.model.stop_training = True
+        print(f"Evaluating early stop for {self.monitor_train}={train_metric} {self.monitor_val}={val_metric}")
 
+        # Determine if the metric should be minimized (loss) or maximized (accuracy)
+        is_loss = 'loss' in self.monitor_train.lower()
+        train_condition = train_metric <= self.threshold if is_loss else train_metric >= self.threshold
+        val_condition = val_metric <= self.threshold if is_loss else val_metric >= self.threshold
+
+        # Check if both conditions are met
+        if train_metric is not None and val_metric is not None:
+            if train_condition and val_condition:
+                self.epochs_waited += 1
+                print(f"Threshold reached: {self.monitor_train} = {train_metric:.4f}, {self.monitor_val} = {val_metric:.4f}, waited {self.epochs_waited}/{self.patience} epochs.")
+                if self.epochs_waited >= self.patience:
+                    print(f"Stopping training after {self.patience} epochs of meeting the threshold.")
+                    self.model.stop_training = True
+            else:
+                self.epochs_waited = 0
 class DayTradingRNNModelCreator:
 
     def __init__(self):
@@ -136,7 +161,20 @@ class DayTradingRNNModelCreator:
         return X
 
     # Function to make all numeric variables in the dataframe stationary
-    def __make_stationary__(self,df):
+    def __make_stationary__(self, df):
+        """
+        Make the time series stationary by differencing if necessary, based on the ADF test.
+        Save the list of columns that were differenced to a CSV file.
+
+        Parameters:
+        df (pd.DataFrame): DataFrame with time series data.
+
+        Returns:
+        pd.DataFrame: Stationary DataFrame.
+        """
+        # List to store columns that were differenced
+        differenced_columns = []
+
         for var in df.columns:
             # Check if the column is numeric (ignore non-numeric columns like dates)
             if pd.api.types.is_numeric_dtype(df[var]):
@@ -147,14 +185,64 @@ class DayTradingRNNModelCreator:
                 # If the p-value is greater than 0.05, the series is non-stationary and needs differencing
                 if result[1] > 0.05:
                     # Apply first-order differencing to make the series stationary
-                    df[var] = df[var].diff().dropna()  # Differencing removes the first value (NaN after diff)
+                    df[var] = df[var].diff().dropna()
+                    differenced_columns.append(var)
                     print(f"Variable {var} has been made stationary using differencing.")
                 else:
                     print(f"Variable {var} is already stationary.")
             else:
                 print(f"Skipping non-numeric column: {var}")
 
+        # Save the list of differenced columns to a CSV file
+        if differenced_columns:
+            differenced_df = pd.DataFrame({'differenced_columns': differenced_columns})
+            output_path = os.path.join(_OUTPUT_PATH, 'differenced_columns.csv')
+            differenced_df.to_csv(output_path, index=False)
+            print(f"Differenced columns saved to {output_path}")
+
         return df
+
+    def __make_stationary_with_memory__(self, df, state=None):
+        """
+        Make the time series stationary by differencing, using the list of columns
+        previously identified as non-stationary (from differenced_columns.csv).
+        Maintain continuity across blocks using a state.
+
+        Parameters:
+        df (pd.DataFrame): DataFrame with time series data.
+        state (dict): Last values from the previous block for continuity (default: None).
+
+        Returns:
+        tuple: (stationary DataFrame, updated state)
+        """
+        # Load the list of columns that need differencing
+        output_path = os.path.join(_OUTPUT_PATH, 'differenced_columns.csv')
+        if not os.path.exists(output_path):
+            raise FileNotFoundError(
+                f"Expected differenced_columns.csv at {output_path}. Run __make_stationary__ first.")
+
+        differenced_columns = pd.read_csv(output_path)['differenced_columns'].tolist()
+        print(f"Columns to be differenced (loaded from CSV): {differenced_columns}")
+
+        # Apply differencing to the specified columns
+        for col in df.columns:
+            if col in differenced_columns:
+                # If there's a state, use the last value to compute the first difference
+                if state is not None and col in state:
+                    first_value = df[col].iloc[0]
+                    df[col].iloc[0] = first_value - state[col]
+
+                # Apply differencing to the rest of the column
+                df[col] = df[col].diff().fillna(0)
+                print(f"Applied differencing to {col} with continuity.")
+            else:
+                print(f"Skipping {col} (not in differenced columns).")
+
+        # Update the state with the last values of the current block
+        numeric_cols = df.select_dtypes(include=np.number).columns
+        new_state = {col: df[col].iloc[-1] for col in numeric_cols if col in differenced_columns}
+
+        return df, new_state
 
     def __preformat_training_set__(self,training_series_df):
 
@@ -256,7 +344,7 @@ class DayTradingRNNModelCreator:
     def train_LSTM(self, training_series_df, model_output, symbol, classif_key, epochs,
                    timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,
                    variables_csv,clipping_rate=None,
-                   accuracy_stop=None, make_stationary=False,inner_activation='tanh',batch_size=1):
+                   threshold_stop=None, make_stationary=False,inner_activation='tanh',batch_size=1):
         """
         Build and train an LSTM model on the given training data and save the model.
 
@@ -318,8 +406,7 @@ class DayTradingRNNModelCreator:
             model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
             # Early Stop
-            custom_early_stopping = CustomEarlyStopping(monitor_train='accuracy', monitor_val='val_accuracy', threshold=accuracy_stop)
-
+            custom_early_stopping = CustomEarlyStopping(monitor_train='loss', monitor_val='val_loss', threshold=threshold_stop, patience=5)
             # Train the model
             model.fit(train_generator, epochs=epochs, validation_data=test_generator, verbose=1,
                       callbacks=[custom_early_stopping])
@@ -392,7 +479,12 @@ class DayTradingRNNModelCreator:
 
         #1-Stationary DF
         if make_stationary:
-            test_series_df = self.__make_stationary__(test_series_df)
+            test_series_df, stationarity_state = self.__make_stationary_with_memory__(test_series_df,
+                                                                                      state=prev_states.get(
+                                                                                          'stationarity_state',
+                                                                                          None) if prev_states else None)
+        else:
+            stationarity_state = None
 
         # 2-Preformat DF
         self.__preformat_test_sets__(test_series_df)
