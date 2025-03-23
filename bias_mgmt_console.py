@@ -35,7 +35,7 @@ def show_commands():
     print("#11-TrainLSTM [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [threshold_stop] [batch_size*] [inner_activation*] [make_stationary*]")
     print("#12-TrainLSTMWithGrouping [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [epochs] [timestamps] [# neurons] [learning_rate] [reg_rate] [dropout_rate] [clipping_rate] [threshold_stop] [grouping_unit] [grouping_classif_criteria] [batch_size*] [inner_activation*]")
 
-    print("#13-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
+    print("#13-TestDailyLSTM [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [classif_threshold] [algo_params*]")
     print("#14-TestDailyLSTMWithGrouping [symbol] [variables_csv] [from] [to] [timestemps] [model_to_use] [portf_size] [trade_comm] [trading_algo] [grouping_unit] [algo_params*]")
     print("#15-BacktestSlopeModel [symbol] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#16-BacktestSlopeModelOnCustomETF [ETF_path] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
@@ -297,6 +297,7 @@ def process_test_LSTM_cmd(cmd):
     mov_avg=__get_param__(cmd,"mov_avg",True,None)
     use_sliding_window = __get_param__(cmd, "use_sliding_window", True,def_value="None")#NONE,CUT_INPUT_DF,GET_FAKE_DATA
     make_stationary = __get_bool_param__(cmd, "make_stationary", True, False)
+    classif_threshold = __get_param__(cmd, "classif_threshold", True, 0.5)
 
     cmd_param_list=[]
     if n_buffer is not None:
@@ -310,7 +311,8 @@ def process_test_LSTM_cmd(cmd):
                             timesteps=timesteps,model_to_use=model_to_use, portf_size=portf_size,
                             trade_comm=comm, trading_algo=trading_algo,interval=interval,
                             grouping_unit=grouping_unit,n_params=cmd_param_list,
-                            use_sliding_window=use_sliding_window,make_stationary=make_stationary)
+                            use_sliding_window=use_sliding_window,make_stationary=make_stationary,
+                            classif_threshold=classif_threshold)
 
     print(f"Test LSTM successfully finished...")
 
@@ -755,7 +757,7 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
 
 def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model_to_use, portf_size, trade_comm,
                             trading_algo,grouping_unit=None,n_params=[],interval=None,use_sliding_window=None,
-                            make_stationary=True):
+                            make_stationary=True,classif_threshold=0.5):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -796,7 +798,8 @@ def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model
                                                grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
                                                n_algo_params=n_params,
                                                interval=interval if interval is not None else None,
-                                               make_stationary=make_stationary
+                                               make_stationary=make_stationary,
+                                               classif_threshold=classif_threshold
                                                )
         else:
             raise Exception(f"Unknown interval! : {interval}")
