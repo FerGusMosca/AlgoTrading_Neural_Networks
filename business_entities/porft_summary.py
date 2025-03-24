@@ -54,6 +54,7 @@ class PortfSummary:
 
 
     def calculate_last_portf_position_summary(self,day):
-        position_summary= PortfPnLSummary(day,self.daily_profits[-1],self.max_cum_drawdowns[-1])
+        position_summary= PortfPnLSummary(day,self.daily_profits[-1],
+                                          self.max_cum_drawdowns[-1] if len(self.max_cum_drawdowns)>0 else 0)
         self.portf_pos_summary.append(position_summary)
         return  position_summary

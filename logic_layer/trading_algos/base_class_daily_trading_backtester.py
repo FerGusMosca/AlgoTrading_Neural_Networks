@@ -221,7 +221,7 @@ class BaseClassDailyTradingBacktester:
         #Calculate the max drawdown
         max_drawdown=None
         max_drawdown_pct=None
-        if(portf_pos.daily_MTMs is not None):
+        if(portf_pos.daily_MTMs is not None and len(portf_pos.daily_MTMs)>0):
             max_drawdown_pct=FinancialCalculationsHelper.max_drawdown_on_MTM(portf_pos.daily_MTMs)
             max_drawdown= str(round(max_drawdown_pct*100,2))+" %"
 

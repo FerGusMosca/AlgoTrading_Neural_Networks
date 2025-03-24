@@ -252,7 +252,45 @@ class DayTradingRNNModelCreator:
 
         training_series_df.dropna(inplace=True)
 
-    def __get_test_sets__(self, test_series_df, symbol_col='trading_symbol', date_col='date', variables_csv=None):
+    def __get_test_sets_daily__(self, test_series_df, symbol_col='trading_symbol', date_col='date'):
+        """
+        Prepare the test set from the given DataFrame.
+
+        Parameters:
+        test_series_df (pd.DataFrame): DataFrame containing the time series test data.
+        symbol_col (str): The column name for the trading symbol.
+        date_col (str): The column name for the date.
+
+        Returns:
+        np.ndarray: X_test (normalized test features)
+        """
+        # Preprocess 'trading_symbol' column (convert to numeric using LabelEncoder)
+        if symbol_col in test_series_df.columns:
+            label_encoder_symbol = LabelEncoder()
+            test_series_df[symbol_col] = label_encoder_symbol.fit_transform(test_series_df[symbol_col])
+
+        # Preprocess 'date' column (convert to timestamp)
+        if date_col in test_series_df.columns:
+            test_series_df[date_col] = pd.to_datetime(test_series_df[date_col])  # Ensure it's a datetime object
+            test_series_df[date_col] = test_series_df[date_col].map(pd.Timestamp.timestamp)  # Convert to timestamp
+
+        # Calculate feature columns based on training data (excluding the classification column)
+        feature_columns = [col for col in test_series_df.columns]
+
+        # Use the feature columns from training to ensure consistency
+        if feature_columns is not None:
+            X_test = test_series_df[feature_columns].values
+        else:
+            raise ValueError("feature_columns must be provided to match the training set.")
+
+        # Normalize the feature data
+        scaler = StandardScaler()
+        X_test = scaler.fit_transform(X_test)
+
+        return X_test
+
+    def __get_test_sets__(self, test_series_df, symbol_col='trading_symbol', date_col='date',
+                          variables_csv=None,normalize=True):
         """
         Prepare the test set from the given DataFrame.
 
@@ -293,7 +331,8 @@ class DayTradingRNNModelCreator:
         print(f"Columns in X_test: {feature_columns}")
 
         # Normalize the feature data
-        X_test = self.__load_scaler_and_normalize__(X_test)
+        if normalize:
+            X_test = self.__load_scaler_and_normalize__(X_test)
 
         return X_test
 
@@ -629,9 +668,62 @@ class DayTradingRNNModelCreator:
 
         return result_df
 
-    def test_LSTM(self, symbol, test_series_df, model_to_use, timesteps, price_to_use="close",
-                  preloaded_model=None, prev_states=None, make_stationary=True, variables_csv=None,
-                  threshold=0.6):
+
+    def test_LSTM_daily(self,symbol,test_series_df, model_to_use,timesteps,price_to_use="close",
+                            preloaded_model=None, prev_states=None,variables_csv=None):
+
+        self.__preformat_test_sets__(test_series_df)
+
+        X_test=self.__get_test_sets_daily__(test_series_df,symbol_col="trading_symbol",date_col="date")
+
+        model=None
+        if(preloaded_model is None):
+            # Load the saved LSTM model
+            model = tensorflow.keras.models.load_model(model_to_use)
+        else:
+            model=preloaded_model
+
+        # timestamps= Number of timestamps used in training (adjust this to match your model's training configuration)
+        # Create a time series generator for the test data
+        test_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(
+            X_test, np.zeros(len(X_test)), length=timesteps, batch_size=1
+        )
+
+        # Generate predictions
+        states=None
+        if prev_states is None:
+            predictions = model.predict(test_generator)
+        else:
+            predictions = model.predict(test_generator,prev_states)
+
+        # Convert predictions to actions (LONG, SHORT, FLAT)
+        actions = np.argmax(predictions, axis=1)
+
+        action_labels = {0: "LONG", 1: "SHORT", 2: "FLAT"}
+        action_series = pd.Series(actions).map(action_labels)
+
+        # Adjust the DataFrame to match the length of the predictions
+        dates = pd.to_datetime(test_series_df['date'].iloc[timesteps:].reset_index(drop=True), unit='s')
+        formatted_dates = dates.dt.strftime(_OUTPUT_DATE_FORMAT)
+        #symbols = test_series_df['trading_symbol'].iloc[timestamps:].reset_index(drop=True)
+
+        # Create the final output DataFrame
+        result_df = pd.DataFrame({
+            'trading_symbol': symbol,
+            'date': dates,
+            'formatted_date': formatted_dates,
+            'action': action_series
+        })
+
+
+        result_df=self.__add_trading_prices__(test_series_df,result_df,f"{price_to_use}_{symbol}",dates,"trading_symbol_price")
+
+
+        return result_df,states
+
+    def test_LSTM_scalping(self, symbol, test_series_df, model_to_use, timesteps, price_to_use="close",
+                  preloaded_model=None, prev_states=None, make_stationary=True,
+                  normalize=True, variables_csv=None,threshold=0.6):
         """
         Test the LSTM model on the given data, with a custom threshold for predictions.
 
@@ -650,7 +742,7 @@ class DayTradingRNNModelCreator:
         self.__preformat_test_sets__(test_series_df)
 
         X_test = self.__get_test_sets__(test_series_df, symbol_col="trading_symbol", date_col="date",
-                                        variables_csv=variables_csv)
+                                        variables_csv=variables_csv,normalize=normalize)
 
         model = None
         if preloaded_model is None:
