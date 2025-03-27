@@ -1048,10 +1048,21 @@ class AlgosOrchestationLogic:
 
             rnn_model_trainer= DayTradingRNNModelCreator()
 
-            rnn_model_trainer.train_LSTM(training_series_df, model_output, symbol_min_series_df, classif_key, epochs,
-                                         timestamps, n_neurons, learning_rate, reg_rate, dropout_rate, variables_csv,
-                                         clipping_rate, threshold_stop, make_stationary=make_stationary,
-                                         inner_activation=inner_activation, batch_size=batch_size)
+            if interval==DataSetBuilder._1_DAY_INTERVAL:
+                rnn_model_trainer.train_LSTM_scalping(training_series_df, model_output, symbol_min_series_df, classif_key,
+                                                      epochs, timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,
+                                                      variables_csv, clipping_rate, threshold_stop,
+                                                      make_stationary=make_stationary, inner_activation=inner_activation,
+                                                      batch_size=batch_size)
+            elif interval==DataSetBuilder._1_MIN_INTERVAL:
+                rnn_model_trainer.train_LSTM_daily(training_series_df, model_output, symbol_min_series_df,
+                                                      classif_key,
+                                                      epochs, timestamps, n_neurons, learning_rate, reg_rate,
+                                                      dropout_rate,
+                                                      variables_csv, clipping_rate, threshold_stop,
+                                                      make_stationary=make_stationary,
+                                                      inner_activation=inner_activation,
+                                                      batch_size=batch_size)
 
             #pd.set_option('display.max_columns', None)
             #print(training_series_df.head())
