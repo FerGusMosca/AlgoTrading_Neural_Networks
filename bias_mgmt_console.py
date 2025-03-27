@@ -215,6 +215,9 @@ def process_create_sinthetic_indicator(cmd):
     inv_steps = __get_param__(cmd, "inv_steps", True, None)
     min_units_to_pred = __get_param__(cmd, "min_units_to_pred", True, None)
 
+    #SARIMA
+    s = __get_param__(cmd, "s", True, None)
+
     cmd_param_dict = {}
 
     if slope_units is not None:
@@ -228,6 +231,9 @@ def process_create_sinthetic_indicator(cmd):
 
     if q is not None:
         cmd_param_dict["q"] = q
+
+    if s is not None:
+        cmd_param_dict["s"] = s
 
     if step is not None:
         cmd_param_dict["step"] = step

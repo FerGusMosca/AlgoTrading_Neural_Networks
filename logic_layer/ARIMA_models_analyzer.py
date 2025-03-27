@@ -6,7 +6,7 @@ from statsmodels.graphics.tsaplots import plot_acf
 from statsmodels.graphics.tsaplots import plot_pacf
 from statsmodels.tsa.arima.model import ARIMA
 import pandas as pd
-
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 from common.enums.on_off_indicator_values import OnOffIndicatorValue
 
 
@@ -157,7 +157,6 @@ class ARIMAModelsAnalyzer():
 
         return dickey_fuller_test_dict
 
-
     def build_and__predict_ARIMA_model(self,series_df,symbol,p,d,q,period,step):
         df_period=self.__aggregate_weekly_basis__(series_df,symbol,period)
         udiff=self.__add_weekly_returns__(df_period,symbol)
@@ -169,7 +168,61 @@ class ARIMAModelsAnalyzer():
 
         return forecast_list
 
+    def build_and_predict_SARIMA_model(self, series_df, symbol, p, d, q, P, D, Q, s, period, step):
+        """
+        Builds and predicts using a SARIMA model.
 
+        Parameters:
+        - series_df: DataFrame containing the time series data.
+        - symbol: Symbol or identifier of the series (e.g., 'OECD_CLI_US').
+        - p, d, q: Non-seasonal parameters of the SARIMA model (AR order, differencing, MA order).
+        - P, D, Q, s: Seasonal parameters of the SARIMA model (seasonal AR order, seasonal differencing, seasonal MA order, seasonal period).
+        - period: Period for aggregation (e.g., 'weekly').
+        - step: Number of steps to forecast ahead.
+
+        Returns:
+        - forecast_list: List containing the predictions.
+        """
+        # Aggregate the data on a weekly basis (or the specified period)
+        df_period = self.__aggregate_weekly_basis__(series_df, symbol, period)
+
+        # Calculate weekly returns (or differences, depending on the method)
+        udiff = self.__add_weekly_returns__(df_period, symbol)
+
+        # Build the SARIMA model with the specified parameters
+        sarima_model = self.__build_SARIMA__(udiff, p, d, q, P, D, Q, s)
+
+        # Perform the forecast using the SARIMA model
+        preds = self.__run_forecast__(udiff, sarima_model, step)
+
+        # Convert the predictions to a list
+        forecast_list = preds.tolist()
+
+        return forecast_list
+
+    def __build_SARIMA__(self, series, p, d, q, P, D, Q, s):
+        """
+        Builds a SARIMA model with the specified parameters.
+
+        Parameters:
+        - series: Time series data (pandas Series or array).
+        - p, d, q: Non-seasonal parameters (AR order, differencing, MA order).
+        - P, D, Q, s: Seasonal parameters (seasonal AR order, seasonal differencing, seasonal MA order, seasonal period).
+
+        Returns:
+        - Fitted SARIMA model.
+        """
+        from statsmodels.tsa.statespace.sarimax import SARIMAX
+
+        # Fit the SARIMA model with the given parameters
+        model = SARIMAX(series,
+                        order=(p, d, q),
+                        seasonal_order=(P, D, Q, s),
+                        enforce_stationarity=False,  # Disable stationarity enforcement to avoid convergence issues
+                        enforce_invertibility=False)  # Disable invertibility enforcement for flexibility
+        model_fit = model.fit(disp=False)  # Fit the model, suppressing output messages with disp=False
+
+        return model_fit
     def eval_still_on_indicator(self,preds,step,inv_steps):
 
         if inv_steps>step:

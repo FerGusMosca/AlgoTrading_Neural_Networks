@@ -71,6 +71,40 @@ class SintheticIndicatorCreator():
 
             return  active_ind
 
+
+    def __process_sarima_indicator__(self,indicators_series_df,row,indicator,n_algo_param_dict, inv_ind=False):
+        arima_Analyzer = ARIMAModelsAnalyzer(self.logger)
+
+        date=row["date"]
+        filtered_df = indicators_series_df[indicators_series_df['date'] <= date]
+
+        self.logger.do_log(f"Processing predictions for {date} for indicator {indicator.indicator}",MessageType.INFO)
+        p = self.__extract_variable__(ArimaParameters.p.value, n_algo_param_dict, indicator.type)
+        d = self.__extract_variable__(ArimaParameters.d.value, n_algo_param_dict, indicator.type)
+        q = self.__extract_variable__(ArimaParameters.q.value, n_algo_param_dict, indicator.type)
+        s= self.__extract_variable__(ArimaParameters.s.value, n_algo_param_dict, indicator.type)
+        period = self.__extract_variable__(ArimaParameters.period.value, n_algo_param_dict, indicator.type,
+                                           optional=True, def_val=None)
+        min_units_to_pred = self.__extract_variable__(ArimaParameters.min_units_to_pred.value, n_algo_param_dict, indicator.type,
+                                           optional=True, def_val=24)
+
+        step = self.__extract_variable__(ArimaParameters.step.value, n_algo_param_dict, indicator.type)
+        inv_steps = self.__extract_variable__(ArimaParameters.inv_steps.value, n_algo_param_dict,
+                                              indicator.type)
+
+
+        if len(filtered_df)<min_units_to_pred:
+            return OnOffIndicatorValue.OFF_NUMERIC.value
+        else:
+            preds = arima_Analyzer.build_and_predict_SARIMA_model(filtered_df,
+                                                                  f"{ColumnsPrefix.CLOSE_PREFIX.value}{indicator.indicator}",
+                                                                  p, d, q,p,d,q,s, period, step)
+            all_on_ind= arima_Analyzer.eval_still_on_indicator(preds, inv_steps,inv_steps )
+            active_ind= all_on_ind if not inv_ind else not all_on_ind
+            self.logger.do_log(f"Predictions for {date} for indicator {indicator.indicator} successfully processed: ON --> {active_ind}", MessageType.INFO)
+
+            return  active_ind
+
     def build_sinthetic_indicator(self,indicators_series_df,indicator_type_arr,n_algo_param_dict):
 
         for indicator in indicator_type_arr:
@@ -92,8 +126,15 @@ class SintheticIndicatorCreator():
                 elif indicator.type == IndicatorType.ARIMA.value:
                     all_on_ind=self.__process_arima_indicator__(indicators_series_df, row, indicator,
                                                                 n_algo_param_dict,inv_ind=False)
+                elif indicator.type == IndicatorType.SARIMA.value:
+                    all_on_ind=self.__process_sarima_indicator__(indicators_series_df, row, indicator,
+                                                                n_algo_param_dict,inv_ind=False)
+
                 elif indicator.type == IndicatorType.INV_ARIMA.value:
                     all_on_ind=self.__process_arima_indicator__(indicators_series_df, row, indicator,
+                                                                n_algo_param_dict,inv_ind=True)
+                elif indicator.type == IndicatorType.INV_SARIMA.value:
+                    all_on_ind=self.__process_sarima_indicator__(indicators_series_df, row, indicator,
                                                                 n_algo_param_dict,inv_ind=True)
                 else:
                     raise Exception(f"Could not recognize indicator type {indicator.type}")
