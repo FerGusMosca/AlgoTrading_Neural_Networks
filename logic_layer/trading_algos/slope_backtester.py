@@ -22,7 +22,7 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
     def get_algo_name(self):
         raise Exception("get_algo_name not implemented in base class!")
 
-
+    '''
     def __run_trades_single_pos__(self, predictions_df, init_portf_size,slope_indicator,n_algo_param_dict):
         """
         Summarizes trading positions using the N_MIN_BUFFER_W_FLIP algorithm.
@@ -95,6 +95,7 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
         return trading_summary_df,portf_positions
 
 
+    '''
 
     def __run_trades_mult_pos__(self, predictions_df, init_portf_size,slope_indicator,
                                       n_algo_param_dict,etf_comp_dto_arr=None):
@@ -184,10 +185,6 @@ class SlopeBacktester(BaseClassDailyTradingBacktester):
         series_df = series_df.dropna(how='all', subset=[col for col in series_df.columns if
                                                         col.startswith(ColumnsPrefix.CLOSE_PREFIX.value)])
 
-
-        if sum(col.startswith(ColumnsPrefix.CLOSE_PREFIX.value) for col in series_df.columns)<=1:
-            trading_summary_df,port_pos = self.__run_trades_single_pos__(series_df, portf_size, indicator, n_algo_param_dict)
-            return self.__calculate_day_trading_single_pos_summary__(self.get_algo_name(), trading_summary_df, series_df),port_pos
-        else:
-            trading_summary_df,port_pos = self.__run_trades_mult_pos__(series_df, portf_size, indicator, n_algo_param_dict,etf_comp_dto_arr)
-            return self.__calculate_day_trading_multiple_pos_summary__("mult_pos_algo",trading_summary_df),port_pos
+        trading_summary_df, port_pos = self.__run_trades_mult_pos__(series_df, portf_size, indicator, n_algo_param_dict,
+                                                                    etf_comp_dto_arr)
+        return self.__calculate_day_trading_multiple_pos_summary__("mult_pos_algo", trading_summary_df), port_pos
