@@ -182,7 +182,7 @@
                 <p id="slopeResult" style="color: red; font-weight: bold;"></p>
             </div>
 
-            <h2>Calculate (S)ARIMA</h2>
+           <h2>Calculate (S)ARIMA</h2>
             <div class="regression-container">
                 <label for="arima_p">p:</label>
                 <input type="number" id="arima_p" name="arima_p" min="0" value="1" required>
@@ -194,13 +194,13 @@
                 <input type="number" id="arima_q" name="arima_q" min="0" value="1" required>
                 <br>
                 <label for="arima_s">s:</label>
-                <input type="number" id="arima_s" name="arima_s" min="1" required>
+                <input type="number" id="arima_s" name="arima_s" min="1">
                 <br>
                 <label for="forecast_periods">Forecast Periods:</label>
                 <input type="number" id="forecast_periods" name="forecast_periods" min="1" value="5" required>
                 <br>
-                <label for="arima_new_value">New Value (optional, decimal):</label>
-                <input type="number" id="arima_new_value" name="arima_new_value" step="0.01">
+                <label>Predictions:</label>
+                <ul id="arimaPredictions" style="color: white;"></ul>
                 <br>
                 <button type="button" id="calculateArimaButton" onclick="calculateArima()">Calculate (S)ARIMA</button>
                 <p id="arimaResult" style="color: red; font-weight: bold;"></p>
@@ -387,28 +387,42 @@
         }
 
 
-        function calculateArima() {
+       function calculateArima() {
             let arima_p = document.getElementById("arima_p").value;
             let arima_d = document.getElementById("arima_d").value;
             let arima_q = document.getElementById("arima_q").value;
             let arima_s = document.getElementById("arima_s").value;
             let forecast_periods = document.getElementById("forecast_periods").value;
-            let new_value = document.getElementById("arima_new_value").value;
 
             if (!arima_p || arima_p < 0) {
                 alert("Please enter a valid integer (≥ 0) for p.");
                 return;
             }
-            // ... (otras validaciones similares)
+            if (!arima_d || arima_d < 0) {
+                alert("Please enter a valid integer (≥ 0) for d.");
+                return;
+            }
+            if (!arima_q || arima_q < 0) {
+                alert("Please enter a valid integer (≥ 0) for q.");
+                return;
+            }
+            if (arima_s && arima_s < 1) {
+                alert("If provided, s must be a valid integer (≥ 1).");
+                return;
+            }
+            if (!forecast_periods || forecast_periods < 1) {
+                alert("Please enter a valid number of forecast periods (≥ 1).");
+                return;
+            }
+
             let formData = new FormData();
             formData.append("p", arima_p);
             formData.append("d", arima_d);
             formData.append("q", arima_q);
-            formData.append("s", arima_s);
-            formData.append("forecast_periods", forecast_periods);
-            if (new_value) {
-                formData.append("new_value", new_value);
+            if (arima_s) {
+                formData.append("s", arima_s);
             }
+            formData.append("forecast_periods", forecast_periods);
 
             fetch("/display_series/calculate_arima", {
                 method: "POST",
@@ -417,12 +431,24 @@
             .then(response => response.json())
             .then(data => {
                 let arimaResult = document.getElementById("arimaResult");
-                arimaResult.innerText = `Valores ARIMA calculados: ${data.result}`; // Ajusta según lo que devuelva el backend
+                let arimaPredictions = document.getElementById("arimaPredictions");
+                arimaPredictions.innerHTML = ""; // Limpiar predicciones anteriores
+
+                if (data.result && Array.isArray(data.result)) {
+                    data.result.forEach((value, index) => {
+                        let li = document.createElement("li");
+                        li.innerText = `Pred ${index + 1}: ${value}`;
+                        arimaPredictions.appendChild(li);
+                    });
+                    arimaResult.innerText = "ARIMA predictions calculated successfully.";
+                } else {
+                    arimaResult.innerText = "No predictions returned.";
+                }
             })
             .catch(error => {
                 console.error("Error calculating ARIMA:", error);
                 let arimaResult = document.getElementById("arimaResult");
-                arimaResult.innerText = "Error calculando ARIMA.";
+                arimaResult.innerText = "Error calculating ARIMA.";
             });
         }
 

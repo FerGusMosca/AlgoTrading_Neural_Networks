@@ -149,35 +149,28 @@ class DisplaySeriesController(BaseController):
                               new_value: float = Form(None)):
         try:
             cmd_param_dict = {}
-
             if p is not None:
                 cmd_param_dict["p"] = p
-
             if d is not None:
                 cmd_param_dict["d"] = d
-
             if q is not None:
                 cmd_param_dict["q"] = q
-
             if s is not None:
                 cmd_param_dict["s"] = s
             else:
-                cmd_param_dict["s"]=None
-
+                cmd_param_dict["s"] = None
             cmd_param_dict["period"] = None
             cmd_param_dict["step"] = forecast_periods
             cmd_param_dict["inv_steps"] = forecast_periods
-            d_from=DateHandler.convert_str_date(self.last_from, "%Y-%m-%d")
+            d_from = DateHandler.convert_str_date(self.last_from, "%Y-%m-%d")
             d_to = DateHandler.convert_str_date(self.last_to, "%Y-%m-%d")
 
             dataMgm = AlgosOrchestationLogic(self.config_settings["hist_data_conn_str"],
-                                             self.config_settings["ml_reports_conn_str"],
-                                             self.config_settings["classification_map_key"], self.logger)
+                                              self.config_settings["ml_reports_conn_str"],
+                                              self.config_settings["classification_map_key"], self.logger)
             pred_dict = dataMgm.process_ARIMA_predictions(self.last_series_key, d_from, d_to, cmd_param_dict)
 
-
-            #TODO eval what to do with this
-            return None
+            return {"result": pred_dict}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error calculating ARIMA: {str(e)}")
 

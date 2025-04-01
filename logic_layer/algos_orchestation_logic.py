@@ -1155,7 +1155,7 @@ class AlgosOrchestationLogic:
         step=algo_params["step"]
 
         preds=None
-        if s is not None: #ARIMA
+        if s is  None: #ARIMA
             preds = arima_Analyzer.build_and__predict_ARIMA_model(series_df,f"close",
                                                                  p, d, q, period, step)
         else:
