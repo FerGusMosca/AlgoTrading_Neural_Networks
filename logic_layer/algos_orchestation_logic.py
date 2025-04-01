@@ -1135,6 +1135,35 @@ class AlgosOrchestationLogic:
         return summary_dto
 
 
+    def process_ARIMA_predictions(self, series_key,d_from,d_to,algo_params):
+        start_of_day = datetime(d_from.year, d_from.month, d_from.day)
+        end_of_day = d_to + timedelta(hours=23, minutes=59, seconds=59)
+
+        # 1- The trading symbols DF
+        series_df = self.data_set_builder.build_interval_series(series_key, start_of_day, end_of_day,
+                                                                           interval=DataSetBuilder._1_DAY_INTERVAL,
+                                                                           output_col=["symbol", "date", "open",
+                                                                                       "high", "low", "close"])
+
+        #2 - Predict ARIMA
+        arima_Analyzer = ARIMAModelsAnalyzer(self.logger)
+        p=algo_params["p"]
+        d=algo_params["d"]
+        q=algo_params["q"]
+        s = algo_params["s"]
+        period=algo_params["period"]
+        step=algo_params["step"]
+
+        preds=None
+        if s is not None: #ARIMA
+            preds = arima_Analyzer.build_and__predict_ARIMA_model(series_df,f"close",
+                                                                 p, d, q, period, step)
+        else:
+            raise Exception("SARIMA not implemented")
+
+        return preds
+
+
     def process_create_sinthetic_indicator_logic(self,comp_path,model_candle,d_from,d_to,algo_params):
         start_of_day = datetime(d_from.year, d_from.month, d_from.day)
         end_of_day = d_to + timedelta(hours=23, minutes=59, seconds=59)
