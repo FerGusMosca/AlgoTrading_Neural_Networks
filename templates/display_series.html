@@ -182,7 +182,7 @@
                 <p id="slopeResult" style="color: red; font-weight: bold;"></p>
             </div>
 
-           <h2>Calculate (S)ARIMA</h2>
+            <h2>Calculate (S)ARIMA</h2>
             <div class="regression-container">
                 <label for="arima_p">p:</label>
                 <input type="number" id="arima_p" name="arima_p" min="0" value="1" required>
@@ -193,8 +193,11 @@
                 <label for="arima_q">q:</label>
                 <input type="number" id="arima_q" name="arima_q" min="0" value="1" required>
                 <br>
+                <label for="use_sarima">Use SARIMA:</label>
+                <input type="checkbox" id="use_sarima" name="use_sarima" onchange="toggleSarima()">
+                <br>
                 <label for="arima_s">s:</label>
-                <input type="number" id="arima_s" name="arima_s" min="1">
+                <input type="number" id="arima_s" name="arima_s" min="1" disabled>
                 <br>
                 <label for="forecast_periods">Forecast Periods:</label>
                 <input type="number" id="forecast_periods" name="forecast_periods" min="1" value="5" required>
@@ -203,12 +206,10 @@
                 <ul id="arimaPredictions" style="color: white;"></ul>
                 <br>
                 <button type="button" id="calculateArimaButton" onclick="calculateArima()">Calculate (S)ARIMA</button>
-                <p id="arimaResult" style="color: red; font-weight: bold;"></p>
+                <p id="arimaResult" style="font-weight: bold;"></p>
             </div>
+
         </div>
-    </div>
-
-
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             fetchChartData();
@@ -387,12 +388,23 @@
         }
 
 
-       function calculateArima() {
+       // Función para habilitar/deshabilitar el campo s según el checkbox
+        function toggleSarima() {
+            let useSarima = document.getElementById("use_sarima").checked;
+            let arimaSInput = document.getElementById("arima_s");
+            arimaSInput.disabled = !useSarima;
+            if (!useSarima) {
+                arimaSInput.value = ""; // Limpiar el valor de s si se desactiva SARIMA
+            }
+        }
+
+        function calculateArima() {
             let arima_p = document.getElementById("arima_p").value;
             let arima_d = document.getElementById("arima_d").value;
             let arima_q = document.getElementById("arima_q").value;
             let arima_s = document.getElementById("arima_s").value;
             let forecast_periods = document.getElementById("forecast_periods").value;
+            let useSarima = document.getElementById("use_sarima").checked;
 
             if (!arima_p || arima_p < 0) {
                 alert("Please enter a valid integer (≥ 0) for p.");
@@ -406,8 +418,8 @@
                 alert("Please enter a valid integer (≥ 0) for q.");
                 return;
             }
-            if (arima_s && arima_s < 1) {
-                alert("If provided, s must be a valid integer (≥ 1).");
+            if (useSarima && (!arima_s || arima_s < 1)) {
+                alert("If SARIMA is selected, s must be a valid integer (≥ 1).");
                 return;
             }
             if (!forecast_periods || forecast_periods < 1) {
@@ -419,7 +431,7 @@
             formData.append("p", arima_p);
             formData.append("d", arima_d);
             formData.append("q", arima_q);
-            if (arima_s) {
+            if (useSarima && arima_s) {
                 formData.append("s", arima_s);
             }
             formData.append("forecast_periods", forecast_periods);
@@ -428,31 +440,69 @@
                 method: "POST",
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 let arimaResult = document.getElementById("arimaResult");
                 let arimaPredictions = document.getElementById("arimaPredictions");
-                arimaPredictions.innerHTML = ""; // Limpiar predicciones anteriores
+                arimaPredictions.innerHTML = ""; // Clear previous predictions
 
                 if (data.result && Array.isArray(data.result)) {
-                    data.result.forEach((value, index) => {
+                    // Convert values to numbers to avoid issues with string comparison
+                    let predictions = data.result.map(value => parseFloat(value));
+
+                    // Display the predictions in the UI
+                    predictions.forEach((value, index) => {
                         let li = document.createElement("li");
                         li.innerText = `Pred ${index + 1}: ${value}`;
                         arimaPredictions.appendChild(li);
                     });
-                    arimaResult.innerText = "ARIMA predictions calculated successfully.";
+
+                    // Log predictions for debugging purposes
+                    console.log("Predictions:", predictions);
+
+                    // Analyze predictions to detect possible trend inversions
+                    let negativeIndex = predictions.findIndex(value => value < 0);
+                    console.log("Negative Index:", negativeIndex); // Log the index of the first negative prediction
+
+                    if (negativeIndex !== -1) {
+                        // If a negative term is found, show a message in red indicating a possible trend inversion after the prediction
+                        arimaResult.innerText = `Possible trend inversion after Pred ${negativeIndex + 1}`;
+                        arimaResult.style.color = "red";
+                    } else {
+                        // Check if all terms have the same sign
+                        let allPositive = predictions.every(value => value >= 0);
+                        let allNegative = predictions.every(value => value <= 0);
+                        if (allPositive || allNegative) {
+                            // If all terms have the same sign, show a message in green
+                            arimaResult.innerText = "No trend inversion detected";
+                            arimaResult.style.color = "green";
+                        } else {
+                            // If there is a mix of signs but no negative was detected earlier (rare case), show a generic message
+                            arimaResult.innerText = "Trend analysis inconclusive";
+                            arimaResult.style.color = "yellow";
+                        }
+                    }
                 } else {
                     arimaResult.innerText = "No predictions returned.";
+                    arimaResult.style.color = "red";
                 }
             })
             .catch(error => {
                 console.error("Error calculating ARIMA:", error);
                 let arimaResult = document.getElementById("arimaResult");
-                arimaResult.innerText = "Error calculating ARIMA.";
+                arimaResult.innerText = "Error calculating ARIMA: " + error.message;
+                arimaResult.style.color = "red";
             });
         }
 
     </script>
 
+
+    </div>
 </body>
 </html>

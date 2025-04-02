@@ -1159,7 +1159,8 @@ class AlgosOrchestationLogic:
             preds = arima_Analyzer.build_and__predict_ARIMA_model(series_df,f"close",
                                                                  p, d, q, period, step)
         else:
-            raise Exception("SARIMA not implemented")
+            preds = arima_Analyzer.build_and_predict_SARIMA_model(series_df, f"close",
+                                                                  p, d, q,p,d,q,s,period, step)
 
         return preds
 
