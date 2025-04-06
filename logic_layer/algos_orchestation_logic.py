@@ -1055,14 +1055,20 @@ class AlgosOrchestationLogic:
                                                       make_stationary=make_stationary, inner_activation=inner_activation,
                                                       batch_size=batch_size)
             elif interval==DataSetBuilder._1_MIN_INTERVAL:
-                rnn_model_trainer.train_LSTM_daily(training_series_df, model_output, symbol_min_series_df,
-                                                      classif_key,
-                                                      epochs, timestamps, n_neurons, learning_rate, reg_rate,
-                                                      dropout_rate,
-                                                      variables_csv, clipping_rate, threshold_stop,
-                                                      make_stationary=make_stationary,
-                                                      inner_activation=inner_activation,
-                                                      batch_size=batch_size)
+                rnn_model_trainer.train_LSTM_daily_stateful(training_series_df= training_series_df,
+                                                           model_output= model_output,
+                                                           symbol=symbol,
+                                                           variables_csv=variables_csv,
+                                                           classif_key=classif_key,
+                                                           epochs= epochs,
+                                                           timestamps= timestamps,
+                                                           n_neurons= n_neurons,
+                                                           learning_rate= learning_rate,
+                                                           reg_rate= reg_rate,
+                                                           dropout_rate= dropout_rate,
+                                                           clipping_rate= clipping_rate,
+                                                           inner_activation=inner_activation,
+                                                           batch_size=batch_size)
 
             #pd.set_option('display.max_columns', None)
             #print(training_series_df.head())

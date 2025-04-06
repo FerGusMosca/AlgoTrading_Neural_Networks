@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import tensorflow
 import tensorflow as tf
-from keras import Sequential
+from keras import Sequential, Input, Model
 from keras.src.callbacks import Callback, ReduceLROnPlateau, EarlyStopping
 from keras.src.layers import TimeDistributed, BatchNormalization, InputLayer
 from keras.src.optimizers import Adam
@@ -20,6 +20,8 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from imblearn.over_sampling import SMOTE, BorderlineSMOTE
+from tensorflow.python.keras.regularizers import l2
+
 from common.util.dataframe_filler import DataframeFiller
 from common.util.machine_learning.f1_score import F1Score
 from imblearn.under_sampling import RandomUnderSampler
@@ -646,258 +648,178 @@ class DayTradingRNNModelCreator:
 
         except Exception as e:
             raise Exception(f"Error al construir el modelo LSTM para el símbolo {symbol}: {e}")
-    def train_LSTM_scalping(self, training_series_df, model_output, symbol, classif_key, epochs,
-                            timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,
-                            variables_csv, clipping_rate=None,
-                            threshold_stop=None, make_stationary=False, inner_activation='tanh', batch_size=1):
+
+    def train_LSTM_daily_unstateful(self, training_series_df, model_output, symbol, classif_key, epochs,
+                              timestamps, n_neurons, learning_rate, reg_rate, dropout_rate, clipping_rate=None,
+                              accuracy_stop=None, inner_activation='tanh', batch_size=1):
+        """
+        Build and train an LSTM model on the given training data and save the model.
+
+        Parameters:
+        training_series_df (pd.DataFrame): DataFrame containing the training data.
+        model_output (str): Path where the trained model will be saved.
+        classif_key (str): The column name of the classification target.
+        safety_minutes (int): Number of time steps to look back in the time series.
+        """
         try:
+
             training_series_df = DataframeFiller.fill_missing_values(training_series_df)
 
-            if make_stationary:
-                training_series_df = self.__make_stationary__(training_series_df)
-
             self.__preformat_training_set__(training_series_df)
+            # Get training and test sets
+            X_train, X_test, y_train, y_test = self.__get_training_sets__(training_series_df,
+                                                                          "trading_symbol", "date",
+                                                                          classif_key
+                                                                          )
 
-            X_train_full, X_test_full, y_train_full, y_test_full = self.__get_training_sets__(training_series_df,
-                                                                                              "trading_symbol", "date",
-                                                                                              classif_key,
-                                                                                              variables_csv=variables_csv,
-                                                                                              test_size=0.2)
+            print("X_Train: NaN={} Inf={}".format(np.isnan(X_train).sum(), np.isinf(X_train).sum()))
 
-            print("Distribución de clases en y_train_full (antes de TimeSeriesSplit):", np.bincount(y_train_full))
-            print("Distribución de clases en y_test_full:", np.bincount(y_test_full))
+            # number of timestamps to use
+            timesteps = timestamps
 
-            tscv = TimeSeriesSplit(n_splits=3)
-            best_val_f1_global = 0
-            best_model = None
+            # Generador de series temporales para datos de entrenamiento y prueba
+            train_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(X_train, y_train,
+                                                                                          length=timesteps,
+                                                                                          batch_size=batch_size)
+            test_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(X_test, y_test,
+                                                                                         length=timesteps,
+                                                                                         batch_size=batch_size)
 
-            val_accuracies = []
-            val_f1_scores = []
-            val_losses = []
+            # Define the LSTM model
+            model = tensorflow.keras.models.Sequential()
+            model.add(
+                LSTM(n_neurons, activation=inner_activation, return_sequences=True,
+                     input_shape=(timesteps, X_train.shape[1])))
+            model.add(Dropout(dropout_rate))  # Dropout layer with 20% dropout rate
+            model.add(BatchNormalization())
+            model.add(LSTM(n_neurons, activation=inner_activation))  # Another LSTM layer without return_sequences
+            model.add(Dropout(dropout_rate))  # Dropout layer with 20% dropout rate
+            model.add(BatchNormalization())
+            model.add(Dense(3, activation='softmax',
+                            kernel_regularizer=tensorflow.keras.regularizers.l2(
+                                reg_rate)))  # Three classes: LONG, SHORT, FLAT
 
-            for fold, (train_index, val_index) in enumerate(tscv.split(X_train_full)):
-                print(f"\nEntrenando fold {fold + 1}/{tscv.n_splits}...")
+            # Adjust the learning rate here
+            learning_rate = learning_rate  # You can experiment with this value
+            optimizer = Adam(learning_rate=learning_rate, clipvalue=clipping_rate if clipping_rate is not None else 0)
 
-                X_train, X_val = X_train_full[train_index], X_train_full[val_index]
-                y_train, y_val = y_train_full[train_index], y_train_full[val_index]
+            # Compile the model
+            model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
-                scaler = StandardScaler()
-                X_train = scaler.fit_transform(X_train)
-                X_val = scaler.transform(X_val)
-                print(f"Fold {fold + 1} - Mean of X_train after normalization:", np.mean(X_train, axis=0))
-                print(f"Fold {fold + 1} - Std of X_train after normalization:", np.std(X_train, axis=0))
-                print(f"Fold {fold + 1} - Mean of X_val after normalization:", np.mean(X_val, axis=0))
-                print(f"Fold {fold + 1} - Std of X_val after normalization:", np.std(X_val, axis=0))
+            # Early Stop
+            custom_early_stopping = CustomEarlyStopping(monitor_train='accuracy', monitor_val='val_accuracy',
+                                                        threshold=accuracy_stop)
 
-                minority_class_count = np.sum(y_train == 1)
-                print(
-                    f"Número de muestras de la clase minoritaria en y_train (fold {fold + 1}): {minority_class_count}")
+            # Train the model
+            model.fit(train_generator, epochs=epochs, validation_data=test_generator, verbose=1,
+                      callbacks=[custom_early_stopping])
 
-                if minority_class_count > 0:
-                    undersampler = RandomUnderSampler(sampling_strategy='auto', random_state=42)
-                    X_train_resampled, y_train_resampled = undersampler.fit_resample(X_train, y_train)
-                else:
-                    print(
-                        f"Fold {fold + 1} - No hay muestras de la clase minoritaria en este fold. Usando datos sin balancear.")
-                    X_train_resampled, y_train_resampled = X_train, y_train
+            # Save the model to the specified path
+            model.save(model_output)
 
-                print(f"Fold {fold + 1} - Distribución de clases en y_train después de submuestreo:",
-                      np.bincount(y_train_resampled))
-                print(f"Fold {fold + 1} - Distribución de clases en y_val:", np.bincount(y_val))
-
-                X_train_resampled = np.clip(X_train_resampled, -3, 3)
-                X_val = np.clip(X_val, -3, 3)
-
-                train_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(X_train_resampled,
-                                                                                              y_train_resampled,
-                                                                                              length=timestamps,
-                                                                                              batch_size=batch_size)
-                val_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(X_val, y_val,
-                                                                                            length=timestamps,
-                                                                                            batch_size=batch_size)
-
-                class_weight_dict = {0: 1.0, 1: 2.0}  # Reducido de 3.0 a 2.0
-                print(f"Pesos de clase para fold {fold + 1}: {class_weight_dict}")
-
-                model = Sequential([
-                    LSTM(n_neurons,  # Reducido a 12 en el comando
-                         activation=inner_activation,
-                         return_sequences=True,
-                         input_shape=(timestamps, X_train.shape[1]),
-                         kernel_regularizer=tensorflow.keras.regularizers.l2(reg_rate)),
-                    BatchNormalization(),
-                    Dropout(dropout_rate),  # Aumentado a 0.8 en el comando
-
-                    LSTM(n_neurons,
-                         activation=inner_activation,
-                         return_sequences=True,
-                         kernel_regularizer=tensorflow.keras.regularizers.l2(reg_rate)),
-                    BatchNormalization(),
-                    Dropout(dropout_rate),
-
-                    LSTM(n_neurons,
-                         activation=inner_activation,
-                         kernel_regularizer=tensorflow.keras.regularizers.l2(reg_rate)),
-                    BatchNormalization(),
-                    Dropout(dropout_rate),
-
-                    Dense(1,
-                          activation='sigmoid',
-                          kernel_regularizer=tensorflow.keras.regularizers.l2(reg_rate))
-                ])
-
-                def focal_loss(gamma=3.0, alpha=0.75):
-                    def focal_loss_fixed(y_true, y_pred):
-                        y_true = tensorflow.cast(y_true, tensorflow.float32)
-                        y_pred = tensorflow.clip_by_value(y_pred, 1e-7, 1.0 - 1e-7)
-                        pt = y_true * y_pred + (1 - y_true) * (1 - y_pred)
-                        alpha_t = y_true * alpha + (1 - y_true) * (1 - alpha)
-                        return -tensorflow.reduce_mean(
-                            alpha_t * tensorflow.pow(1.0 - pt, gamma) * tensorflow.math.log(pt))
-
-                    return focal_loss_fixed
-
-                optimizer = Adam(learning_rate=learning_rate,  # Reducido a 1e-5 en el comando
-                                 clipvalue=clipping_rate if clipping_rate is not None else 15.0)
-
-                model.compile(optimizer=optimizer,
-                              loss=focal_loss(gamma=3.0, alpha=0.75),
-                              metrics=['accuracy', F1Score()])
-
-                early_stopping = tensorflow.keras.callbacks.EarlyStopping(monitor='val_f1_score',
-                                                                          patience=20,
-                                                                          mode='max',
-                                                                          restore_best_weights=True)
-
-                lr_scheduler = ReduceLROnPlateau(monitor='val_loss',
-                                                 factor=0.5,
-                                                 patience=5,
-                                                 min_lr=1e-7)
-
-                history = model.fit(train_generator,
-                                    epochs=epochs,
-                                    validation_data=val_generator,
-                                    verbose=1,
-                                    callbacks=[early_stopping, lr_scheduler],
-                                    class_weight=class_weight_dict)
-
-                val_probabilities = model.predict(val_generator).flatten()
-
-                # Ajustar dinámicamente el umbral para maximizar el F1-score, priorizando precisión
-                from sklearn.metrics import f1_score
-                thresholds = np.arange(0.5, 0.9, 0.05)  # Ajustado para priorizar precisión
-                best_f1 = 0
-                best_threshold = 0.5
-                for threshold in thresholds:
-                    val_predictions = (val_probabilities > threshold).astype(int)
-                    f1 = f1_score(y_val[timestamps:], val_predictions)
-                    if f1 > best_f1:
-                        best_f1 = f1
-                        best_threshold = threshold
-
-                val_predictions = (val_probabilities > best_threshold).astype(int)
-                print(f"Mejor umbral para fold {fold + 1}: {best_threshold}")
-                print(f"Distribución de predicciones en y_val (fold {fold + 1}):", np.bincount(val_predictions))
-
-                # Calcular y mostrar la matriz de confusión
-                from sklearn.metrics import confusion_matrix, precision_score, recall_score
-                cm = confusion_matrix(y_val[timestamps:], val_predictions)
-                print(f"Matriz de confusión para fold {fold + 1}:")
-                print(cm)
-
-                # Calcular precisión y recall para la clase 1
-                precision = precision_score(y_val[timestamps:], val_predictions, pos_label=1, zero_division=0)
-                recall = recall_score(y_val[timestamps:], val_predictions, pos_label=1, zero_division=0)
-                print(f"Precisión para la clase 1 en fold {fold + 1}: {precision:.4f}")
-                print(f"Recall para la clase 1 en fold {fold + 1}: {recall:.4f}")
-
-                # Mejorar el cálculo del retorno acumulado
-                val_dates = training_series_df.index[val_index]
-                val_prices = training_series_df.loc[val_dates, 'close_XLK'].values
-                val_prices = val_prices[timestamps:]
-
-                # Inspeccionar val_prices antes de calcular los retornos
-                print(f"Fold {fold + 1} - val_prices (primeros 10 valores):", val_prices[:10])
-                print(f"Fold {fold + 1} - Número de ceros en val_prices:", np.sum(val_prices == 0))
-                print(f"Fold {fold + 1} - Número de NaN en val_prices:", np.sum(np.isnan(val_prices)))
-
-                # Ignorar días con val_prices igual a 0
-                valid_indices = val_prices != 0
-                val_prices = val_prices[valid_indices]
-                val_predictions = val_predictions[valid_indices[timestamps:]]
-
-                # Rellenar NaN
-                val_prices = pd.Series(val_prices).ffill().bfill().values
-
-                # Verificar que no haya NaN después del llenado
-                if np.any(np.isnan(val_prices)):
-                    print(f"Advertencia: val_prices contiene NaN después del llenado en fold {fold + 1}")
-                    val_prices = np.where(np.isnan(val_prices), 1.0, val_prices)
-
-                # Calcular retornos evitando divisiones por cero
-                returns = np.zeros(len(val_prices) - 1)
-                for i in range(len(returns)):
-                    if val_prices[i] != 0 and not np.isnan(val_prices[i]) and not np.isnan(val_prices[i + 1]):
-                        returns[i] = (val_prices[i + 1] - val_prices[i]) / val_prices[i]
-                        # Clip retornos para evitar valores extremos
-                        returns[i] = np.clip(returns[i], -1, 1)
-                    else:
-                        returns[i] = 0
-
-                # Verificar que no haya NaN en los retornos
-                if np.any(np.isnan(returns)):
-                    print(f"Advertencia: returns contiene NaN en fold {fold + 1}")
-                    returns = np.nan_to_num(returns, 0.0)
-
-                # Ajustar la estrategia de trading: mantener la posición por 1 día
-                strategy_returns = np.zeros(len(returns))
-                hold_period = 1  # Reducido de 2 a 1
-                i = 0
-                while i < len(returns):
-                    if val_predictions[i] == 1:
-                        # Calcular el retorno acumulado durante el período de tenencia
-                        cumulative_return = 0
-                        for j in range(min(hold_period, len(returns) - i)):
-                            cumulative_return += returns[i + j]
-                        # Asignar el retorno acumulado a la primera posición
-                        strategy_returns[i] = cumulative_return
-                        i += hold_period  # Saltar al final del período de tenencia
-                    else:
-                        strategy_returns[i] = 0
-                        i += 1
-
-                cumulative_return = np.prod(1 + strategy_returns) - 1
-                print(f"Retorno acumulado para fold {fold + 1}: {cumulative_return * 100:.2f}%")
-
-                best_val_accuracy = max(history.history['val_accuracy'])
-                best_val_f1 = max(history.history['val_f1_score'])
-                best_val_loss = min(history.history['val_loss'])
-                val_accuracies.append(best_val_accuracy)
-                val_f1_scores.append(best_val_f1)
-                val_losses.append(best_val_loss)
-                print(f"Mejor val_accuracy en fold {fold + 1}: {best_val_accuracy}")
-                print(f"Mejor val_f1_score en fold {fold + 1}: {best_val_f1}")
-                print(f"Mejor val_loss en fold {fold + 1}: {best_val_loss}")
-
-                if best_val_f1 > best_val_f1_global:
-                    best_val_f1_global = best_val_f1
-                    best_model = model
-
-            print(f"Promedio de val_accuracy: {np.mean(val_accuracies)}")
-            print(f"Promedio de val_f1_score: {np.mean(val_f1_scores)}")
-            print(f"Promedio de val_loss: {np.mean(val_losses)}")
-
-            if len(val_losses) > 1 and val_losses[-1] > val_losses[-2]:
-                print("Advertencia: val_loss está aumentando, posible sobreajuste detectado.")
-
-            if best_model is not None:
-                best_model.save(model_output)
-                print(f"Modelo guardado en {model_output}")
-            else:
-                raise Exception("No se entrenó ningún modelo exitosamente.")
+            print(f"Model saved to {model_output}")
 
         except Exception as e:
-            raise Exception(f"Error al construir el modelo LSTM para el símbolo {symbol}: {e}")
+            raise Exception(f"Error building LSTM model for symbol {symbol}: {e}")
+
+    def train_LSTM_daily_stateful(self, training_series_df, model_output, symbol, classif_key, epochs, variables_csv,
+                         timestamps, n_neurons, learning_rate, reg_rate, dropout_rate, clipping_rate=None,
+                         accuracy_stop=None, inner_activation='tanh', batch_size=1):
+        """
+        Train a stateful LSTM model for market classification and save it.
+        """
+        try:
+
+            # Fill missing values and pre-format
+            training_series_df = DataframeFiller.fill_missing_values(training_series_df)
+            self.__preformat_training_set__(training_series_df)
+
+            # Get train/test sets
+            X_train, X_test, y_train, y_test = self.__get_training_sets__(training_series_df,
+                                                                          "trading_symbol", "date",
+                                                                          classif_key,
+                                                                          variables_csv=variables_csv,
+                                                                          test_size=0.2)
+
+            # Trim data to match batch size
+            def trim_data(X, y, timesteps, batch_size):
+                n_samples = len(X) - timesteps
+                n_samples = (n_samples // batch_size) * batch_size
+                return X[:n_samples + timesteps], y[:n_samples + timesteps]
+
+            X_train, y_train = trim_data(X_train, y_train, timestamps, batch_size)
+            X_test, y_test = trim_data(X_test, y_test, timestamps, batch_size)
+
+            # Create sequences manually
+            def create_dataset(X, y, timesteps):
+                Xs, ys = [], []
+                for i in range(len(X) - timesteps):
+                    Xs.append(X[i:i + timesteps])
+                    ys.append(y[i + timesteps])
+                return np.array(Xs), np.array(ys)
+
+            X_train_seq, y_train_seq = create_dataset(X_train, y_train, timestamps)
+            X_test_seq, y_test_seq = create_dataset(X_test, y_test, timestamps)
+
+            # Trim again to match batch size
+            def enforce_batch_shape(X, y, batch_size):
+                cut = (X.shape[0] // batch_size) * batch_size
+                return X[:cut], y[:cut]
+
+            X_train_seq, y_train_seq = enforce_batch_shape(X_train_seq, y_train_seq, batch_size)
+            X_test_seq, y_test_seq = enforce_batch_shape(X_test_seq, y_test_seq, batch_size)
+
+            # Force types to prevent OverflowError
+            X_train_seq = X_train_seq.astype(np.float32)
+            X_test_seq = X_test_seq.astype(np.float32)
+            y_train_seq = y_train_seq.astype(np.int32)
+            y_test_seq = y_test_seq.astype(np.int32)
+
+            print("X_train_seq shape:", X_train_seq.shape)
+            print("y_train_seq shape:", y_train_seq.shape)
+            print("X_test_seq shape:", X_test_seq.shape)
+            print("y_test_seq shape:", y_test_seq.shape)
+            print("batch_size:", batch_size)
+            print("epochs:", epochs)
+
+            # Callback to reset states after each epoch
+            class ResetStatesCallback(Callback):
+                def on_epoch_end(self, epoch, logs=None):
+                    self.model.reset_states()
+
+            # Model architecture
+            input_shape = (batch_size, timestamps, X_train_seq.shape[2])
+            inputs = Input(batch_shape=input_shape)
+            x = LSTM(n_neurons, return_sequences=True, stateful=True, activation=inner_activation)(inputs)
+            x = Dropout(dropout_rate)(x)
+            x = BatchNormalization()(x)
+            x = LSTM(n_neurons, stateful=True, activation=inner_activation)(x)
+            x = Dropout(dropout_rate)(x)
+            x = BatchNormalization()(x)
+            outputs = Dense(3, activation='softmax', kernel_regularizer=l2(reg_rate))(x)
+
+            model = Model(inputs, outputs)
+            model.compile(optimizer=Adam(learning_rate=learning_rate,
+                                         clipvalue=clipping_rate if clipping_rate else 0),
+                          loss='sparse_categorical_crossentropy',
+                          metrics=['accuracy'])
+
+            # Train
+            model.fit(X_train_seq, y_train_seq,
+                      validation_data=(X_test_seq, y_test_seq),
+                      batch_size=int(batch_size),
+                      epochs=int(epochs),
+                      callbacks=[ResetStatesCallback()],
+                      shuffle=False)
+
+            # Save model
+            model.save(model_output)
+            print(f"Model saved to {model_output}")
+
+        except Exception as e:
+            import traceback
+            raise Exception(f"Fatal error during model training: {traceback.format_exc()}")
+
     def preload_model(self,model_to_use):
         # Load the saved LSTM model
         model = tensorflow.keras.models.load_model(model_to_use)
