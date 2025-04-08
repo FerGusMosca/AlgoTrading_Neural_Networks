@@ -59,6 +59,7 @@ class RoutingDashboardController:
         self.router.get("/get_market_data")(self.get_market_data)
         self.router.get("/get_execution_reports")(self.get_execution_reports)
         self.router.get("/get_accounts")(self.get_accounts)
+        self.router.get("/get_portfolio")(self.get_portfolio)
 
     async def read_root(self, request: Request):
         """Serves the Routing Dashboard HTML page."""
@@ -194,3 +195,15 @@ class RoutingDashboardController:
             for acc in accounts
             if acc.broker == broker
         ]
+
+    def get_portfolio(self, account_id: str = Query(...)):
+        """Mocked response for client portfolio"""
+        mock_securities = [
+            {"symbol": "GGAL", "type": "Stock", "currency": "ARS", "qty": 100, "avg_px": 270.50},
+            {"symbol": "YPFD", "type": "Stock", "currency": "ARS", "qty": 50, "avg_px": 1420.10}
+        ]
+        mock_currencies = [
+            {"amount": 45000, "currency": "ARS"},
+            {"amount": 1200, "currency": "USD"}
+        ]
+        return JSONResponse(content={"securities": mock_securities, "currencies": mock_currencies})

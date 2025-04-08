@@ -305,10 +305,14 @@
                 <label for="exchange">Exchange:</label>
                 <input type="text" id="exchange" name="exchange" value="SMART" readonly>
 
-                <label for="account">Account:</label>
-                <select id="account" name="account">
-                </select>
-
+               <label for="account">Account:</label>
+                <div style="display: flex; gap: 10px;">
+                    <select id="account" name="account" style="flex: 2;"></select>
+                    <button type="button" onclick="loadPortfolio()"
+                        style="flex: 1; background-color: #6BAF75; color: white; font-weight: bold; border: none; border-radius: 4px; cursor: pointer;">
+                        🔍
+                    </button>
+                </div>
 
                 <button type="submit">Submit Order</button>
             </form>
@@ -361,12 +365,100 @@
                         </table>
                     </div>
                 </div>
+
+
+
             </div>
+            <div id="portfolio-section" style="margin-top: 30px; display: none;">
+                        <h2 id="portfolio-title">Portfolio</h2>
 
+                        <!-- Securities Table -->
+                        <div class="table-wrapper">
+                            <h3>Securities</h3>
+                            <div class="scrollable-table">
+                                <table class="execution-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Symbol</th>
+                                            <th>Type</th>
+                                            <th>Currency</th>
+                                            <th>Qty</th>
+                                            <th>Avg. Px</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="securities-positions-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
 
-        </div>
+                        <!-- Currencies Table -->
+                        <div class="table-wrapper">
+                            <h3>Currencies</h3>
+                            <div class="scrollable-table">
+                                <table class="execution-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Holdings</th>
+                                            <th>Currency</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="currency-positions-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+            </div>
     </div>
     <script>
+
+
+    function loadPortfolio() {
+        const accountSelect = document.getElementById("account");
+        const accountId = accountSelect.value;
+
+        if (!accountId || accountId === "-") {
+            alert("Please select a valid account.");
+            return;
+        }
+
+        fetch(`/routing_dashboard/get_portfolio?account_id=${accountId}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("portfolio-title").innerText = `${accountSelect.selectedOptions[0].text} Portfolio`;
+                document.getElementById("portfolio-section").style.display = "block";
+
+                const securitiesBody = document.getElementById("securities-positions-table");
+                securitiesBody.innerHTML = "";
+                data.securities.forEach(row => {
+                    securitiesBody.innerHTML += `
+                        <tr>
+                            <td>${row.symbol}</td>
+                            <td>${row.type}</td>
+                            <td>${row.currency}</td>
+                            <td>${row.qty}</td>
+                            <td>${row.avg_px}</td>
+                        </tr>
+                    `;
+                });
+
+                const currenciesBody = document.getElementById("currency-positions-table");
+                currenciesBody.innerHTML = "";
+                data.currencies.forEach(row => {
+                    currenciesBody.innerHTML += `
+                        <tr>
+                            <td>${row.amount}</td>
+                            <td>${row.currency}</td>
+                        </tr>
+                    `;
+                });
+            })
+            .catch(error => {
+                alert("Error loading portfolio");
+                console.error(error);
+            });
+    }
+
 
     function updateAccountOptions() {
         const broker = document.getElementById("broker").value;
