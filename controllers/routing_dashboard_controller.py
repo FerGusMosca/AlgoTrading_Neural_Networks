@@ -1,4 +1,5 @@
 import asyncio
+import time
 from http.client import HTTPException
 from typing import Dict
 
@@ -16,6 +17,7 @@ from common.dto.account_info_dto import AccountInfo
 from common.dto.websocket_conn.cancel_order_dto import CancelOrderDTO
 from common.dto.websocket_conn.client_messages.cancel_order_req import CancelOrderReq
 from common.dto.websocket_conn.client_messages.new_order_req import NewOrderReq
+from common.dto.websocket_conn.client_messages.portfolio_req import PortfolioReq
 from common.dto.websocket_conn.execution_report_dto import ExecutionReportDTO
 from common.dto.websocket_conn.market_data_dto import MarketDataDTO
 from common.dto.websocket_conn.order_dto import OrderDTO
@@ -40,6 +42,7 @@ class RoutingDashboardController:
         self.market_data = {}
         self.execution_reports = {}
         self.order_broker = {}
+        self.portfolios = {}  # Keyed by AccountNumber
 
         self.account_manager = AccountManager(fund_mgmt_dashboard_cs)
 
@@ -70,11 +73,11 @@ class RoutingDashboardController:
 
     async def evaluate_connections(self):
         self.ws_ib_prod_client = WebSocketClient(self.ib_prod_ws, self.logger, self.store_market_data,
-                                                 self.store_execution_report,Brokers.IB_PROD.value)
+                                                 self.store_execution_report,self.store_portfolio,Brokers.IB_PROD.value)
         self.ws_ib_dev_client = WebSocketClient(self.ib_dev_ws, self.logger, self.store_market_data,
-                                                self.store_execution_report,Brokers.IB_DEV.value)
+                                                self.store_execution_report,self.store_portfolio,Brokers.IB_DEV.value)
         self.ws_primary_client = WebSocketClient(self.primary_prod_ws, self.logger, self.store_market_data,
-                                                 self.store_execution_report,Brokers.BYMA_PROD.value)
+                                                 self.store_execution_report,self.store_portfolio,Brokers.BYMA_PROD.value)
 
         # Dictionary to store connection results
         self.connection_status = {
@@ -107,6 +110,9 @@ class RoutingDashboardController:
         """Stores the latest execution report for each ClOrdId."""
         key=ExecutionReportDTO.get_execution_report_key(execution_report.cl_ord_id)
         self.execution_reports[key] = execution_report.dict()
+
+    def store_portfolio(self, portfolio):
+        self.portfolios[portfolio.AccountNumber] = portfolio
 
     def store_market_data(self, market_data: MarketDataDTO):
         """Stores the latest market data for each symbol."""
@@ -196,14 +202,40 @@ class RoutingDashboardController:
             if acc.broker == broker
         ]
 
-    def get_portfolio(self, account_id: str = Query(...)):
-        """Mocked response for client portfolio"""
-        mock_securities = [
-            {"symbol": "GGAL", "type": "Stock", "currency": "ARS", "qty": 100, "avg_px": 270.50},
-            {"symbol": "YPFD", "type": "Stock", "currency": "ARS", "qty": 50, "avg_px": 1420.10}
-        ]
-        mock_currencies = [
-            {"amount": 45000, "currency": "ARS"},
-            {"amount": 1200, "currency": "USD"}
-        ]
-        return JSONResponse(content={"securities": mock_securities, "currencies": mock_currencies})
+    def _get_broker_for_account(self, account_number: str) -> str:
+        for acc in self.account_manager.get_all_accounts():
+            if acc.account_number == account_number:
+                return acc.broker
+        raise ValueError(f"Broker not found for account {account_number}")
+
+    async def get_portfolio(self, account_id: str = Query(...)):
+        account_number = account_id  # mismo valor
+        broker = self._get_broker_for_account(account_number)
+
+        req = PortfolioReq(AccountNumber=account_number)
+
+        await self.send_to_broker(req.model_dump_json(), broker)
+
+        for _ in range(10):  # Espera máx 5 segs
+            if account_number in self.portfolios:
+                portfolio = self.portfolios[account_number]
+                return JSONResponse(content={
+                    "securities": [
+                        {
+                            "symbol": pos.Symbol,
+                            "type": pos.Type,
+                            "currency": pos.Currency,
+                            "qty": pos.Qty,
+                            "avg_px": pos.AvgPx
+                        } for pos in portfolio.SecurityPositions
+                    ],
+                    "currencies": [
+                        {
+                            "amount": pos.Qty,
+                            "currency": pos.Currency
+                        } for pos in portfolio.LiquidPositions
+                    ]
+                })
+            time.sleep(0.5)
+        else:
+            return JSONResponse(content={"error": "Portfolio not received"}, status_code=504)

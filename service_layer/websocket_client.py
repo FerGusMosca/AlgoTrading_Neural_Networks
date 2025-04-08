@@ -5,14 +5,15 @@ import json
 from common.dto.websocket_conn.execution_report_dto import ExecutionReportDTO
 from framework.common.logger.message_type import MessageType
 from common.dto.websocket_conn.market_data_dto import  MarketDataDTO
-
+from common.dto.websocket_conn.portfolio_dto import PortfolioDTO
 class WebSocketClient:
-    def __init__(self, ws_url, logger, market_data_callback,execution_report_callback,broker_id):
+    def __init__(self, ws_url, logger, market_data_callback,execution_report_callback,store_portfolio_callback,broker_id):
         """Initializes the WebSocket client with a given URL, logger, and callback function."""
         self.ws_url = ws_url
         self.logger = logger
         self.market_data_callback = market_data_callback  # Function to send processed data
         self.execution_report_callback=execution_report_callback
+        self.store_portfolio_callback=store_portfolio_callback
         self.broker_id=broker_id
         self.connection = None
         self.is_connected = False
@@ -84,6 +85,10 @@ class WebSocketClient:
                 execution_report = ExecutionReportDTO.from_execution_report(data,self.broker_id)
                 self.logger.do_log(f"Received Execution Report: {execution_report}", MessageType.INFO)
                 self.execution_report_callback(execution_report)
+            elif "Msg" in data and data["Msg"] == "PortfolioMsg":
+                portfolio = PortfolioDTO.from_raw_msg(data)
+                self.logger.do_log(f"Received Portfolio: {portfolio}", MessageType.INFO)
+                self.store_portfolio_callback(portfolio)
             else:
                 self.logger.do_log(f"Received unknown msg {data['Msg']}",MessageType.DEBUG)
         except Exception as e:
