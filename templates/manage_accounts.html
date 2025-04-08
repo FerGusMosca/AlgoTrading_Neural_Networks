@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Accounts</title>
+    <style>
+        body {
+            background-color: #0D1117;
+            color: #e0e0e0;
+            font-family: Arial, sans-serif;
+            padding: 30px;
+        }
+
+        h1 {
+            color: #58A6FF;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: #161B22;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #444;
+        }
+
+        form {
+            margin-top: 30px;
+        }
+
+        input, select {
+            padding: 10px;
+            width: 100%;
+            margin-bottom: 10px;
+            background-color: #21262D;
+            color: white;
+            border: 1px solid #444;
+        }
+
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Manage Accounts</h1>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Account Number</th>
+                <th>Account Name</th>
+                <th>Broker</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for acc in accounts %}
+                <tr>
+                    <td>{{ acc.account_number }}</td>
+                    <td>{{ acc.account_name }}</td>
+                    <td>{{ acc.broker }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Add or Update Account</h2>
+    <form method="post" action="/accounts/save">
+        <input type="text" name="account_number" placeholder="Account Number" required>
+        <input type="text" name="account_name" placeholder="Account Name" required>
+        <select name="broker" required>
+            <option value="IB_PROD">IB_PROD</option>
+            <option value="IB_DEV">IB_DEV</option>
+            <option value="BYMA_PROD">BYMA_PROD</option>
+        </select>
+        <button type="submit">Save Account</button>
+    </form>
+
+</body>
+</html>

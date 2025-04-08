@@ -1,3 +1,4 @@
+# ✅ Updated AccountManager with persistence method
 import pyodbc
 from business_entities.account import Account
 
@@ -11,7 +12,6 @@ class AccountManager:
         self.connection = pyodbc.connect(connection_string)
 
     def get_all_accounts(self) -> list[Account]:
-        """Fetches all accounts from the database via stored procedure."""
         accounts = []
         with self.connection.cursor() as cursor:
             cursor.execute("{CALL GetAccounts}")
@@ -23,3 +23,10 @@ class AccountManager:
                 )
                 accounts.append(account)
         return accounts
+
+    def persist_account(self, account: Account):
+        """Calls the stored procedure to insert or update an account."""
+        with self.connection.cursor() as cursor:
+            params = (account.account_number, account.account_name, account.broker)
+            cursor.execute("{CALL PersistAccount (?, ?, ?)}", params)
+            self.connection.commit()

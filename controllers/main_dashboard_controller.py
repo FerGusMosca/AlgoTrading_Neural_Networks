@@ -4,11 +4,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
+from controllers.account_controller import AccountController
 from controllers.display_custom_etf_controller import DisplayCustomETFController
 from controllers.display_series_controller import DisplaySeriesController
 from controllers.load_series_controller import LoadSeriesController
 from controllers.routing_dashboard_controller import RoutingDashboardController
 from controllers.simulate_indicator_strategy_controller import SimulateIndicatorStrategy
+from data_access_layer.account_manager import AccountManager
 from framework.common.logger.message_type import MessageType
 
 
@@ -45,6 +47,10 @@ class MainDashboardController:
         # 📌 Register Display Series Controller
         self.display_series_controller = DisplaySeriesController(config_settings, logger)
         self.app.include_router(self.display_series_controller.router, prefix="/display_series")
+
+        # 📌 Register Account Controller
+        self.account_controller = AccountController(AccountManager(fund_mgmt_dashboard_cs))
+        self.app.include_router(self.account_controller.router)
 
         # ✅ Set up the templates directory
         templates_path = Path(__file__).parent.parent / "templates"
