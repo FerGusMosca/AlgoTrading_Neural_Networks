@@ -22,9 +22,11 @@ class MainDashboardController:
         ib_prod_ws = config_settings["IB_PROD_WS"]
         primary_prod_ws = config_settings["PRIMARY_PROD_WS"]
         ib_dev_ws = config_settings["IB_DEV_WS"]
+        fund_mgmt_dashboard_cs= config_settings["fund_mgmt_dashboard_cs"]
+
 
         # ✅ Instantiate RoutingDashboardController (WITHOUT creating another FastAPI app)
-        self.routing_dashboard = RoutingDashboardController(logger, ib_prod_ws, primary_prod_ws, ib_dev_ws)
+        self.routing_dashboard = RoutingDashboardController(logger, ib_prod_ws, primary_prod_ws, ib_dev_ws,fund_mgmt_dashboard_cs)
         # ✅ Include the router from RoutingDashboardController
         self.app.include_router(self.routing_dashboard.router, prefix="/routing_dashboard")
 

@@ -191,8 +191,10 @@ def process_display_order_routing_screen(cmd):
     primary_prod_ws = config_settings["PRIMARY_PROD_WS"]
     ib_dev_ws = config_settings["IB_DEV_WS"]
 
+    fund_mgmt_dashboard_cs = config_settings["fund_mgmt_dashboard_cs"]
 
-    wmc= RoutingDashboardController(logger, ib_prod_ws, primary_prod_ws, ib_dev_ws)
+
+    wmc= RoutingDashboardController(logger, ib_prod_ws, primary_prod_ws, ib_dev_ws,fund_mgmt_dashboard_cs)
 
     wmc.display_order_routing_screen()
     print(f"Web Manager Logic successfully shown...")

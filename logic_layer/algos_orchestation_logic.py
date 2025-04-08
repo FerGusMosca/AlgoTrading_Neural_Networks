@@ -857,49 +857,56 @@ class AlgosOrchestationLogic:
             rnn_predictions_today_df = pd.concat([rnn_predictions_today_df, rnn_predictions_curr_window_df.iloc[-1].to_frame().T],ignore_index=True)
         return rnn_predictions_today_df
 
-
-    def __process_LSTM_day_as_cum_sliding_window__(self,rnn_model_processer,model_to_use,test_series_df,timesteps,
-                                                   day,symbol,variables_csv):
+    def __process_LSTM_day_as_cum_sliding_window__(self, rnn_model_processer, model_to_use, test_series_df,
+                                                   timesteps, day, symbol, variables_csv,
+                                                   warmup_minutes=60):
         rnn_predictions_today_df = None
-        #preloaded_model = rnn_model_processer.preload_model(model_to_use=model_to_use)
-        states=None
+        warmup_seconds = warmup_minutes * 60
+        states = None
+
         for i, window in enumerate(self.__sliding_window__(test_series_df, timesteps)):
             test_series_curr_window_df = window.copy()
             min_timestamp = test_series_curr_window_df["date"].min()
             max_timestamp = test_series_curr_window_df["date"].max()
 
-            curr_min_df= test_series_df[test_series_df['date'] <= max_timestamp]
-            self.logger.do_log(f"Processing Window from {min_timestamp} to {max_timestamp} for day {day} for symbol {symbol}",MessageType.INFO)
+            # Skip predictions if not enough time has passed (warm-up period)
+            if (max_timestamp - min_timestamp).total_seconds() < warmup_seconds:
+                self.logger.do_log(f"Skipping prediction from {min_timestamp} to {max_timestamp} (warm-up)",
+                                   MessageType.INFO)
+                continue
 
+            curr_min_df = test_series_df[test_series_df['date'] <= max_timestamp].tail(timesteps)
+            self.logger.do_log(
+                f"Processing Window from {min_timestamp} to {max_timestamp} for day {day} for symbol {symbol}",
+                MessageType.INFO)
 
+            if rnn_predictions_today_df is None:
+                rnn_predictions_today_df = pd.DataFrame(columns=['trading_symbol', 'date', 'formatted_date', 'action'])
 
-            if rnn_predictions_today_df is None:  # we initialize the summarization df
-                rnn_predictions_today_df =  pd.DataFrame(columns=['trading_symbol', 'date', 'formatted_date', 'action'])
-
-            rnn_predictions_curr_window_df = rnn_model_processer.test_stateful_LSTM(symbol=symbol,
-                                                                                    test_series_df=curr_min_df,
-                                                                                    model_to_use=model_to_use,
-                                                                                    timesteps=timesteps,
-                                                                                    price_to_use="close",
-                                                                                    variables_csv=variables_csv)
-
-
-
-            # rnn_predictions_curr_window_df,states = rnn_model_processer.test_daytrading_LSTM(symbol=symbol,
-            #                                                                                  test_series_df=curr_min_df,
-            #                                                                                  model_to_use=model_to_use,
-            #                                                                                  timesteps=timesteps,
-            #                                                                                  price_to_use="close",
-            #                                                                                  prev_states=states)
+            rnn_predictions_curr_window_df = rnn_model_processer.test_cumulative_window_LSTM(
+                symbol=symbol,
+                test_series_df=curr_min_df,
+                model_to_use=model_to_use,
+                timesteps=timesteps,
+                price_to_use="close",
+                variables_csv=variables_csv
+            )
 
             pred_action = rnn_predictions_curr_window_df["action"].iloc[-1]
             curr_mkt_price = rnn_predictions_curr_window_df["trading_symbol_price"].iloc[-1]
             end_of_timestamp = rnn_predictions_curr_window_df["date"].iloc[-1]
-            self.logger.do_log(f"Predicting at {pred_action} at end of {end_of_timestamp} at current mkt price={curr_mkt_price} for symbol {symbol}",MessageType.INFO)
 
-            rnn_predictions_today_df = pd.concat([rnn_predictions_today_df, rnn_predictions_curr_window_df.iloc[-1].to_frame().T],ignore_index=True)
+            self.logger.do_log(
+                f"Predicting {pred_action} at end of {end_of_timestamp} at current mkt price={curr_mkt_price} for symbol {symbol}",
+                MessageType.INFO
+            )
+
+            rnn_predictions_today_df = pd.concat(
+                [rnn_predictions_today_df, rnn_predictions_curr_window_df.iloc[-1].to_frame().T],
+                ignore_index=True
+            )
+
         return rnn_predictions_today_df
-
 
     def __run_LSTM_daily_backtest__(self,day,rnn_predictions_today_df,portf_summary):
         self.logger.do_log(f"Backtesting all day {day} for symbol {portf_summary.symbol}", MessageType.INFO)

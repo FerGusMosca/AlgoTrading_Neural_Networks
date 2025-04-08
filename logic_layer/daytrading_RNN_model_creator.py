@@ -293,6 +293,42 @@ class DayTradingRNNModelCreator:
 
         return X_test
 
+    def __get_test_sets_from_model__(self, test_series_df, model,
+                                     symbol_col='trading_symbol', date_col='date'):
+        """
+        Prepare test set exactly like __get_test_sets_daily__, using the saved scaler.
+
+        Parameters:
+            test_series_df (pd.DataFrame): DataFrame with test data
+            model (keras.Model): Already loaded model (used only to infer shape)
+            symbol_col (str): Column name for symbol
+            date_col (str): Column name for date
+
+        Returns:
+            np.ndarray: X_test normalized and ready for inference
+        """
+
+        # Preprocess trading symbol (LabelEncoder)
+        if symbol_col in test_series_df.columns:
+            from sklearn.preprocessing import LabelEncoder
+            label_encoder_symbol = LabelEncoder()
+            test_series_df[symbol_col] = label_encoder_symbol.fit_transform(test_series_df[symbol_col])
+
+        # Preprocess date to timestamp
+        if date_col in test_series_df.columns:
+            test_series_df[date_col] = pd.to_datetime(test_series_df[date_col])
+            test_series_df[date_col] = test_series_df[date_col].map(pd.Timestamp.timestamp)
+
+        # Use all columns in test_series_df as features
+        feature_columns = [col for col in test_series_df.columns]
+        X_test = test_series_df[feature_columns].values
+
+            # Normalize the feature data
+        scaler = StandardScaler()
+        X_test = scaler.fit_transform(X_test)
+
+        return X_test
+
     def __get_test_sets__(self, test_series_df, symbol_col='trading_symbol', date_col='date',
                           variables_csv=None,normalize=True):
         """
@@ -825,56 +861,125 @@ class DayTradingRNNModelCreator:
         model = tensorflow.keras.models.load_model(model_to_use)
         return  model
 
-    def test_stateful_LSTM(self, symbol, test_series_df, model_to_use, timesteps, price_to_use="close",
-                                      preloaded_model=None):
+    def test_cumulative_window_LSTM(self, symbol, test_series_df, model_to_use, timesteps, price_to_use="close",
+                                    preloaded_model=None, variables_csv=None):
+        """
+        Predict the last action of a cumulative sliding window using a non-stateful model.
+        This simulates statefulness by growing the input window step by step.
+
+        Parameters:
+            symbol (str): Trading symbol
+            test_series_df (pd.DataFrame): The current window of test data
+            model_to_use (str): Path to saved .keras model
+            timesteps (int): Number of timesteps used by the model
+            price_to_use (str): Column suffix for price data
+            preloaded_model (keras.Model): Optional preloaded model
+            variables_csv (str): Ignored in this version
+
+        Returns:
+            pd.DataFrame: DataFrame with one row prediction (last minute of window)
+        """
         self.__preformat_test_sets__(test_series_df)
 
-        # Prepare the test dataset
-        X_test = self.__get_test_sets__(test_series_df, symbol_col="trading_symbol", date_col="date")
-
-        # Load the LSTM model
         if preloaded_model is None:
             model = tensorflow.keras.models.load_model(model_to_use)
         else:
             model = preloaded_model
 
-        # Create a time series generator for sequential test data
-        test_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(
-            X_test, np.zeros(len(X_test)), length=timesteps, batch_size=1
-        )
+        # Use model-based feature detection
+        X_test = self.__get_test_sets_from_model__(test_series_df, model)
 
-        # Perform predictions iteratively
-        predictions = []
-        for i in range(len(test_generator)):
-            X_batch, _ = test_generator[i]  # Get the current batch (1 timestep window)
-            pred = model.predict(X_batch, batch_size=1)  # No states involved
-            predictions.append(pred)
+        # Extract last <timesteps> from cumulative sequence
+        timesteps = model.input_shape[1]
+        n_features = model.input_shape[2]
+        X_input = X_test[-timesteps:]
 
-        # Convert predictions to actions (e.g., LONG, SHORT, FLAT)
-        predictions = np.vstack(predictions)  # Combine predictions into a single array
-        actions = np.argmax(predictions, axis=1)
+        # Validate shape
+        if X_input.shape[1] != n_features:
+            raise ValueError(f"Expected {n_features} features but got {X_input.shape[1]}.")
 
-        # Map actions to readable labels
+        # Reshape to (1, timesteps, n_features)
+        input_batch = np.expand_dims(X_input, axis=0)
+        print("Predicting with input shape:", input_batch.shape)
+
+        # Run prediction
+        pred = model.predict(input_batch, batch_size=1)
+        action_idx = np.argmax(pred[0])
+
+        # Map prediction to label
         action_labels = {0: "LONG", 1: "SHORT", 2: "FLAT"}
-        action_series = pd.Series(actions).map(action_labels)
+        action = action_labels[action_idx]
 
-        # Adjust the DataFrame to match prediction length
-        dates = pd.to_datetime(test_series_df['date'].iloc[timesteps:].reset_index(drop=True), unit='s')
-        formatted_dates = dates.dt.strftime(_OUTPUT_DATE_FORMAT)
+        # Extract last timestamp
+        date = pd.to_datetime(test_series_df['date'].iloc[-1], unit='s')
+        formatted_date = date.strftime(_OUTPUT_DATE_FORMAT)
 
-        # Create the final result DataFrame
+        # Build result
         result_df = pd.DataFrame({
-            'trading_symbol': symbol,
-            'date': dates,
-            'formatted_date': formatted_dates,
-            'action': action_series
+            'trading_symbol': [symbol],
+            'date': [date],
+            'formatted_date': [formatted_date],
+            'action': [action]
         })
 
-        # Add trading prices for better analysis
-        result_df = self.__add_trading_prices__(test_series_df, result_df, f"{price_to_use}_{symbol}", dates,
-                                                "trading_symbol_price")
+        result_df = self.__add_trading_prices__(
+            test_series_df, result_df,
+            f"{price_to_use}_{symbol}", [date],
+            "trading_symbol_price"
+        )
 
         return result_df
+
+    # def test_stateful_LSTM(self, symbol, test_series_df, model_to_use, timesteps, price_to_use="close",
+    #                                   preloaded_model=None):
+    #     self.__preformat_test_sets__(test_series_df)
+    #
+    #     # Prepare the test dataset
+    #     X_test = self.__get_test_sets__(test_series_df, symbol_col="trading_symbol", date_col="date")
+    #
+    #     # Load the LSTM model
+    #     if preloaded_model is None:
+    #         model = tensorflow.keras.models.load_model(model_to_use)
+    #     else:
+    #         model = preloaded_model
+    #
+    #     # Create a time series generator for sequential test data
+    #     test_generator = tensorflow.keras.preprocessing.sequence.TimeseriesGenerator(
+    #         X_test, np.zeros(len(X_test)), length=timesteps, batch_size=1
+    #     )
+    #
+    #     # Perform predictions iteratively
+    #     predictions = []
+    #     for i in range(len(test_generator)):
+    #         X_batch, _ = test_generator[i]  # Get the current batch (1 timestep window)
+    #         pred = model.predict(X_batch, batch_size=1)  # No states involved
+    #         predictions.append(pred)
+    #
+    #     # Convert predictions to actions (e.g., LONG, SHORT, FLAT)
+    #     predictions = np.vstack(predictions)  # Combine predictions into a single array
+    #     actions = np.argmax(predictions, axis=1)
+    #
+    #     # Map actions to readable labels
+    #     action_labels = {0: "LONG", 1: "SHORT", 2: "FLAT"}
+    #     action_series = pd.Series(actions).map(action_labels)
+    #
+    #     # Adjust the DataFrame to match prediction length
+    #     dates = pd.to_datetime(test_series_df['date'].iloc[timesteps:].reset_index(drop=True), unit='s')
+    #     formatted_dates = dates.dt.strftime(_OUTPUT_DATE_FORMAT)
+    #
+    #     # Create the final result DataFrame
+    #     result_df = pd.DataFrame({
+    #         'trading_symbol': symbol,
+    #         'date': dates,
+    #         'formatted_date': formatted_dates,
+    #         'action': action_series
+    #     })
+    #
+    #     # Add trading prices for better analysis
+    #     result_df = self.__add_trading_prices__(test_series_df, result_df, f"{price_to_use}_{symbol}", dates,
+    #                                             "trading_symbol_price")
+    #
+    #     return result_df
 
 
     def test_LSTM_daily(self,symbol,test_series_df, model_to_use,timesteps,price_to_use="close",
@@ -893,15 +998,6 @@ class DayTradingRNNModelCreator:
 
         print("Resumen del modelo:")
         model.summary()
-
-        # Inspeccionar las capas LSTM
-        for layer in model.layers:
-            if isinstance(layer, tensorflow.keras.layers.LSTM):
-                print(f"\nCapa LSTM encontrada: {layer.name}")
-                print(f"Stateful: {layer.stateful}")
-                print(f"Input shape: {layer.input_shape}")
-                print(f"Units: {layer.units}")
-                print(f"Return sequences: {layer.return_sequences}")
 
         # timestamps= Number of timestamps used in training (adjust this to match your model's training configuration)
         # Create a time series generator for the test data

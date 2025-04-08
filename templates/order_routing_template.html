@@ -36,6 +36,8 @@
                 exchange.value = "BUE";
                 account.innerHTML = '<option value="10262">20262 - Fernando M.</option><option value="11303">11303 - Francisco H.</option>';
             }
+
+            updateAccountOptions();
         }
 
         function formatCurrency(input) {
@@ -305,8 +307,8 @@
 
                 <label for="account">Account:</label>
                 <select id="account" name="account">
-                    <option value="-">-Default-</option>
                 </select>
+
 
                 <button type="submit">Submit Order</button>
             </form>
@@ -366,6 +368,25 @@
     </div>
     <script>
 
+    function updateAccountOptions() {
+        const broker = document.getElementById("broker").value;
+        const accountSelect = document.getElementById("account");
+
+        fetch(`/routing_dashboard/get_accounts?broker=${broker}`)
+            .then(response => response.json())
+            .then(accounts => {
+                accountSelect.innerHTML = "";
+                accounts.forEach(account => {
+                    let option = document.createElement("option");
+                    option.value = account.account_id;
+                    option.text = `${account.account_id} - ${account.client_name}`;
+                    accountSelect.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error("Error fetching accounts:", error);
+            });
+    }
 
 
 
@@ -557,6 +578,11 @@
             });
         }
 
+
+        // Automatically load account options for the default broker on page load
+        document.addEventListener("DOMContentLoaded", () => {
+            updateAccountOptions();
+        });
 
     </script>
     

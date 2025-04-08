@@ -2,16 +2,17 @@ import asyncio
 from http.client import HTTPException
 from typing import Dict
 
-from fastapi import FastAPI, WebSocket, Request, Body, APIRouter
+from fastapi import FastAPI, WebSocket, Request, Body, APIRouter, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from typing import List
 import uvicorn
 import threading
 import json
 
 from starlette.responses import JSONResponse
 
+from common.dto.account_info_dto import AccountInfo
 from common.dto.websocket_conn.cancel_order_dto import CancelOrderDTO
 from common.dto.websocket_conn.client_messages.cancel_order_req import CancelOrderReq
 from common.dto.websocket_conn.client_messages.new_order_req import NewOrderReq
@@ -19,13 +20,14 @@ from common.dto.websocket_conn.execution_report_dto import ExecutionReportDTO
 from common.dto.websocket_conn.market_data_dto import MarketDataDTO
 from common.dto.websocket_conn.order_dto import OrderDTO
 from common.enums.brokers import Brokers
+from data_access_layer.account_manager import AccountManager
 from framework.common.logger.message_type import MessageType
 from service_layer.websocket_client import WebSocketClient
 
 
 
 class RoutingDashboardController:
-    def __init__(self, logger, ib_prod_ws, primary_prod_ws, ib_dev_ws):
+    def __init__(self, logger, ib_prod_ws, primary_prod_ws, ib_dev_ws,fund_mgmt_dashboard_cs):
         self.logger = logger
         self.ib_prod_ws = ib_prod_ws
         self.primary_prod_ws = primary_prod_ws
@@ -38,6 +40,8 @@ class RoutingDashboardController:
         self.market_data = {}
         self.execution_reports = {}
         self.order_broker = {}
+
+        self.account_manager = AccountManager(fund_mgmt_dashboard_cs)
 
         # Start evaluating connections in a separate thread
         threading.Thread(target=self._run_async_evaluation, daemon=True).start()
@@ -54,6 +58,7 @@ class RoutingDashboardController:
         self.router.get("/get_connection_status")(self.get_connection_status)
         self.router.get("/get_market_data")(self.get_market_data)
         self.router.get("/get_execution_reports")(self.get_execution_reports)
+        self.router.get("/get_accounts")(self.get_accounts)
 
     async def read_root(self, request: Request):
         """Serves the Routing Dashboard HTML page."""
@@ -180,3 +185,12 @@ class RoutingDashboardController:
             uvicorn.run(self.app, host="0.0.0.0", port=port)
 
         threading.Thread(target=run, daemon=True).start()
+
+    def get_accounts(self, broker: str = Query(...)) -> List[AccountInfo]:
+        """Returns account options for a specific broker from the database."""
+        accounts = self.account_manager.get_all_accounts()
+        return [
+            AccountInfo(account_id=acc.account_number, client_name=acc.account_name)
+            for acc in accounts
+            if acc.broker == broker
+        ]
