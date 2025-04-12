@@ -28,7 +28,7 @@ class DisplayCustomETFController(BaseController):
         # 📌 Define Routes
         self.router.get("/", response_class=HTMLResponse)(self.display_page)
         self.router.post("/upload_custom_etf")(self.upload_custom_etf)
-        self.router.get("/get_chart_data")(self.get_chart_data)
+        self.router.get("/get_chart_data")(self.get_chart_data_w_mmov)
 
     async def display_page(self, request: Request):
         """Renders the custom ETF upload page."""
@@ -36,9 +36,34 @@ class DisplayCustomETFController(BaseController):
 
     from fastapi import UploadFile, File, HTTPException
 
-    async def upload_custom_etf(self, file: UploadFile = File(...),
+
+    def calc_mov_avgs(self,moving_avg):
+        # ✅ Compute moving average if requested by user
+        if moving_avg and moving_avg.strip().isdigit():
+            window = int(moving_avg)
+            if window <= 0:
+                raise ValueError("Moving average must be a positive integer")
+
+            # ✅ Get all MTM values (including None) to keep proper alignment
+            values = [item.MTM for item in self.detailed_MTMS]
+
+            # ✅ Create a pandas Series, keeping original index alignment
+            mtm_series = pd.Series(values)
+
+            # ✅ Calculate moving average, which will naturally produce NaNs for the first (window - 1) points
+            ma_series = mtm_series.rolling(window=window).mean()
+
+            # ✅ Convert result to a list of float/None values (for JSON serialization)
+            self.moving_avg_values = [None if pd.isna(val) else float(val) for val in ma_series.tolist()]
+        else:
+            # No moving average requested or invalid input
+            self.moving_avg_values = []
+
+    async def upload_custom_etf(self,
+                                file: UploadFile = File(...),
                                 start_date: str = Form(...),
-                                end_date: str = Form(...)):
+                                end_date: str = Form(...),
+                                moving_avg: str = Form(None)):
         """Handles the file upload."""
         try:
             if not file:
@@ -58,6 +83,8 @@ class DisplayCustomETFController(BaseController):
             dstart_date = datetime.strptime(start_date, "%Y-%m-%d").date()
             dend_date = datetime.strptime(end_date, "%Y-%m-%d").date()
             self.detailed_MTMS= aol.model_custom_etf(weights_csv,symbols_csv,dstart_date,dend_date)
+
+            self.calc_mov_avgs(moving_avg)
 
             self.logger.do_log( {"message": f"File '{file.filename}' uploaded successfully"},MessageType.INFO)
 

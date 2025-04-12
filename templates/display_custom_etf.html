@@ -98,6 +98,14 @@
             <label for="end_date">End Date:</label>
             <input type="date" id="end_date" name="end_date">
 
+            <br>
+            <input type="checkbox" id="enable_mavg" onchange="toggleMovingAvgInput()">
+            <label for="enable_mavg">Enable Moving Average</label>
+
+            <input type="number" id="mavg_period" placeholder="Mov. Avg. Period" min="1" style="margin-left:10px;" disabled>
+            <span id="mavg_error" style="color: red; display: none;">* Required and must be positive</span>
+
+
             <button type="button" id="uploadButton" onclick="uploadETF()">Upload</button>
         </form>
         <p id="uploadResult"></p> <!-- ✅ Display Upload Results -->
@@ -110,6 +118,17 @@
 
 
     <script>
+
+
+        function toggleMovingAvgInput() {
+            let checkbox = document.getElementById("enable_mavg");
+            let input = document.getElementById("mavg_period");
+            let error = document.getElementById("mavg_error");
+            input.disabled = !checkbox.checked;
+            input.value = "";
+            error.style.display = "none";
+        }
+
 
          // ✅ Set default date range (last 10 years)
             document.addEventListener("DOMContentLoaded", function () {
@@ -138,6 +157,17 @@
             formData.append("file", file);
             formData.append("start_date", startDate);
             formData.append("end_date", endDate);
+
+            if (document.getElementById("enable_mavg").checked) {
+                let mavgVal = document.getElementById("mavg_period").value;
+                if (!mavgVal || parseInt(mavgVal) <= 0) {
+                    document.getElementById("mavg_error").style.display = "inline";
+                    return;
+                }
+                formData.append("moving_avg", parseInt(mavgVal));
+            } else {
+                formData.append("moving_avg", "");
+            }
 
             // ✅ Disable button and show loading text
             uploadButton.disabled = true;
@@ -170,42 +200,36 @@
         }
 
 
-        function drawChart(dates, values) {
-            var trace = {
+        function drawChart(dates, values, movingAvg = []) {
+            let traces = [{
                 x: dates,
                 y: values,
                 mode: "lines",
-                line: { color: "blue" }
-            };
+                line: { color: "blue" },
+                name: "ETF Value"
+            }];
 
-            var layout = {
+            if (movingAvg.length > 0) {
+                traces.push({
+                    x: dates,
+                    y: movingAvg,
+                    mode: "lines",
+                    line: { color: "red", width: 2 },
+                    name: "Moving Average"
+                });
+            }
+
+            let layout = {
                 title: "Custom ETF Time Series",
                 xaxis: { title: "Date" },
-                yaxis: { title: "Value", autorange: true }, // ✅ Ensure autorange is enabled
+                yaxis: { title: "Value", autorange: true },
                 dragmode: "zoom",
                 margin: { t: 50, b: 50 }
             };
 
-            Plotly.newPlot("chartContainer", [trace], layout);
-
-            // ✅ Add event listener for zoom (range selector)
-            document.getElementById("chartContainer").on("plotly_relayout", function (eventData) {
-                if (eventData["xaxis.range"]) {
-                    let [start, end] = eventData["xaxis.range"];
-
-                    // ✅ Filter data based on the selected range
-                    let filteredValues = values.filter((_, i) => dates[i] >= start && dates[i] <= end);
-
-                    if (filteredValues.length > 0) {
-                        let minY = Math.min(...filteredValues);
-                        let maxY = Math.max(...filteredValues);
-
-                        // ✅ Update y-axis range dynamically
-                        Plotly.relayout("chartContainer", { "yaxis.range": [minY, maxY] });
-                    }
-                }
-            });
+            Plotly.newPlot("chartContainer", traces, layout);
         }
+
 
 
 
@@ -225,7 +249,7 @@
                     return;
                 }
 
-                drawChart(data.dates, data.values);
+                drawChart(data.dates, data.values, data.moving_avg);
             })
             .catch(error => {
                 console.error("Error fetching chart data:", error);
