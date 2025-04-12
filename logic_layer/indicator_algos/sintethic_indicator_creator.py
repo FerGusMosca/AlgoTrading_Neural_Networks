@@ -4,6 +4,7 @@ from common.enums.arima_parameters import ArimaParameters
 from common.enums.columns_prefix import ColumnsPrefix
 from common.enums.indicator_type import IndicatorType
 from common.enums.on_off_indicator_values import OnOffIndicatorValue
+from common.enums.positive_threshold_parameters import PositiveThresholdParameters
 from common.util.slope_calculator import SlopeCalculator
 from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
@@ -37,6 +38,21 @@ class SintheticIndicatorCreator():
         current_slope = row[f"{ColumnsPrefix.CLOSE_PREFIX.value}{indicator.indicator}_{SlopeBacktester._SLOPE_POSFIX}"]
         all_on_ind = False if np.isnan(current_slope) or current_slope > 0 else all_on_ind
         return all_on_ind
+
+    def __process_threshold_indicator__(self,indicators_series_df,row,indicator,n_algo_param_dict, inv_ind=False):
+        date=row["date"]
+        filtered_df = indicators_series_df[indicators_series_df['date'] <= date]
+
+        self.logger.do_log(f"Processing predictions for {date} for indicator {indicator.indicator}",MessageType.INFO)
+        pos_threshold = self.__extract_variable__(PositiveThresholdParameters.pos_threshold.value, n_algo_param_dict, indicator.type)
+
+        curr_val = row[f"{ColumnsPrefix.CLOSE_PREFIX.value}{indicator.indicator}"]
+
+        self.logger.do_log(
+            f"Predictions for {date} for indicator {indicator.indicator} successfully processed:",
+            MessageType.INFO)
+
+        return curr_val>pos_threshold if inv_ind is False else curr_val<pos_threshold
 
 
     def __process_arima_indicator__(self,indicators_series_df,row,indicator,n_algo_param_dict, inv_ind=False):
@@ -126,6 +142,9 @@ class SintheticIndicatorCreator():
                 elif indicator.type == IndicatorType.ARIMA.value:
                     all_on_ind=self.__process_arima_indicator__(indicators_series_df, row, indicator,
                                                                 n_algo_param_dict,inv_ind=False)
+                elif indicator.type == IndicatorType.POS_THRESHOLD.value:
+                    all_on_ind= self.__process_threshold_indicator__(indicators_series_df, row, indicator,
+                                                                     n_algo_param_dict,inv_ind=False)
                 elif indicator.type == IndicatorType.SARIMA.value:
                     all_on_ind=self.__process_sarima_indicator__(indicators_series_df, row, indicator,
                                                                 n_algo_param_dict,inv_ind=False)

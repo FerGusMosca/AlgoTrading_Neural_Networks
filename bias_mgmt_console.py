@@ -220,6 +220,10 @@ def process_create_sinthetic_indicator(cmd):
     #SARIMA
     s = __get_param__(cmd, "s", True, None)
 
+
+    #POS_THRESHOLDS ind
+    pos_threshold = __get_param__(cmd, "pos_threshold", True, None)
+
     cmd_param_dict = {}
 
     if slope_units is not None:
@@ -245,6 +249,9 @@ def process_create_sinthetic_indicator(cmd):
 
     if min_units_to_pred is not None:
         cmd_param_dict["min_units_to_pred"] = min_units_to_pred
+
+    if pos_threshold is not None:
+        cmd_param_dict["pos_threshold"] = pos_threshold
 
     process_create_sinthetic_indicator_logic(comp_apth, model_candle=model_candle, d_from=d_from, d_to=d_to,
                                             algo_params=cmd_param_dict)
