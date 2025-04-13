@@ -220,9 +220,13 @@ def process_create_sinthetic_indicator(cmd):
     #SARIMA
     s = __get_param__(cmd, "s", True, None)
 
-
     #POS_THRESHOLDS ind
     pos_threshold = __get_param__(cmd, "pos_threshold", True, None)
+
+    #SUDDEN_STOP
+    st_units = __get_param__(cmd, "st_units", True, None)
+    st_eval_p = __get_param__(cmd, "st_eval_p", True, None)
+    st_blackout_p = __get_param__(cmd, "st_blackout_p", True, None)
 
     cmd_param_dict = {}
 
@@ -252,6 +256,15 @@ def process_create_sinthetic_indicator(cmd):
 
     if pos_threshold is not None:
         cmd_param_dict["pos_threshold"] = pos_threshold
+
+    if st_units is not None:
+        cmd_param_dict["st_units"] = st_units
+
+    if st_eval_p is not None:
+        cmd_param_dict["st_eval_p"] = st_eval_p
+
+    if st_blackout_p is not None:
+        cmd_param_dict["st_blackout_p"] = st_blackout_p
 
     process_create_sinthetic_indicator_logic(comp_apth, model_candle=model_candle, d_from=d_from, d_to=d_to,
                                             algo_params=cmd_param_dict)

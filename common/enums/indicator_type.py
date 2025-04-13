@@ -7,6 +7,7 @@ class IndicatorType(Enum):
     INV_SLOPE = "inv_slope"
     ARIMA = "arima"
     POS_THRESHOLD = "pos_threshold"
+    SUDDEN_STOP = "sudden_stop"
     SARIMA="sarima"
     INV_ARIMA = "inv_arima"
     INV_SARIMA="inv_sarima"

@@ -1,4 +1,3 @@
-import asyncio
 import traceback
 from datetime import timedelta, datetime
 
@@ -6,16 +5,13 @@ from dateutil.relativedelta import relativedelta
 
 from business_entities.porft_summary import PortfSummary
 from common.dto.indicator_type_dto import IndicatorTypeDTO
-from common.enums.columns_prefix import ColumnsPrefix
 from common.enums.grouping_criterias import GroupCriteria as gc
-from common.enums.intervals import Intervals
-from common.enums.parameters_keys import ParametersKeys
+from common.enums.parameters.parameters_keys import ParametersKeys
 from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws, SlidingWindowStrategy
 from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas, TradingAlgoStrategy
 from common.util.dataframe_filler import DataframeFiller
 from common.util.dataframe_printer import DataframePrinter
 from common.util.date_handler import DateHandler
-from common.util.economic_value_handler import EconomicValueHandler
 from common.util.etf_logic_manager import ETFLogicManager
 from common.util.graph_builder import GraphBuilder
 from common.util.image_handler import ImageHandler
@@ -23,14 +19,12 @@ from common.util.light_logger import LightLogger
 from common.util.portfolio_summary_analyzer import PortfolioSummaryAnalyzer
 from common.util.random_walk_generator import RandomWalkGenerator
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
-from data_access_layer.economic_series_manager import EconomicSeriesManager
 from data_access_layer.timestamp_classification_manager import TimestampClassificationManager
 
 from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
 from logic_layer.convolutional_neural_netowrk import ConvolutionalNeuralNetwork
 from logic_layer.indicator_algos.sintethic_indicator_creator import SintheticIndicatorCreator
-from logic_layer.trading_algos.base_class_daily_trading_backtester import BaseClassDailyTradingBacktester
 from logic_layer.trading_algos.buy_and_hold_backtester import BuyAndHoldBacktester
 from logic_layer.trading_algos.direct_slope_backtester import DirectSlopeBacktester
 from logic_layer.trading_algos.inv_slope_backtester import InvSlopeBacktester

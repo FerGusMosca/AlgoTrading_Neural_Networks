@@ -1,13 +1,15 @@
 import numpy as np
 
-from common.enums.arima_parameters import ArimaParameters
+from common.enums.parameters.arima_parameters import ArimaParameters
 from common.enums.columns_prefix import ColumnsPrefix
 from common.enums.indicator_type import IndicatorType
 from common.enums.on_off_indicator_values import OnOffIndicatorValue
-from common.enums.positive_threshold_parameters import PositiveThresholdParameters
+from common.enums.parameters.positive_threshold_parameters import PositiveThresholdParameters
+from common.enums.parameters.sudden_stop_parameters import SuddenStopParameters
 from common.util.slope_calculator import SlopeCalculator
 from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
+from logic_layer.indicator_algos.sudden_stop_indicator import SuddenStopIndicator
 from logic_layer.trading_algos.inv_slope_backtester import InvSlopeBacktester
 from logic_layer.trading_algos.slope_backtester import SlopeBacktester
 
@@ -15,6 +17,7 @@ from logic_layer.trading_algos.slope_backtester import SlopeBacktester
 class SintheticIndicatorCreator():
 
     def __init__(self,logger=None):
+        self.sudden_stop_ind={}
         self.logger=logger
 
 
@@ -29,14 +32,14 @@ class SintheticIndicatorCreator():
                 return  def_val
 
 
-    def __proces__direct_slope__indicator__(self,row,indicator,all_on_ind):
+    def __proces__direct_slope__indicator__(self,row,indicator):
         current_slope = row[f"{ColumnsPrefix.CLOSE_PREFIX.value}{indicator.indicator}_{SlopeBacktester._SLOPE_POSFIX}"]
-        all_on_ind = False if np.isnan(current_slope) or current_slope < 0 else all_on_ind
+        all_on_ind = False if np.isnan(current_slope) or current_slope < 0 else True
         return all_on_ind
 
-    def __proces__inv_slope__indicator__(self,row,indicator,all_on_ind):
+    def __proces__inv_slope__indicator__(self,row,indicator):
         current_slope = row[f"{ColumnsPrefix.CLOSE_PREFIX.value}{indicator.indicator}_{SlopeBacktester._SLOPE_POSFIX}"]
-        all_on_ind = False if np.isnan(current_slope) or current_slope > 0 else all_on_ind
+        all_on_ind = False if np.isnan(current_slope) or current_slope > 0 else True
         return all_on_ind
 
     def __process_threshold_indicator__(self,indicators_series_df,row,indicator,n_algo_param_dict, inv_ind=False):
@@ -53,6 +56,26 @@ class SintheticIndicatorCreator():
             MessageType.INFO)
 
         return curr_val>pos_threshold if inv_ind is False else curr_val<pos_threshold
+
+    def __process_sudden_top__(self,indicators_series_df,row,indicator,n_algo_param_dict, inv_ind=False):
+        date=row["date"]
+        key = indicator.indicator.strip().upper()
+        if key not in  self.sudden_stop_ind:
+            st_units = self.__extract_variable__(SuddenStopParameters.st_units.value, n_algo_param_dict, indicator.type)
+            st_eval_p = self.__extract_variable__(SuddenStopParameters.st_eval_p.value, n_algo_param_dict, indicator.type)
+            st_blackout_p = self.__extract_variable__(SuddenStopParameters.st_blackout_p.value, n_algo_param_dict, indicator.type)
+
+            self.sudden_stop_ind[key]=SuddenStopIndicator(indicator.indicator,st_units,st_eval_p,st_blackout_p)
+
+
+        sudden_stop_ind=self.sudden_stop_ind[key]
+        self.logger.do_log(
+            f"Processing predictions for {date} for indicator {indicator.indicator} (units={sudden_stop_ind.units} months)",
+            MessageType.INFO)
+
+        sudden_stop = sudden_stop_ind.eval_sudden_stop(date,indicators_series_df)
+
+        return not sudden_stop #If not sudden Stop --> Indicator active
 
 
     def __process_arima_indicator__(self,indicators_series_df,row,indicator,n_algo_param_dict, inv_ind=False):
@@ -132,13 +155,13 @@ class SintheticIndicatorCreator():
                                                                     f"{ColumnsPrefix.CLOSE_PREFIX.value}{indicator.indicator}")
 
         for index,row in indicators_series_df.iterrows():
-            all_on_ind=True
+            all_on_ind_arr=[]
             for indicator in indicator_type_arr:
-
+                all_on_ind=True
                 if indicator.type==IndicatorType.DIRECT_SLOPE.value:
-                    all_on_ind=self.__proces__direct_slope__indicator__(row,indicator,all_on_ind)
+                    all_on_ind=self.__proces__direct_slope__indicator__(row,indicator)
                 elif indicator.type==IndicatorType.INV_SLOPE.value:
-                    all_on_ind = self.__proces__inv_slope__indicator__(row, indicator, all_on_ind)
+                    all_on_ind = self.__proces__inv_slope__indicator__(row, indicator)
                 elif indicator.type == IndicatorType.ARIMA.value:
                     all_on_ind=self.__process_arima_indicator__(indicators_series_df, row, indicator,
                                                                 n_algo_param_dict,inv_ind=False)
@@ -155,14 +178,18 @@ class SintheticIndicatorCreator():
                 elif indicator.type == IndicatorType.INV_SARIMA.value:
                     all_on_ind=self.__process_sarima_indicator__(indicators_series_df, row, indicator,
                                                                 n_algo_param_dict,inv_ind=True)
+                elif indicator.type == IndicatorType.SUDDEN_STOP.value:
+                    all_on_ind=self.__process_sudden_top__(indicators_series_df, row, indicator,
+                                                           n_algo_param_dict,inv_ind=True)
                 else:
                     raise Exception(f"Could not recognize indicator type {indicator.type}")
 
-                if not all_on_ind:
-                    break
+                all_on_ind_arr.append(all_on_ind)
 
 
-            indicators_series_df.at[index, 'signal'] = OnOffIndicatorValue.ON_NUMERIC.value if all_on_ind \
+            all_ind_active= all(all_on_ind_arr)
+
+            indicators_series_df.at[index, 'signal'] = OnOffIndicatorValue.ON_NUMERIC.value if all_ind_active \
                                                                 else OnOffIndicatorValue.OFF_NUMERIC.value
 
 
