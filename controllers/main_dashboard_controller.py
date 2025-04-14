@@ -1,5 +1,4 @@
-from urllib import request
-
+from fastapi import Request
 from fastapi import FastAPI, Request, APIRouter
 from fastapi.params import Form
 from fastapi.responses import HTMLResponse
@@ -22,7 +21,7 @@ from data_access_layer.account_manager import AccountManager
 from data_access_layer.user_manager import UserManager
 from framework.common.logger.message_type import MessageType
 from fastapi.responses import HTMLResponse
-
+from fastapi.templating import Jinja2Templates
 class MainDashboardController:
     def __init__(self, logger, config_settings):
         self.logger = logger
@@ -107,9 +106,9 @@ class MainDashboardController:
         import threading
         threading.Thread(target=run, daemon=True).start()
 
+    from fastapi import Request
 
-
-    async def login(self, response: Response, username: str = Form(...), password: str = Form(...)):
+    async def login(self, request: Request, username: str = Form(...), password: str = Form(...)):
         """
         Handles the login logic, checking user credentials and providing feedback
         """
@@ -118,10 +117,9 @@ class MainDashboardController:
             response = RedirectResponse(url="/", status_code=302)
             response.set_cookie(key="session", value=token, httponly=True, max_age=3600)
             return response
-
-        # Improved error message for invalid credentials displayed in HTML
-        error_message = "Invalid credentials: The username or password you entered is incorrect. Please check your input and try again."
-        return self.templates.TemplateResponse("login.html", {"request": request, "error_message": error_message})
+        else:
+            error_message = "Invalid credentials: The username or password you entered is incorrect. Please check your input and try again."
+            return self.templates.TemplateResponse("login.html", {"request": request, "error_message": error_message})
 
     async def logout(self, request: Request):
         response = RedirectResponse(url="/login", status_code=302)

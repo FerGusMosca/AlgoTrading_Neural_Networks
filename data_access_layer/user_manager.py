@@ -1,3 +1,5 @@
+import hashlib
+
 import pyodbc
 from business_entities.user import User
 from itsdangerous import TimestampSigner
@@ -23,8 +25,8 @@ class UserManager:
         """
         with self.connection.cursor() as cursor:
             # Calls the stored procedure to verify the username and password
-            params = (username, password)
-            cursor.execute("{CALL sp_authenticate_user (?,?)}", params)
+            params = (username, hashlib.sha256(password.encode('utf-8')).hexdigest())
+            cursor.execute("{CALL AuthenticateUser (?,?)}", params)
             result = cursor.fetchone()  # Fetches the result from the stored procedure
 
             # If the result contains a value (1 means success)

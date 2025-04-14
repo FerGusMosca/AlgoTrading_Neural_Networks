@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <title>Bias - Main Dashboard</title>
     <style>
+
+        .error-message {
+            color: red;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
         body {
             background-color: #0D1117;
             font-family: Arial, sans-serif;
@@ -21,16 +29,18 @@
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
-            width: 80%; /* Adjust width for responsiveness */
+            width: 80%; /* Ajustamos el tamaño para adaptarlo mejor */
             max-width: 1200px;
+            height: 70vh; /* Puedes ajustar esto también según el tamaño deseado */
         }
 
         .image-side {
-            background-image: url("/static/image.png"); /* Ensure this path is correct */
-            background-size: cover; /* Ensures the image covers the full background */
-            background-position: center; /* Centers the image */
-            width: 50%; /* Half of the container */
+            background-image: url("/static/image.png"); /* Asegúrate de que la ruta sea correcta */
+            background-size: cover; /* Hace que la imagen cubra todo el fondo */
+            background-position: center; /* Centra la imagen */
+            width: 50%; /* Ajustamos al 50% del contenedor */
             height: 100%;
+            display: block;
         }
 
         .login-box {
@@ -99,6 +109,13 @@
                 <input type="password" name="password" placeholder="Password" required />
                 <button type="submit">Login</button>
             </form>
+            {% if error_message %}
+                <div class="error-message">
+                    <p>{{ error_message }}</p>
+                </div>
+            {% endif %}
+
+
         </div>
     </div>
 </body>
