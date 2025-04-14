@@ -3,6 +3,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from business_entities.account import Account
 from data_access_layer.account_manager import AccountManager
+
+
 class AccountController:
     def __init__(self, account_manager: AccountManager):
         self.router = APIRouter()
