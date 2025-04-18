@@ -83,11 +83,17 @@ class MainDashboardController:
         self.app.get("/login", response_class=HTMLResponse)(self.login_form)
         self.app.get("/logout")(self.logout)
 
+        self.app.add_event_handler("startup", self.startup_event)
+
         self.app.add_middleware(
             AuthMiddleware,
             secret_key="my_super_secret",
             exempt_paths=["/login", "/login/", "/static", "/static/", "/favicon.ico"]
         )
+
+    async def startup_event(self):
+        await self.routing_dashboard.initialize()
+        self.app.include_router(self.routing_dashboard.router)
 
     async def login_form(self, request: Request):
         return self.templates.TemplateResponse("login.html", {"request": request})

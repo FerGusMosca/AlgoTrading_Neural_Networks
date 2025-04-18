@@ -416,15 +416,25 @@
     function loadPortfolio() {
         const accountSelect = document.getElementById("account");
         const accountId = accountSelect.value;
+        const spinner = document.getElementById("loading-spinner");
 
         if (!accountId || accountId === "-") {
             alert("Please select a valid account.");
             return;
         }
 
+        spinner.style.display = "block";  // 👈 Mostrar el loading
+
         fetch(`/routing_dashboard/get_portfolio?account_id=${accountId}`)
             .then(response => response.json())
             .then(data => {
+                spinner.style.display = "none";  // 👈 Ocultar el loading al recibir respuesta
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
                 document.getElementById("portfolio-title").innerText = `${accountSelect.selectedOptions[0].text} Portfolio`;
                 document.getElementById("portfolio-section").style.display = "block";
 
@@ -454,10 +464,12 @@
                 });
             })
             .catch(error => {
+                spinner.style.display = "none";
                 alert("Error loading portfolio");
                 console.error(error);
             });
     }
+
 
 
     function updateAccountOptions() {
@@ -679,6 +691,8 @@
     </script>
     
     
-    
+    <div id="loading-spinner" style="display: none; position: fixed; top: 20px; right: 20px; background-color: #222; color: white; padding: 10px 20px; border-radius: 8px; box-shadow: 0 0 10px black;">
+    ⏳ Loading portfolio...
+    </div>
 </body>
 </html>

@@ -45,9 +45,7 @@ class RoutingDashboardController:
         self.portfolios = {}  # Keyed by AccountNumber
 
         self.account_manager = AccountManager(fund_mgmt_dashboard_cs)
-
-        # Start evaluating connections in a separate thread
-        threading.Thread(target=self._run_async_evaluation, daemon=True).start()
+        self.portfolio_futures = {}  # Dict[str, asyncio.Future]
 
         # ✅ Use APIRouter instead of FastAPI
         self.router = APIRouter()
@@ -64,20 +62,16 @@ class RoutingDashboardController:
         self.router.get("/get_accounts")(self.get_accounts)
         self.router.get("/get_portfolio")(self.get_portfolio)
 
-    async def read_root(self, request: Request):
-        """Serves the Routing Dashboard HTML page."""
-        return self.templates.TemplateResponse("order_routing_template.html", {"request": request})
-    def _run_async_evaluation(self):
-        """Runs evaluate_connections in an independent event loop."""
-        asyncio.run(self.evaluate_connections())
 
-    async def evaluate_connections(self):
+    async def initialize(self):
         self.ws_ib_prod_client = WebSocketClient(self.ib_prod_ws, self.logger, self.store_market_data,
-                                                 self.store_execution_report,self.store_portfolio,Brokers.IB_PROD.value)
+                                                 self.store_execution_report, self.store_portfolio,
+                                                 Brokers.IB_PROD.value)
         self.ws_ib_dev_client = WebSocketClient(self.ib_dev_ws, self.logger, self.store_market_data,
-                                                self.store_execution_report,self.store_portfolio,Brokers.IB_DEV.value)
+                                                self.store_execution_report, self.store_portfolio, Brokers.IB_DEV.value)
         self.ws_primary_client = WebSocketClient(self.primary_prod_ws, self.logger, self.store_market_data,
-                                                 self.store_execution_report,self.store_portfolio,Brokers.BYMA_PROD.value)
+                                                 self.store_execution_report, self.store_portfolio,
+                                                 Brokers.BYMA_PROD.value)
 
         # Dictionary to store connection results
         self.connection_status = {
@@ -86,7 +80,6 @@ class RoutingDashboardController:
             Brokers.BYMA_PROD.value: False
         }
 
-        # Attempt to connect to each WebSocket
         await asyncio.gather(
             self._connect_and_store_status(Brokers.IB_PROD.value, self.ws_ib_prod_client),
             self._connect_and_store_status(Brokers.IB_DEV.value, self.ws_ib_dev_client),
@@ -95,6 +88,10 @@ class RoutingDashboardController:
 
         # Log results
         self.logger.do_log("WebSocket connection evaluation completed.", MessageType.INFO)
+
+    async def read_root(self, request: Request):
+        """Serves the Routing Dashboard HTML page."""
+        return self.templates.TemplateResponse("order_routing_template.html", {"request": request})
 
     async def _connect_and_store_status(self, name, ws_client):
         """Attempts to connect a WebSocket client and stores its status."""
@@ -113,6 +110,10 @@ class RoutingDashboardController:
 
     def store_portfolio(self, portfolio):
         self.portfolios[portfolio.AccountNumber] = portfolio
+        if portfolio.AccountNumber in self.portfolio_futures:
+            future = self.portfolio_futures.pop(portfolio.AccountNumber)
+            if not future.done():
+                future.set_result(portfolio)
 
     def store_market_data(self, market_data: MarketDataDTO):
         """Stores the latest market data for each symbol."""
@@ -209,33 +210,38 @@ class RoutingDashboardController:
         raise ValueError(f"Broker not found for account {account_number}")
 
     async def get_portfolio(self, account_id: str = Query(...)):
-        account_number = account_id  # mismo valor
+        account_number = account_id
         broker = self._get_broker_for_account(account_number)
 
         req = PortfolioReq(AccountNumber=account_number)
 
+        future = asyncio.get_running_loop().create_future()
+        self.portfolio_futures[account_number] = future
+
         await self.send_to_broker(req.model_dump_json(), broker)
 
-        for _ in range(10):  # Espera máx 5 segs
-            if account_number in self.portfolios:
-                portfolio = self.portfolios[account_number]
-                return JSONResponse(content={
-                    "securities": [
-                        {
-                            "symbol": pos.Symbol,
-                            "type": pos.Type,
-                            "currency": pos.Currency,
-                            "qty": pos.Qty,
-                            "avg_px": pos.AvgPx
-                        } for pos in portfolio.SecurityPositions
-                    ],
-                    "currencies": [
-                        {
-                            "amount": pos.Qty,
-                            "currency": pos.Currency
-                        } for pos in portfolio.LiquidPositions
-                    ]
-                })
-            time.sleep(0.5)
-        else:
-            return JSONResponse(content={"error": "Portfolio not received"}, status_code=504)
+        try:
+            # Wait for the response or timeout after 10 seconds
+            portfolio = await asyncio.wait_for(future, timeout=10.0)
+        except asyncio.TimeoutError:
+            self.portfolio_futures.pop(account_number, None)
+            return JSONResponse(content={"error": "Portfolio not received (timeout)"}, status_code=504)
+
+        return JSONResponse(content={
+            "securities": [
+                {
+                    "symbol": pos.Symbol,
+                    "type": pos.Type,
+                    "currency": pos.Currency,
+                    "qty": pos.Qty,
+                    "avg_px": pos.AvgPx
+                } for pos in portfolio.SecurityPositions
+            ],
+            "currencies": [
+                {
+                    "amount": pos.Qty,
+                    "currency": pos.Currency
+                } for pos in portfolio.LiquidPositions
+            ]
+        })
+
