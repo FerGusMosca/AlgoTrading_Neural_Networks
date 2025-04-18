@@ -11,6 +11,7 @@ import uvicorn
 import threading
 import json
 
+from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from common.dto.account_info_dto import AccountInfo
@@ -61,6 +62,7 @@ class RoutingDashboardController:
         self.router.get("/get_execution_reports")(self.get_execution_reports)
         self.router.get("/get_accounts")(self.get_accounts)
         self.router.get("/get_portfolio")(self.get_portfolio)
+        self.router.post("/retry_connection")(self.retry_connection)
 
 
     async def initialize(self):
@@ -94,10 +96,16 @@ class RoutingDashboardController:
         return self.templates.TemplateResponse("order_routing_template.html", {"request": request})
 
     async def _connect_and_store_status(self, name, ws_client):
-        """Attempts to connect a WebSocket client and stores its status."""
-        await ws_client.connect()
-        self.connection_status[name] = ws_client.get_status()
-        self.logger.do_log(f"{name} Connection Status: {self.connection_status[name]}", MessageType.INFO)
+        """Attempts to connect a WebSocket client with a timeout and stores its status."""
+        try:
+            await asyncio.wait_for(ws_client.connect(), timeout=5)  # ⏱ 5 segundos de timeout
+            self.connection_status[name] = ws_client.get_status()
+        except asyncio.TimeoutError:
+            self.logger.do_log(f"{name} Connection timed out.", MessageType.ERROR)
+            self.connection_status[name] = False
+        except Exception as e:
+            self.logger.do_log(f"{name} Connection failed: {e}", MessageType.ERROR)
+            self.connection_status[name] = False
 
     async def read_root(self, request: Request):
         """Renderiza la página principal"""
@@ -244,4 +252,34 @@ class RoutingDashboardController:
                 } for pos in portfolio.LiquidPositions
             ]
         })
+
+    class RetryConnectionRequest(BaseModel):
+        broker: str
+    async def retry_connection(self, req: RetryConnectionRequest):
+        broker = req.broker
+        try:
+            ws_map = {
+                "IB_PROD": self.ws_ib_prod_client,
+                "IB_DEV": self.ws_ib_dev_client,
+                "BYMA_PROD": self.ws_primary_client,
+            }
+            client = ws_map.get(broker)
+
+            if not client:
+                return {"status": "error", "message": f"No WebSocket client for broker {broker}"}
+
+            # Try to connect with timeout
+            await asyncio.wait_for(client.connect(), timeout=5)
+
+            # Only get status if connect() succeeded
+            self.connection_status[broker] = client.get_status()
+            return {"status": "success", "connected": self.connection_status[broker]}
+
+        except asyncio.TimeoutError:
+            self.connection_status[broker] = False
+            return {"status": "error", "message": "signal timed out"}
+
+        except Exception as e:
+            self.connection_status[broker] = False
+            return {"status": "error", "message": str(e)}
 
