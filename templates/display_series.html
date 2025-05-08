@@ -313,15 +313,57 @@
             dataList.innerHTML = "";
 
             let recentData = dates.map((date, index) => ({ date, value: values[index] }))
-                                 .slice(-5)
-                                 .reverse();
+                                  .slice(-5)
+                                  .reverse();
 
             recentData.forEach(data => {
                 let li = document.createElement("li");
-                li.innerText = `Date: ${data.date}, Value: ${data.value}`;
+
+                let dateSpan = document.createElement("span");
+                dateSpan.innerText = `Date: ${data.date}, `;
+
+                let valueInput = document.createElement("input");
+                valueInput.type = "number";
+                valueInput.step = "0.01";
+                valueInput.value = data.value;
+                valueInput.style.width = "80px";
+
+                let saveBtn = document.createElement("button");
+                saveBtn.innerText = "Save";
+                saveBtn.style.marginLeft = "10px";
+                saveBtn.onclick = () => updateDataPoint(data.date, valueInput.value);
+
+                li.appendChild(dateSpan);
+                li.appendChild(valueInput);
+                li.appendChild(saveBtn);
                 dataList.appendChild(li);
             });
         }
+
+
+        function updateDataPoint(date, newValue) {
+            let formData = new FormData();
+            formData.append("date", date);
+            formData.append("value", newValue);
+
+            fetch("/display_series/add_data", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                alert(`✔️ ${data.message}`);
+                fetchChartData(); // Refrescar el gráfico
+            })
+            .catch(error => {
+                console.error("Error updating point:", error);
+                alert("❌ Error updating data: " + error.message);
+            });
+        }
+
 
 
         function addNewPoint() {
