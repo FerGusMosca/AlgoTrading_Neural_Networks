@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Global M2 Indicator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background-color: #0D1117;
+            color: #e0e0e0;
+            font-family: Arial, sans-serif;
+            padding: 30px;
+        }
+
+        h1 {
+            color: #58A6FF;
+        }
+
+        input, button {
+            padding: 10px;
+            margin-right: 10px;
+            background-color: #21262D;
+            color: white;
+            border: 1px solid #444;
+        }
+
+        button {
+            background-color: #2ea44f;
+            cursor: pointer;
+        }
+
+        canvas {
+            margin-top: 30px;
+            background-color: #161B22;
+            border: 1px solid #444;
+        }
+    </style>
+</head>
+<body>
+<h1>Global M2 Indicator</h1>
+
+<form id="m2Form">
+    Start Date:
+    <input type="date" name="start_date" value="2010-01-01">
+    End Date:
+    <input type="date" name="end_date" value="2024-12-31">
+    Offset (days):
+    <input type="number" name="offset_days" value="0">
+    <button type="submit" id="calcBtn">Calculate</button>
+</form>
+
+<canvas id="m2Chart" width="1200" height="500"></canvas>
+
+<script>
+    const form = document.getElementById("m2Form");
+    const btn = document.getElementById("calcBtn");
+    const ctx = document.getElementById('m2Chart').getContext('2d');
+    let chart = null;
+
+    form.onsubmit = async function (e) {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+        btn.disabled = true;
+        const oldText = btn.innerText;
+        btn.innerText = 'Calculating...';
+
+        try {
+            const response = await fetch("/global_m2_indicator/calculate", {
+                method: "POST",
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.message) {
+                alert(result.message);
+                if (chart) chart.destroy();
+            } else {
+                const dates = result.dates;
+                const values = result.values;
+
+                if (chart) chart.destroy();
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [{
+                            label: 'Global M2 (USD)',
+                            data: values,
+                            borderWidth: 2,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            x: { ticks: { color: '#ccc' } },
+                            y: { ticks: { color: '#ccc' } }
+                        },
+                        plugins: {
+                            legend: { labels: { color: '#ccc' } }
+                        }
+                    }
+                });
+            }
+
+        } catch (err) {
+            alert("Error calculating indicator.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = oldText;
+        }
+    }
+</script>
+</body>
+</html>
