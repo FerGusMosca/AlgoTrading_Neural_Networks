@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Stripe ACH Bank Account Connection</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    body {
+      background-color: #0D1117;
+      color: #e0e0e0;
+      font-family: Arial, sans-serif;
+      padding: 30px;
+    }
+    input, button {
+      margin: 10px 0;
+      padding: 10px;
+      width: 100%;
+      font-size: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h2>Stripe ACH Bank Account Connection</h2>
+
+  <label>Publishable Key (pk_test_...)</label>
+  <input type="text" id="pk_input" value="pk_test_..." />
+
+  <label>Secret Key (sk_test_...)</label>
+  <input type="text" id="sk_input" value="sk_test_..." />
+
+  <label>Client Secret</label>
+  <input type="text" id="client_secret_input" placeholder="Auto-filled after generating SetupIntent..." />
+
+  <button onclick="generateSetupIntent()">🔄 Generate SetupIntent</button>
+  <button onclick="launchStripeACH()">🏦 Connect Bank Account</button>
+
+  <h3 id="result"></h3>
+
+  <script>
+    async function generateSetupIntent() {
+      const secretKey = document.getElementById("sk_input").value;
+
+      const response = await fetch('/stripe_ACH_POC/create_setup_intent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ secret_key: secretKey })
+      });
+
+      const data = await response.json();
+
+      if (data.client_secret) {
+        document.getElementById("client_secret_input").value = data.client_secret;
+        document.getElementById("result").innerText = `✅ SetupIntent created: ${data.setup_intent_id}`;
+      } else {
+        document.getElementById("result").innerText = `❌ Error: ${data.error}`;
+      }
+    }
+
+    async function launchStripeACH() {
+      const pk = document.getElementById("pk_input").value;
+      const clientSecret = document.getElementById("client_secret_input").value;
+
+      if (!pk || !clientSecret) {
+        alert("Please provide both publishable key and client secret.");
+        return;
+      }
+
+      const stripe = Stripe(pk);
+
+      const { error, setupIntent } = await stripe.collectBankAccountForSetup({
+        clientSecret: clientSecret,
+        params: {
+          payment_method_type: 'us_bank_account',
+          payment_method_data: {
+            billing_details: {
+              name: 'John Doe',
+              email: 'john@example.com',
+            },
+          },
+        },
+      });
+
+      if (error) {
+        document.getElementById("result").innerText = `❌ Error: ${error.message}`;
+      } else {
+        document.getElementById("result").innerText = `✅ The generated token is ${setupIntent.payment_method}`;
+      }
+    }
+  </script>
+</body>
+</html>

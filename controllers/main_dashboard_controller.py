@@ -17,6 +17,7 @@ from controllers.display_series_controller import DisplaySeriesController
 from controllers.load_series_controller import LoadSeriesController
 from controllers.routing_dashboard_controller import RoutingDashboardController
 from controllers.simulate_indicator_strategy_controller import SimulateIndicatorStrategy
+from controllers.stripe_ACH_POC_controller import StripeAchDemoController
 from data_access_layer.account_manager import AccountManager
 from data_access_layer.user_manager import UserManager
 from framework.common.logger.message_type import MessageType
@@ -67,6 +68,11 @@ class MainDashboardController:
         # 📌 Register Account Controller
         self.account_controller = AccountController(AccountManager(fund_mgmt_dashboard_cs))
         self.app.include_router(self.account_controller.router)
+
+
+        # 📌 Stripe ACH POC
+        self.stripe_ACH_POC_controller = StripeAchDemoController(config_settings, logger)
+        self.app.include_router(self.stripe_ACH_POC_controller.router, prefix="/stripe_ACH_POC")
 
         # ✅ Set up the templates directory
         templates_path = Path(__file__).parent.parent / "templates"
