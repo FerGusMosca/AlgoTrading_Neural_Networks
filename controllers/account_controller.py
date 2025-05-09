@@ -16,6 +16,12 @@ class AccountController:
 
         # Endpoint to persist (insert/update) an account
         self.router.post("/accounts/save")(self.save_account)
+        self.router.post("/accounts/delete")(self.delete_account)
+
+
+    async def delete_account(self, account_number: str = Form(...)):
+        self.account_manager.delete_account(account_number)
+        return RedirectResponse(url="/accounts", status_code=303)
 
     async def account_list_view(self, request: Request):
         """Displays all accounts and a form to insert/update."""

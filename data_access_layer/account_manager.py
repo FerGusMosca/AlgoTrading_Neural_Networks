@@ -30,3 +30,10 @@ class AccountManager:
             params = (account.account_number, account.account_name, account.broker)
             cursor.execute("{CALL PersistAccount (?, ?, ?)}", params)
             self.connection.commit()
+
+
+    def delete_account(self, account_number: str):
+        """Calls the stored procedure to delete an account."""
+        with self.connection.cursor() as cursor:
+            cursor.execute("{CALL DeleteAccount (?)}", (account_number,))
+            self.connection.commit()

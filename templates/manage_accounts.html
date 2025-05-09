@@ -64,15 +64,22 @@
                 <th>Account Number</th>
                 <th>Account Name</th>
                 <th>Broker</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
-            {% for acc in accounts %}
-                <tr>
-                    <td>{{ acc.account_number }}</td>
-                    <td>{{ acc.account_name }}</td>
-                    <td>{{ acc.broker }}</td>
-                </tr>
+           {% for acc in accounts %}
+            <tr>
+                <td>{{ acc.account_number }}</td>
+                <td>{{ acc.account_name }}</td>
+                <td>{{ acc.broker }}</td>
+                <td>
+                    <form method="post" action="/accounts/delete" style="display:inline">
+                        <input type="hidden" name="account_number" value="{{ acc.account_number }}">
+                        <button type="submit" style="background-color:#b10000; color:white; border:none; padding:6px 10px;">Delete</button>
+                    </form>
+                </td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>
