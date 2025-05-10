@@ -16,12 +16,37 @@
             color: #58A6FF;
         }
 
-        input, button {
+        form {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .form-column {
+            flex: 1;
+            min-width: 300px;
+            margin-right: 20px;
+        }
+
+        label {
+            display: block;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
+
+        input, select, button {
             padding: 10px;
-            margin-right: 10px;
             background-color: #21262D;
             color: white;
             border: 1px solid #444;
+            margin-bottom: 10px;
+        }
+
+        select[multiple] {
+            width: 100%;
+            height: 160px;
         }
 
         button {
@@ -37,33 +62,53 @@
     </style>
 </head>
 <body>
+
 <h1>Global M2 Indicator</h1>
 
 <form id="m2Form">
-    Start Date:
-    <input type="date" name="start_date" value="2010-01-01">
-    End Date:
-    <input type="date" name="end_date" value="2024-12-31">
-    Offset (days):
-    <input type="number" name="offset_days" value="0">
-    <button type="submit" id="calcBtn">Calculate</button>
+    <!-- Columna izquierda -->
+    <div class="form-column">
+        <label>Start Date:</label>
+        <input type="date" name="start_date" value="2010-01-01">
+        <label>End Date:</label>
+        <input type="date" name="end_date" value="2024-12-31">
+        <label>Offset (days):</label>
+        <input type="number" name="offset_days" value="0">
+        <button type="submit" id="calcBtn">Calculate</button>
+    </div>
+
+    <!-- Columna derecha -->
+    <div class="form-column">
+        <label for="currencySelect">Currencies (Ctrl+Click to select/deselect):</label>
+        <select name="currencies" id="currencySelect" multiple>
+            {% for cur in available_currencies %}
+                <option value="{{ cur }}" selected>{{ cur }}</option>
+            {% endfor %}
+        </select>
+    </div>
 </form>
 
 <canvas id="m2Chart" width="1200" height="500"></canvas>
+<div id="log" style="white-space: pre-wrap; margin-top: 20px; font-family: monospace; color: #aaa;"></div>
 
 <script>
     const form = document.getElementById("m2Form");
     const btn = document.getElementById("calcBtn");
     const ctx = document.getElementById('m2Chart').getContext('2d');
+    const logEl = document.getElementById("log");
     let chart = null;
 
     form.onsubmit = async function (e) {
         e.preventDefault();
 
         const formData = new FormData(form);
+        const selected = Array.from(document.getElementById("currencySelect").selectedOptions).map(o => o.value);
+        selected.forEach(v => formData.append("currencies", v));
+
         btn.disabled = true;
         const oldText = btn.innerText;
         btn.innerText = 'Calculating...';
+        logEl.innerText = "";
 
         try {
             const response = await fetch("/global_m2_indicator/calculate", {
@@ -77,17 +122,15 @@
                 alert(result.message);
                 if (chart) chart.destroy();
             } else {
-                const dates = result.dates;
-                const values = result.values;
-
                 if (chart) chart.destroy();
+
                 chart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: dates,
+                        labels: result.dates,
                         datasets: [{
                             label: 'Global M2 (USD)',
-                            data: values,
+                            data: result.values,
                             borderWidth: 2,
                             fill: true
                         }]
@@ -102,6 +145,10 @@
                         }
                     }
                 });
+
+                if (result.logs) {
+                    logEl.innerText = result.logs.join("\n");
+                }
             }
 
         } catch (err) {
@@ -110,7 +157,8 @@
             btn.disabled = false;
             btn.innerText = oldText;
         }
-    }
+    };
 </script>
+
 </body>
 </html>
