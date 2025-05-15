@@ -34,15 +34,13 @@ class StripeAchDemoController(BaseController):
         try:
             stripe.api_key = payload.secret_key
 
-            # Create Stripe Customer
+            # Create customer first
             customer = stripe.Customer.create(
                 email=payload.email,
                 name=payload.name
             )
 
-            self.logger.do_log(f"✅ Stripe customer created: {customer.id}", MessageType.INFO)
-
-            # Create SetupIntent for ACH
+            # Then create SetupIntent with the customer
             setup_intent = stripe.SetupIntent.create(
                 customer=customer.id,
                 payment_method_types=["us_bank_account"],

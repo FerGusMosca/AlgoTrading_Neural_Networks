@@ -29,21 +29,24 @@
   <input type="text" id="sk_input" value="sk_test_..." />
 
   <label>Email</label>
-  <input type="email" id="email_input" placeholder="john@example.com" />
+  <input type="text" id="email_input" value="john@example.com" />
 
   <label>Name</label>
-  <input type="text" id="name_input" placeholder="John Doe" />
+  <input type="text" id="name_input" value="John Doe" />
 
   <label>Client Secret</label>
   <input type="text" id="client_secret_input" placeholder="Auto-filled after generating SetupIntent..." />
 
-  <button onclick="generateCustomerAndSetupIntent()">🧾 Create Customer + SetupIntent</button>
+  <label>Customer ID</label>
+  <input type="text" id="customer_id_input" placeholder="Auto-filled after generating SetupIntent..." />
+
+  <button onclick="generateSetupIntent()">🔄 Generate SetupIntent</button>
   <button onclick="launchStripeACH()">🏦 Connect Bank Account</button>
 
   <h3 id="result"></h3>
 
   <script>
-    async function generateCustomerAndSetupIntent() {
+    async function generateSetupIntent() {
       const secretKey = document.getElementById("sk_input").value;
       const email = document.getElementById("email_input").value;
       const name = document.getElementById("name_input").value;
@@ -60,6 +63,7 @@
 
       if (data.client_secret) {
         document.getElementById("client_secret_input").value = data.client_secret;
+        document.getElementById("customer_id_input").value = data.customer_id;
         document.getElementById("result").innerText = `✅ SetupIntent created: ${data.setup_intent_id}`;
       } else {
         document.getElementById("result").innerText = `❌ Error: ${data.error}`;
@@ -84,10 +88,10 @@
           payment_method_data: {
             billing_details: {
               name: document.getElementById("name_input").value,
-              email: document.getElementById("email_input").value,
-            },
-          },
-        },
+              email: document.getElementById("email_input").value
+            }
+          }
+        }
       });
 
       if (error) {
