@@ -12,6 +12,8 @@ from controllers.base_controller import BaseController
 
 class SetupIntentRequest(BaseModel):
     secret_key: str
+    email: str
+    name: str
 
 class StripeAchDemoController(BaseController):
     def __init__(self, config_settings, logger):
@@ -23,7 +25,6 @@ class StripeAchDemoController(BaseController):
         self.templates = Jinja2Templates(directory=templates_path)
 
         self.router.get("/", response_class=HTMLResponse)(self.display_page)
-
         self.router.post("/create_setup_intent")(self.create_setup_intent_endpoint)
 
     async def display_page(self, request: Request):
@@ -33,15 +34,27 @@ class StripeAchDemoController(BaseController):
         try:
             stripe.api_key = payload.secret_key
 
+            # Create Stripe Customer
+            customer = stripe.Customer.create(
+                email=payload.email,
+                name=payload.name
+            )
+
+            self.logger.do_log(f"✅ Stripe customer created: {customer.id}", MessageType.INFO)
+
+            # Create SetupIntent for ACH
             setup_intent = stripe.SetupIntent.create(
-                payment_method_types=["us_bank_account"]
+                customer=customer.id,
+                payment_method_types=["us_bank_account"],
+                usage="off_session"
             )
 
             self.logger.do_log(f"✅ SetupIntent created: {setup_intent.id}", MessageType.INFO)
 
             return JSONResponse(content={
                 "client_secret": setup_intent.client_secret,
-                "setup_intent_id": setup_intent.id
+                "setup_intent_id": setup_intent.id,
+                "customer_id": customer.id
             })
 
         except Exception as e:

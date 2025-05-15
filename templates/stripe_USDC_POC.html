@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Stripe USDC Payment (POC)</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    body {
+      background-color: #0D1117;
+      color: #e0e0e0;
+      font-family: Arial, sans-serif;
+      padding: 30px;
+    }
+    input, button {
+      margin: 10px 0;
+      padding: 10px;
+      width: 100%;
+      font-size: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h2>Stripe USDC Payment</h2>
+
+  <label>Publishable Key (pk_test_...)</label>
+  <input type="text" id="pk_input" value="pk_test_..." />
+
+  <label>Secret Key (sk_test_...)</label>
+  <input type="text" id="sk_input" value="sk_test_..." />
+
+  <label>Amount (USD cents)</label>
+  <input type="text" id="amount_input" value="1000" />
+
+  <button onclick="generateUsdcPaymentIntent()">🔄 Generate USDC PaymentIntent</button>
+  <button onclick="launchUsdcPayment()">💸 Confirm USDC Payment</button>
+
+  <h3 id="result"></h3>
+
+  <script>
+    let clientSecretGlobal = "";
+
+    async function generateUsdcPaymentIntent() {
+      const secretKey = document.getElementById("sk_input").value;
+      const amount = document.getElementById("amount_input").value;
+
+      const response = await fetch('/stripe_USDC_POC/create_usdc_payment_intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret_key: secretKey, amount: parseInt(amount) })
+      });
+
+      const data = await response.json();
+      if (data.client_secret) {
+        clientSecretGlobal = data.client_secret;
+        document.getElementById("result").innerText = `✅ PaymentIntent created: ${data.payment_intent_id}`;
+      } else {
+        document.getElementById("result").innerText = `❌ Error: ${data.error}`;
+      }
+    }
+
+    async function launchUsdcPayment() {
+      const pk = document.getElementById("pk_input").value;
+      const stripe = Stripe(pk);
+
+      const { error, paymentIntent } = await stripe.confirmUsdcPayment(clientSecretGlobal, {
+        payment_method: 'usdc'
+      });
+
+      if (error) {
+        document.getElementById("result").innerText = `❌ Error: ${error.message}`;
+      } else {
+        document.getElementById("result").innerText = `✅ Transaction succeeded with PaymentIntent ID: ${paymentIntent.id}`;
+      }
+    }
+  </script>
+</body>
+</html>

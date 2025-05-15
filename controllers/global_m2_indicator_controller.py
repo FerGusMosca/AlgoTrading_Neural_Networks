@@ -48,14 +48,14 @@ class GlobalM2IndicatorController:
                     symbol=m2_symbol,
                     exchange='ECONOMICS',
                     interval=Interval.in_monthly,
-                    n_bars=500
+                    n_bars=200
                 )
 
                 df_fx = self.tv.get_hist(
                     symbol=f"{currency_code}USD",
                     exchange='FX_IDC',
                     interval=Interval.in_monthly,
-                    n_bars=500
+                    n_bars=200
                 )
 
                 if df_m2 is None or df_fx is None or df_m2.empty or df_fx.empty:

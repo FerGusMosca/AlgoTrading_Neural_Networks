@@ -19,6 +19,7 @@ from controllers.load_series_controller import LoadSeriesController
 from controllers.routing_dashboard_controller import RoutingDashboardController
 from controllers.simulate_indicator_strategy_controller import SimulateIndicatorStrategy
 from controllers.stripe_ACH_POC_controller import StripeAchDemoController
+from controllers.stripe_USDC_POC_controller import StripeUSDCDemoController
 from data_access_layer.account_manager import AccountManager
 from data_access_layer.user_manager import UserManager
 from framework.common.logger.message_type import MessageType
@@ -74,6 +75,11 @@ class MainDashboardController:
         # 📌 Stripe ACH POC
         self.stripe_ACH_POC_controller = StripeAchDemoController(config_settings, logger)
         self.app.include_router(self.stripe_ACH_POC_controller.router, prefix="/stripe_ACH_POC")
+
+
+        # 📌 Stripe USDC POC
+        self.stripe_SUDC_POC_controller = StripeUSDCDemoController(config_settings, logger)
+        self.app.include_router(self.stripe_SUDC_POC_controller.router, prefix="/stripe_USDC_POC")
 
         # Registrar el controlador
         global_m2_controller = GlobalM2IndicatorController(config_settings, logger)

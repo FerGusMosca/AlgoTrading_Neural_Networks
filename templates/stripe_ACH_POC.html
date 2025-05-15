@@ -28,24 +28,32 @@
   <label>Secret Key (sk_test_...)</label>
   <input type="text" id="sk_input" value="sk_test_..." />
 
+  <label>Email</label>
+  <input type="email" id="email_input" placeholder="john@example.com" />
+
+  <label>Name</label>
+  <input type="text" id="name_input" placeholder="John Doe" />
+
   <label>Client Secret</label>
   <input type="text" id="client_secret_input" placeholder="Auto-filled after generating SetupIntent..." />
 
-  <button onclick="generateSetupIntent()">🔄 Generate SetupIntent</button>
+  <button onclick="generateCustomerAndSetupIntent()">🧾 Create Customer + SetupIntent</button>
   <button onclick="launchStripeACH()">🏦 Connect Bank Account</button>
 
   <h3 id="result"></h3>
 
   <script>
-    async function generateSetupIntent() {
+    async function generateCustomerAndSetupIntent() {
       const secretKey = document.getElementById("sk_input").value;
+      const email = document.getElementById("email_input").value;
+      const name = document.getElementById("name_input").value;
 
       const response = await fetch('/stripe_ACH_POC/create_setup_intent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ secret_key: secretKey })
+        body: JSON.stringify({ secret_key: secretKey, email: email, name: name })
       });
 
       const data = await response.json();
@@ -75,8 +83,8 @@
           payment_method_type: 'us_bank_account',
           payment_method_data: {
             billing_details: {
-              name: 'John Doe',
-              email: 'john@example.com',
+              name: document.getElementById("name_input").value,
+              email: document.getElementById("email_input").value,
             },
           },
         },
