@@ -40,6 +40,7 @@ def show_commands():
     print("#15-BacktestSlopeModel [symbol] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#16-BacktestSlopeModelOnCustomETF [ETF_path] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#17-CreateSintheticIndicator [comp_path] [model_candle] [from] [to] [slope_units]")
+    print("#18-TrainRF [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [n_estimators] [max_depth] [min_samples_split] [criterion] [batch_size*] [grouping_unit*] [grouping_classif_criteria*] [group_as_mov_avg*] [grouping_mov_avg_unit*] [class_weight*] [make_stationary*] [interval*]")
     print("======================== UI ========================")
     print("#30-BiasMainLandingPage")
     print("#31-DisplayOrderRoutingScreen")
@@ -344,6 +345,100 @@ def process_test_LSTM_cmd(cmd):
 
     print(f"Test LSTM successfully finished...")
 
+
+def process_train_RF(symbol, variables_csv, d_from, d_to, model_output, classification_key,
+                     n_estimators, max_depth, min_samples_split, criterion,
+                     grouping_unit=None, grouping_classif_criteria=None,
+                     group_as_mov_avg=False, grouping_mov_avg_unit=100,
+                     interval=None, make_stationary=False, class_weight=None):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print(f"Initializing dataframe creation for series : {variables_csv}", MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        dataMgm = AlgosOrchestationLogic(
+            config_settings["hist_data_conn_str"],
+            config_settings["ml_reports_conn_str"],
+            config_settings["classification_map_key"] if classification_key is None else classification_key,
+            logger
+        )
+
+        dataMgm.process_train_RF(
+            symbol=symbol,
+            variables_csv=variables_csv,
+            d_from=d_from,
+            d_to=d_to,
+            model_output=model_output.replace('"', ""),
+            classif_key=classification_key,
+            n_estimators=int(n_estimators),
+            max_depth=None if str(max_depth).lower() == "none" else int(max_depth),
+            min_samples_split=int(min_samples_split),
+            criterion=criterion,
+            grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
+            grouping_classif_criteria=grouping_classif_criteria,
+            group_as_mov_avg=bool(group_as_mov_avg),
+            grouping_mov_avg_unit=int(grouping_mov_avg_unit),
+            interval=interval.replace('_', " ") if interval is not None else None,
+            make_stationary=make_stationary,
+            class_weight=None if class_weight is None or str(class_weight).lower() == "none" else class_weight
+        )
+
+        logger.print(f"Random Forest model successfully trained for symbol {symbol} and variables {variables_csv}",
+                     MessageType.INFO)
+
+    except Exception as e:
+        logger.print(f"CRITICAL ERROR running process_train_RF: {str(e)}", MessageType.ERROR)
+
+def process_train_RF_cmd(cmd, cmd_param_list):
+    # Required parameters
+    symbol = __get_param__(cmd, "symbol")
+    variables_csv = __get_param__(cmd, "variables_csv")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    model_output = __get_param__(cmd, "model_output")
+    classif_key = __get_param__(cmd, "classif_key")
+
+    # RF-specific hyperparameters
+    n_estimators = __get_param__(cmd, "n_estimators", True, def_value=100)
+    max_depth = __get_param__(cmd, "max_depth", True, def_value=None)
+    max_depth = None if str(max_depth).lower() == "none" else int(max_depth)
+    class_weight = __get_param__(cmd, "class_weight", True, def_value=None)
+    class_weight = None if class_weight is None or class_weight == "None" else class_weight
+
+    min_samples_split = __get_param__(cmd, "min_samples_split", True, def_value=2)
+    criterion = __get_param__(cmd, "criterion", True, def_value="gini")
+
+    # Optional common flags
+    interval = __get_param__(cmd, "interval", True, def_value=None)
+    grouping_unit = __get_param__(cmd, "grouping_unit", True)
+    grouping_classif_criteria = __get_param__(cmd, "grouping_classif_criteria", True)
+    group_as_mov_avg = __get_bool_param__(cmd, "group_as_mov_avg", True, def_value=False)
+    grouping_mov_avg_unit = __get_param__(cmd, "grouping_mov_avg_unit", True, def_value=100)
+    make_stationary = __get_bool_param__(cmd, "make_stationary", True, def_value=False)
+
+    # Call processing method with parsed params
+    process_train_RF(symbol=symbol,
+                     variables_csv=variables_csv,
+                     d_from=d_from,
+                     d_to=d_to,
+                     model_output=model_output,
+                     classification_key=classif_key,
+                     n_estimators=int(n_estimators),
+                     max_depth=None if max_depth is None else int(max_depth),
+                     min_samples_split=int(min_samples_split),
+                     criterion=criterion,
+                     interval=interval,
+                     grouping_unit=grouping_unit,
+                     grouping_classif_criteria=grouping_classif_criteria,
+                     group_as_mov_avg=group_as_mov_avg,
+                     grouping_mov_avg_unit=grouping_mov_avg_unit,
+                     class_weight=class_weight,
+                     make_stationary=make_stationary)
+
+    print(f"Train RF successfully finished...")
 
 
 def process_traing_LSTM_cmd(cmd,cmd_param_list):
@@ -992,6 +1087,8 @@ def process_commands(cmd):
 
     elif cmd_param_list[0] == "TrainLSTM":
         process_traing_LSTM_cmd(cmd,cmd_param_list)
+    elif cmd_param_list[0] == "TrainRF":
+        process_train_RF_cmd(cmd,cmd_param_list)
 
     elif cmd_param_list[0] == "TrainLSTMWithGrouping":
         process_traing_LSTM_cmd(cmd,cmd_param_list)
