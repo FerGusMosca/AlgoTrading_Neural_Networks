@@ -41,6 +41,7 @@ def show_commands():
     print("#16-BacktestSlopeModelOnCustomETF [ETF_path] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#17-CreateSintheticIndicator [comp_path] [model_candle] [from] [to] [slope_units]")
     print("#18-TrainRF [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [n_estimators] [max_depth] [min_samples_split] [criterion] [batch_size*] [grouping_unit*] [grouping_classif_criteria*] [group_as_mov_avg*] [grouping_mov_avg_unit*] [class_weight*] [make_stationary*] [interval*]")
+    print("#19-TestDailyRF [symbol] [variables_csv] [from] [to] [model_to_use] [portf_size] [trade_comm] [trading_algo] [classif_threshold] [algo_params*]")
     print("======================== UI ========================")
     print("#30-BiasMainLandingPage")
     print("#31-DisplayOrderRoutingScreen")
@@ -308,6 +309,38 @@ def process_backtest_slope_model_on_custom_etf(cmd):
                                                     trading_algo=trading_algo,algo_params=cmd_param_dict)
 
     print(f"Test Backtest Slope Model finished...")
+
+
+def process_test_RF_cmd(cmd):
+    symbol = __get_param__(cmd, "symbol")
+    variables_csv = __get_param__(cmd, "variables_csv")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    model_to_use = __get_param__(cmd, "model_to_use")
+    portf_size = float(__get_param__(cmd, "portf_size"))
+    comm = float(__get_param__(cmd, "comm"))
+    interval = __get_param__(cmd, "interval", True, "1_day")
+    trading_algo = __get_param__(cmd, "trading_algo")
+    grouping_unit = __get_param__(cmd, "grouping_unit", True, None)
+    make_stationary = __get_bool_param__(cmd, "make_stationary", True, False)
+    classif_threshold = float(__get_param__(cmd, "classif_threshold", True, 0.5))
+
+    process_test_daily_RF(
+        symbol=symbol,
+        variables_csv=variables_csv,
+        d_from=d_from,
+        d_to=d_to,
+        model_to_use=model_to_use,
+        portf_size=portf_size,
+        trade_comm=comm,
+        trading_algo=trading_algo,
+        interval=interval,
+        grouping_unit=grouping_unit,
+        make_stationary=make_stationary,
+        classif_threshold=classif_threshold
+    )
+
+    print(f"Test RF successfully finished...")
 
 
 def process_test_LSTM_cmd(cmd):
@@ -878,6 +911,48 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
         logger.print("CRITICAL ERROR running process_train_LSTM:{}".format(str(e)), MessageType.ERROR)
 
 
+
+def process_test_daily_RF(symbol, variables_csv, d_from, d_to, model_to_use, portf_size, trade_comm,
+                          trading_algo, grouping_unit=None, n_params=[], interval=None,
+                          use_sliding_window=None, make_stationary=True, classif_threshold=0.5):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print("Initializing RF model testing for symbol {} and model {} on {}".format(symbol, model_to_use, d_from),
+                     MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
+                                         None,
+                                         logger)
+        interval = interval.replace('_', " ")
+
+        if interval == DataSetBuilder._1_DAY_INTERVAL:
+            dataMgm.process_test_scalping_RF(symbol=symbol, variables_csv=variables_csv,
+                                             model_to_use=model_to_use.replace('"', ""),
+                                             d_from=d_from,
+                                             d_to=d_to,
+                                             portf_size=float(portf_size),
+                                             trade_comm=float(trade_comm),
+                                             trading_algo=trading_algo,
+                                             grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
+                                             n_algo_params=n_params,
+                                             interval=interval if interval is not None else None,
+                                             make_stationary=make_stationary,
+                                             classif_threshold=classif_threshold)
+        else:
+            raise Exception(f"Unknown interval for RF testing: {interval}")
+
+        logger.print("Displaying predictions for RF model: symbol {} and model {} on {}".format(symbol, model_to_use, d_from),
+                     MessageType.INFO)
+
+    except Exception as e:
+        logger.print("CRITICAL ERROR running process_test_daily_RF: {}".format(str(e)), MessageType.ERROR)
+
+
+
 def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model_to_use, portf_size, trade_comm,
                             trading_algo,grouping_unit=None,n_params=[],interval=None,use_sliding_window=None,
                             make_stationary=True,classif_threshold=0.5):
@@ -1106,7 +1181,8 @@ def process_commands(cmd):
         process_test_LSTM_cmd(cmd)
     elif cmd_param_list[0] == "BacktestSlopeModel":
         process_backtest_slope_model(cmd)
-
+    elif cmd_param_list[0] == "TestDailyRF":
+        process_test_RF_cmd(cmd)
     elif cmd_param_list[0] == "BacktestSlopeModelOnCustomETF":
         process_backtest_slope_model_on_custom_etf(cmd)
     elif cmd_param_list[0] == "TestDailyLSTMWithGrouping":

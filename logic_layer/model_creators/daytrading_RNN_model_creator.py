@@ -10,22 +10,13 @@ from keras import Sequential, Input, Model
 from keras.src.callbacks import Callback, ReduceLROnPlateau, EarlyStopping
 from keras.src.layers import TimeDistributed, BatchNormalization, InputLayer
 from keras.src.optimizers import Adam
-from keras.src.utils import to_categorical
-from sklearn.metrics import roc_curve
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split, TimeSeriesSplit
-from sklearn.utils import compute_class_weight
-from statsmodels.tsa.stattools import adfuller
 from tensorflow.keras.layers import LSTM, Dense, Dropout
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from imblearn.over_sampling import SMOTE, BorderlineSMOTE
-from tensorflow.python.keras.regularizers import l2
-
 from common.util.dataframe_filler import DataframeFiller
 from common.util.machine_learning.f1_score import F1Score
 from imblearn.under_sampling import RandomUnderSampler
-import yfinance as yf
 
 from logic_layer.model_creators.base_model_creator import BaseModelCreator
 
@@ -81,61 +72,6 @@ class DayTradingRNNModelCreator(BaseModelCreator):
 
 
     #region Private Methods
-
-    def __preformat_test_sets__(self, test_series_df):
-        """
-        Preformat the test set by dropping NaN values.
-
-        Parameters:
-        test_series_df (pd.DataFrame): DataFrame containing the test time series data.
-        """
-        test_series_df.dropna(inplace=True)
-
-
-
-    def __make_stationary_with_memory__(self, df, state=None):
-        """
-        Make the time series stationary by differencing, using the list of columns
-        previously identified as non-stationary (from differenced_columns.csv).
-        Maintain continuity across blocks using a state.
-
-        Parameters:
-        df (pd.DataFrame): DataFrame with time series data.
-        state (dict): Last values from the previous block for continuity (default: None).
-
-        Returns:
-        tuple: (stationary DataFrame, updated state)
-        """
-        # Load the list of columns that need differencing
-        output_path = os.path.join(_OUTPUT_PATH, 'differenced_columns.csv')
-        if not os.path.exists(output_path):
-            raise FileNotFoundError(
-                f"Expected differenced_columns.csv at {output_path}. Run __make_stationary__ first.")
-
-        differenced_columns = pd.read_csv(output_path)['differenced_columns'].tolist()
-        print(f"Columns to be differenced (loaded from CSV): {differenced_columns}")
-
-        # Apply differencing to the specified columns
-        for col in df.columns:
-            if col in differenced_columns:
-                # If there's a state, use the last value to compute the first difference
-                if state is not None and col in state:
-                    first_value = df[col].iloc[0]
-                    df[col].iloc[0] = first_value - state[col]
-
-                # Apply differencing to the rest of the column
-                df[col] = df[col].diff().fillna(0)
-                print(f"Applied differencing to {col} with continuity.")
-            else:
-                print(f"Skipping {col} (not in differenced columns).")
-
-        # Update the state with the last values of the current block
-        numeric_cols = df.select_dtypes(include=np.number).columns
-        new_state = {col: df[col].iloc[-1] for col in numeric_cols if col in differenced_columns}
-
-        return df, new_state
-
-
 
     def __get_test_sets_daily__(self, test_series_df, symbol_col='trading_symbol', date_col='date'):
         """
@@ -210,76 +146,6 @@ class DayTradingRNNModelCreator(BaseModelCreator):
 
         return X_test
 
-    def __get_test_sets__(self, test_series_df, symbol_col='trading_symbol', date_col='date',
-                          variables_csv=None,normalize=True):
-        """
-        Prepare the test set from the given DataFrame.
-
-        Parameters:
-        test_series_df (pd.DataFrame): DataFrame containing the time series test data.
-        symbol_col (str): The column name for the trading symbol.
-        date_col (str): The column name for the date.
-        variables_csv (str): Comma-separated string of variable names to use as features.
-
-        Returns:
-        np.ndarray: X_test (normalized test features)
-        """
-        # Print the columns and the first few rows of test_series_df for debugging
-        print(f"Columns in test_series_df: {test_series_df.columns.tolist()}")
-        print(f"First 5 rows of test_series_df:\n{test_series_df.head()}")
-
-        # Split variables_csv into a list of feature columns
-        if variables_csv is None:
-            raise ValueError("variables_csv must be provided to determine the feature columns.")
-        expected_features = variables_csv.split(',')
-
-        # Exclude symbol_col, date_col, and any columns not in expected_features
-        feature_columns = [col for col in test_series_df.columns if col in expected_features]
-
-        # Check for missing or extra features
-        missing_features = [col for col in expected_features if col not in feature_columns]
-        extra_features = [col for col in test_series_df.columns if
-                          col not in expected_features and col not in [symbol_col, date_col]]
-
-        if missing_features:
-            raise ValueError(f"Missing columns in test_series_df: {missing_features}")
-        if extra_features:
-            print(f"Warning: Extra columns in test_series_df that will not be used: {extra_features}")
-
-        # Create X_test with the feature columns
-        X_test = test_series_df[feature_columns].values
-        print(f"Shape of X_test before normalization: {X_test.shape}")
-        print(f"Columns in X_test: {feature_columns}")
-
-        # Normalize the feature data
-        if normalize:
-            X_test = self.__load_scaler_and_normalize__(X_test)
-
-        return X_test
-
-    def __add_trading_prices__(self, test_series_df, result_df, symbol, dates, closing_price_col):
-        # Asegúrate de que 'symbol' esté presente en test_series_df
-        if symbol in test_series_df.columns:
-            # Crear un DataFrame temporal con 'date' y la columna del símbolo para los precios de cierre
-            temp_df = test_series_df[['date', symbol]].copy()
-
-            # Renombrar la columna del símbolo para que coincida con el nombre deseado de la columna de precios de cierre
-            temp_df.rename(columns={symbol: closing_price_col}, inplace=True)
-
-            # Convertir la columna 'date' a formato datetime en ambos DataFrames
-            temp_df['date'] = pd.to_datetime(temp_df['date'], unit='s')
-            result_df['date'] = pd.to_datetime(result_df['date'], unit='s')
-
-            # Unir result_df con temp_df basándose en la columna 'date' para agregar los precios de cierre
-            result_df = result_df.merge(temp_df, on='date', how='left')
-
-            return  result_df
-
-
-        else:
-            raise Exception("Missing column {} in df test_series_df ".format(symbol))
-
-    
 
     #endregion
 
@@ -692,6 +558,7 @@ class DayTradingRNNModelCreator(BaseModelCreator):
             x = LSTM(n_neurons, stateful=True, activation=inner_activation)(x)
             x = Dropout(dropout_rate)(x)
             x = BatchNormalization()(x)
+            from tensorflow.python.keras.regularizers import l2
             outputs = Dense(3, activation='softmax', kernel_regularizer=l2(reg_rate))(x)
 
             model = Model(inputs, outputs)

@@ -311,6 +311,69 @@ class AlgosOrchestationLogic:
 
         return None
 
+    def process_test_scalping_RF(self, symbol, variables_csv, model_to_use, d_from, d_to, portf_size, trade_comm,
+                                 trading_algo, interval=None, grouping_unit=None, n_algo_params=[],
+                                 make_stationary=True, classif_threshold=0.5):
+        try:
+            self.logger.do_log(
+                f"Initializing RF backtest for symbol {symbol} from {d_from} to {d_to} (portf_size={portf_size}, comm={trade_comm})",
+                MessageType.INFO)
+
+            rf_model_processor = RandomForestModelCreator()
+            rf_predictions_df = None
+
+            for day in self.__get_business_days_in_range__(d_from, d_to):
+                self.logger.do_log(f"Processing day {day}", MessageType.INFO)
+                LOOKBACK_RF_DAYS = 60
+                symbol_int_series_df, start_period_all_ind, start_period, end_period = self.__build_symbol_series__(
+                    symbol, day, LOOKBACK_RF_DAYS, interval
+                )
+
+                if symbol_int_series_df is None:
+                    self.logger.do_log(f"Skipping day {day} due to missing values (possible holiday)",
+                                       MessageType.WARNING)
+                    continue
+
+                variables_int_series_df = self.data_set_builder.build_interval_series(
+                    variables_csv, start_period_all_ind, end_period,
+                    interval=interval, output_col=["symbol", "date", "open", "high", "low", "close"])
+
+                test_series_df = self.data_set_builder.merge_series(symbol_int_series_df, variables_int_series_df,
+                                                                    "symbol", "date", symbol)
+
+                test_series_df = DataframeFiller.fill_missing_values(test_series_df)
+                test_series_df = self.__eval_df_grouping__(test_series_df, grouping_unit, variables_csv)
+                test_series_df = test_series_df[test_series_df['date'] >= start_period]
+
+                if test_series_df['trading_symbol'].isna().any():
+                    continue
+
+                rf_predictions_df_today,states = rf_model_processor.test_RF_scalping(
+                    symbol=symbol,
+                    test_series_df=test_series_df,
+                    model_to_use=model_to_use,
+                    price_to_use="close",
+                    make_stationary=make_stationary,
+                    normalize=True,
+                    variables_csv=variables_csv,
+                    threshold=classif_threshold
+                )
+
+                rf_predictions_df_today = rf_predictions_df_today[rf_predictions_df_today['date'] == day]
+
+                if rf_predictions_df is None:
+                    rf_predictions_df = pd.DataFrame(columns=rf_predictions_df_today.columns).astype(
+                        rf_predictions_df_today.dtypes)
+
+                rf_predictions_df = pd.concat([rf_predictions_df, rf_predictions_df_today], ignore_index=True)
+
+            self.__backtest_scalping__("RF_SCALPING", symbol, rf_predictions_df, symbol_int_series_df)
+
+        except Exception as e:
+            msg = f"CRITICAL ERROR @process_test_scalping_RF: {str(e)}"
+            traceback.print_exc()
+            self.logger.do_log(msg, MessageType.ERROR)
+            raise Exception(msg)
 
     def train_algos(self,series_csv,d_from,d_to,p_classif_key,algos_arr=None):
 

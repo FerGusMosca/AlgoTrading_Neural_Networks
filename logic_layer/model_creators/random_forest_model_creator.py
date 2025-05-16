@@ -1,3 +1,5 @@
+import pickle
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from sklearn.model_selection import TimeSeriesSplit
@@ -9,7 +11,7 @@ import joblib
 from common.util.dataframe_filler import DataframeFiller
 from logic_layer.model_creators.base_model_creator import BaseModelCreator
 
-
+_OUTPUT_DATE_FORMAT = '%m/%d/%Y %H:%M:%S'
 class RandomForestModelCreator(BaseModelCreator):
     def train_random_forest_daily(self, training_series_df, model_output, symbol, classif_key,
                                    variables_csv, n_estimators=100, max_depth=None,
@@ -93,3 +95,61 @@ class RandomForestModelCreator(BaseModelCreator):
 
         except Exception as e:
             raise Exception(f"Fatal error during Random Forest training: {e}")
+
+    def test_RF_scalping(self, symbol, test_series_df, model_to_use, price_to_use="close",
+                         make_stationary=True, normalize=True, variables_csv=None,
+                         threshold=0.5, preloaded_model=None):
+        """
+        Test a Random Forest model on given data and return predicted actions.
+
+        Parameters:
+        - symbol: string, trading symbol.
+        - test_series_df: pd.DataFrame, dataset with features and target.
+        - model_to_use: path to saved RF model (.pkl) or preloaded model.
+        - price_to_use: column base for trading price ('close', 'open', etc.).
+        - make_stationary: bool, whether to difference the data.
+        - normalize: bool, whether to scale the data using stored scaler.
+        - variables_csv: comma-separated string of features to use.
+        - threshold: float, probability threshold for LONG classification.
+        - preloaded_model: optional, already loaded model to skip disk I/O.
+
+        Returns:
+        - result_df: pd.DataFrame with trading decisions.
+        - states: dict (empty, for compatibility).
+        """
+        if make_stationary:
+            test_series_df, _ = self.__make_stationary_with_memory__(test_series_df)
+
+        self.__preformat_test_sets__(test_series_df)
+
+        X_test = self.__get_test_sets__(test_series_df, symbol_col="trading_symbol", date_col="date",
+                                        variables_csv=variables_csv, normalize=normalize)
+
+        if preloaded_model is None:
+            model = joblib.load(model_to_use)
+        else:
+            model = preloaded_model
+
+        probs = model.predict_proba(X_test)
+        prob_long = probs[:, 0]  # Assuming class 0 = LONG
+        actions = np.where(prob_long >= threshold, 0, 1)  # 0=LONG, 1=SHORT
+        action_labels = {0: "LONG", 1: "SHORT"}
+        action_series = pd.Series(actions).map(action_labels)
+
+        # Align dates (no timesteps shift needed)
+        dates = pd.to_datetime(test_series_df['date'].reset_index(drop=True), unit='s')
+        formatted_dates = dates.dt.strftime(_OUTPUT_DATE_FORMAT)
+
+        result_df = pd.DataFrame({
+            'trading_symbol': symbol,
+            'date': dates,
+            'formatted_date': formatted_dates,
+            'action': action_series
+        })
+
+        result_df = self.__add_trading_prices__(test_series_df, result_df, f"{price_to_use}_{symbol}", dates,
+                                                "trading_symbol_price")
+
+        states = {}  # no states for RF
+        return result_df, states
+
