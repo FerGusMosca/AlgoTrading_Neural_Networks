@@ -1,6 +1,7 @@
 import pandas as pd
 
 from business_entities.portf_position import PortfolioPosition
+from common.enums.sliding_window_strategy import SlidingWindowStrategy
 from common.util.date_handler import DateHandler
 from common.util.light_logger import LightLogger
 from logic_layer.trading_algos.slope_backtester import SlopeBacktester
@@ -12,7 +13,7 @@ class DirectPredictionBacktester(SlopeBacktester):
         pass
 
     def __validate_bias__(self,side,bias):
-        if bias=="NONE":
+        if bias==SlidingWindowStrategy.NONE.value:
             return True
         else:
             return side==bias
@@ -38,7 +39,7 @@ class DirectPredictionBacktester(SlopeBacktester):
 
 
     def backtest(self, symbol, symbol_prices_df,predictions_dic,bias,last_trading_dict, n_algo_param_dict,
-                    init_last_portf_size_dict=None):
+                 init_last_portf_size_dict=None):
         portf_pos_dict = {}
 
         for algo in predictions_dic.keys():

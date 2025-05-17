@@ -411,6 +411,8 @@ class DayTradingRNNModelCreator(BaseModelCreator):
         except Exception as e:
             raise Exception(f"Error al construir el modelo LSTM para el símbolo {symbol}: {e}")
 
+
+    '''
     def train_LSTM_daily_unstateful(self, training_series_df, model_output, symbol, classif_key, epochs,
                               timestamps, n_neurons, learning_rate, reg_rate, dropout_rate, clipping_rate=None,
                               accuracy_stop=None, inner_activation='tanh', batch_size=1):
@@ -431,7 +433,7 @@ class DayTradingRNNModelCreator(BaseModelCreator):
             # Get training and test sets
             X_train, X_test, y_train, y_test = self.__get_training_sets__(training_series_df,
                                                                           "trading_symbol", "date",
-                                                                          classif_key
+                                                                          classif_key,variables_csv="",test_size=-0.2
                                                                           )
 
             print("X_Train: NaN={} Inf={}".format(np.isnan(X_train).sum(), np.isinf(X_train).sum()))
@@ -483,7 +485,7 @@ class DayTradingRNNModelCreator(BaseModelCreator):
 
         except Exception as e:
             raise Exception(f"Error building LSTM model for symbol {symbol}: {e}")
-
+    '''
     def train_LSTM_daily_stateful(self, training_series_df, model_output, symbol, classif_key, epochs, variables_csv,
                          timestamps, n_neurons, learning_rate, reg_rate, dropout_rate, clipping_rate=None,
                          accuracy_stop=None, inner_activation='tanh', batch_size=1):

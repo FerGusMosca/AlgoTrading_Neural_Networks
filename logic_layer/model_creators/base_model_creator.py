@@ -210,34 +210,37 @@ class BaseModelCreator:
         X = scaler.transform(X)
         return X
 
-    def __get_training_sets__(self, df, symbol_col, date_col, classif_key, variables_csv, test_size):
-        expected_features = variables_csv.split(
-            ',')  # Lista de variables esperadas (por ejemplo, ['SPY', 'XLY', 'VIXCLS', ...])
-        train_size = int(len(df) * (1 - test_size))  # Calcula el tamaño del conjunto de entrenamiento
-        train_df = df[:train_size]  # Divide el DataFrame en entrenamiento (primeros train_size registros)
-        test_df = df[train_size:]  # Divide el DataFrame en prueba (registros restantes)
-        # Define las columnas a eliminar: columnas de símbolo, fecha, clase, y cualquier columna no esperada
-        columns_to_drop = [symbol_col, date_col, classif_key] + [col for col in train_df.columns if
-                                                                 col not in expected_features and col not in [
-                                                                     symbol_col, date_col, classif_key]]
-        X_train = train_df.drop(columns=columns_to_drop).values  # Extrae las características de entrenamiento
-        y_train = train_df[classif_key].values  # Extrae las etiquetas de entrenamiento
-        X_test = test_df.drop(columns=columns_to_drop).values  # Extrae las características de prueba
-        y_test = test_df[classif_key].values  # Extrae las etiquetas de prueba
-        print(f"Shape of X_train before normalization: {X_train.shape}")
-        print(f"Columns in X_train: {train_df.drop(columns=columns_to_drop).columns.tolist()}")
+    def __get_training_sets__(self, df, symbol_col, date_col, classif_key, variables_csv, test_size,
+                              return_encoder_and_scaler=False):
+        expected_features = variables_csv.split(',')
 
-        print(f"X_test shape: {X_test.shape}")
-        print(f"First 5 rows of training_series_df:\n{df.head()}")
-        print(f"Last 5 rows of training_series_df:\n{df.tail()}")
-        print(f"Split sizes - X_train: {len(X_train)}, X_test: {len(X_test)}")
+        train_size = int(len(df) * (1 - test_size))
+        train_df = df[:train_size]
+        test_df = df[train_size:]
 
-        X_train = self.__normalize_and_save_scaler__(X_train)  # Normaliza X_train y guarda el escalador
-        X_test = self.__load_scaler_and_normalize__(X_test)  # Normaliza X_test usando el escalador guardado
-        label_encoder_target = LabelEncoder()  # Codifica las etiquetas (por ejemplo, 'LONG'/'SHORT' a 0/1)
-        y_train = label_encoder_target.fit_transform(y_train)
-        y_test = label_encoder_target.transform(y_test)
-        return X_train, X_test, y_train, y_test
+        # Feature matrices
+        X_train_df = train_df[expected_features]
+        X_test_df = test_df[expected_features]
+
+        # Normalize
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train_df)
+        X_test = scaler.transform(X_test_df)
+
+        # Encode labels
+        y_train_raw = train_df[classif_key].values
+        y_test_raw = test_df[classif_key].values
+
+        label_encoder = LabelEncoder()
+        label_encoder.fit(["LONG", "SHORT", "FLAT"])  # Fit with all classes to avoid unseen error
+        y_train = label_encoder.transform(y_train_raw)
+        y_test = label_encoder.transform(y_test_raw)
+
+        # Return tuple based on flag
+        if return_encoder_and_scaler:
+            return X_train, X_test, y_train, y_test, label_encoder, scaler
+        else:
+            return X_train, X_test, y_train, y_test
 
     def __preformat_training_set__(self,training_series_df):
 

@@ -28,6 +28,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
 import pickle
 
+from logic_layer.model_creators.random_forest_model_creator import RandomForestModelCreator
 from logic_layer.trading_algos.direct_prediction_backtester import DirectPredictionBacktester
 
 _OUTPUT_PATH="./output/"
@@ -464,7 +465,46 @@ class MLModelAnalyzer():
                                                last_trading_dict,
                                                n_algo_param_dict=n_algo_param_dict)
 
+    def evaluate_trading_performance_last_model_RF(self, symbol_df, symbol, series_df, model_filename, bias,
+                                                   last_trading_dict, n_algo_param_dict):
+        """
+        Generate prediction DataFrame from RF model.
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: (result_df, test_series_df)
+        """
 
+        rf_creator = RandomForestModelCreator()
+
+        model_file = model_filename
+        classif_threshold = float(n_algo_param_dict.get("classif_threshold", 0.6))
+        make_stationary = n_algo_param_dict.get("make_stationary", True)
+
+        # Merge symbol prices with feature variables
+        test_series_df = pd.merge(symbol_df, series_df, on="date", how="inner")
+        test_series_df["trading_symbol"] = symbol  # Required column
+
+        # Filter out invalid rows
+        test_series_df = test_series_df.dropna(subset=["date", "trading_symbol"])
+        test_series_df = test_series_df[test_series_df["trading_symbol"] == symbol]
+
+        if len(test_series_df) == 0:
+            raise Exception(f"Empty test set for {symbol} → Check data availability or date range.")
+
+        # Run RF prediction
+        result_df, _ = rf_creator.test_RF_scalping(
+            symbol=symbol,
+            test_series_df=test_series_df,
+            model_to_use=model_file,
+            make_stationary=make_stationary,
+            normalize=True,
+            variables_csv=n_algo_param_dict["series_csv"],
+            threshold=classif_threshold
+        )
+
+        # Alias required for backtest compatibility
+        result_df[symbol] = result_df["trading_symbol_price"]
+
+        return result_df, test_series_df
 
 
 

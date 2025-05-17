@@ -1,10 +1,14 @@
+import os
 import traceback
 from datetime import timedelta, datetime
 
 from dateutil.relativedelta import relativedelta
 
 from business_entities.porft_summary import PortfSummary
+from business_entities.portf_position import PortfolioPosition
 from common.dto.indicator_type_dto import IndicatorTypeDTO
+from common.enums.filename_prefix import FilenamePrefix
+from common.enums.folders import Folders
 from common.enums.grouping_criterias import GroupCriteria as gc
 from common.enums.parameters.parameters_keys import ParametersKeys
 from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws, SlidingWindowStrategy
@@ -13,6 +17,7 @@ from common.util.dataframe_filler import DataframeFiller
 from common.util.dataframe_printer import DataframePrinter
 from common.util.date_handler import DateHandler
 from common.util.etf_logic_manager import ETFLogicManager
+from common.util.financial_calculation_helper import FinancialCalculationsHelper
 from common.util.graph_builder import GraphBuilder
 from common.util.image_handler import ImageHandler
 from common.util.light_logger import LightLogger
@@ -27,6 +32,7 @@ from logic_layer.convolutional_neural_netowrk import ConvolutionalNeuralNetwork
 from logic_layer.indicator_algos.sintethic_indicator_creator import SintheticIndicatorCreator
 from logic_layer.model_creators.random_forest_model_creator import RandomForestModelCreator
 from logic_layer.trading_algos.buy_and_hold_backtester import BuyAndHoldBacktester
+from logic_layer.trading_algos.direct_prediction_backtester import DirectPredictionBacktester
 from logic_layer.trading_algos.direct_slope_backtester import DirectSlopeBacktester
 from logic_layer.trading_algos.inv_slope_backtester import InvSlopeBacktester
 from logic_layer.trading_algos.n_min_buffer_w_flip_daily_trading_backtester import NMinBufferWFlipDailyTradingBacktester
@@ -217,6 +223,38 @@ class AlgosOrchestationLogic:
 
         else:
             raise Exception(f"NOT RECOGNIZED trading algo {portf_summary.trading_algo}")
+
+    def __wrap_positions_in_summary__(self, algo_name, portf_positions, n_algo_param_dict, eval_d_from):
+        summary = PortfSummary(
+            symbol=portf_positions[0].symbol if portf_positions else "UNKNOWN",
+            p_portf_position_size=n_algo_param_dict["init_portf_size"],
+            p_trade_comm=n_algo_param_dict["trade_comm"],
+            p_trading_algo=algo_name,
+            p_algo_params=n_algo_param_dict,
+            p_period=DateHandler.get_two_month_period_from_date(eval_d_from),
+            p_year=eval_d_from.year
+        )
+
+        summary.portf_pos_summary = portf_positions
+
+        # Daily MTMs
+        all_MTMs = []
+        for pos in portf_positions:
+            all_MTMs.extend(pos.detailed_MTMs)
+
+        all_MTMs.sort(key=lambda x: x.date)
+        filled = PortfolioPosition.fill_missing_dates(all_MTMs)
+
+        summary.daily_profits = [m.MTM for m in filled]
+        summary.max_cum_drawdowns.append(FinancialCalculationsHelper.max_drawdown_on_MTM(summary.daily_profits))
+
+        summary.portf_final_MTM = filled[-1].MTM if filled else 0
+        summary.portf_init_MTM = filled[0].MTM if filled else 0
+        summary.total_net_profit = summary.portf_final_MTM - summary.portf_init_MTM
+        summary.total_net_profit_str = f"{round(summary.total_net_profit, 2)} $"
+
+        summary.update_max_drawdown()
+        return summary
 
     def __backtest_strategy__(self, series_df,indicator,portf_size,
                                     n_algo_params,portf_summary,
@@ -513,8 +551,113 @@ class AlgosOrchestationLogic:
 
         return summary_dict_arr
 
+    def sliding_train_and_evaluate_random_forest_performance(self, symbol, series_csv, d_from, d_to,
+                                                             last_trading_dict=None, n_algo_param_dict=None):
+        """
+        Train and evaluate a Random Forest model using a sliding window approach.
+        """
+        summary_dict_arr = []
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        sliding_window_years = int(n_algo_param_dict["sliding_window_years"])
+        sliding_window_months = int(n_algo_param_dict["sliding_window_months"])
+        init_portf_size = float(n_algo_param_dict["init_portf_size"])
+        classif_key = n_algo_param_dict["classif_key"]
+        trade_comm = float(n_algo_param_dict["trade_comm"])
+        classif_threshold = float(n_algo_param_dict.get("classif_threshold", 0.6))
+        idx_loop=0
+        init_last_portf_size_dict=None
+
+        curr_d_from = d_from
+        curr_d_to = curr_d_from + relativedelta(years=sliding_window_years) - relativedelta(days=1)
+        if curr_d_to > d_to:
+            curr_d_to = d_to
+
+        os.makedirs(Folders.OUTPUT_RF_FOLDER.value, exist_ok=True)
+
+        mlAnalyzer = MLModelAnalyzer(self.logger)
+
+        while curr_d_from <= d_to:
+            model_filename = f"{Folders.OUTPUT_RF_FOLDER.value}/{FilenamePrefix.RF_MODEL.value }{symbol}_{curr_d_from.strftime('%Y%m%d')}_{curr_d_to.strftime('%Y%m%d')}.pkl"
+
+            self.logger.do_log(f"Training RF from {curr_d_from} to {curr_d_to} → {model_filename}", MessageType.INFO)
+
+            self.process_train_RF(
+                symbol=symbol,
+                variables_csv=series_csv,
+                d_from=curr_d_from.strftime('%m/%d/%Y'),
+                d_to=curr_d_to.strftime('%m/%d/%Y'),
+                model_output=model_filename,
+                classif_key=classif_key,
+                n_estimators=200,
+                max_depth=5,
+                min_samples_split=10,
+                criterion="gini",
+                interval=DataSetBuilder._1_DAY_INTERVAL,
+                make_stationary=True,
+                class_weight="balanced"
+            )
+
+            eval_d_from = curr_d_to + relativedelta(days=1)
+            eval_d_to = eval_d_from + relativedelta(months=sliding_window_months) - relativedelta(days=1)
+            if eval_d_to > d_to:
+                eval_d_to = d_to
+
+            self.logger.do_log(f"Evaluating RF from {eval_d_from} to {eval_d_to}", MessageType.INFO)
+
+            n_algo_param_dict["series_csv"] = series_csv
+
+            symbol_df = self.data_set_builder.build_interval_series(
+                symbol, d_from, d_to,
+                interval=DataSetBuilder._1_DAY_INTERVAL,
+                output_col=["symbol", "date", "open", "high", "low", "close"]
+            )
+            series_df = self.data_set_builder.build_daily_series_classification(series_csv, eval_d_from, eval_d_to,
+                                                                                add_classif_col=False)
+            series_df = DataframeFiller.fill_missing_values(series_df)
+
+            result_df, test_series_df = mlAnalyzer.evaluate_trading_performance_last_model_RF(
+                symbol_df=symbol_df,
+                symbol=symbol,
+                series_df=series_df,
+                model_filename=model_filename,
+                bias=None,
+                last_trading_dict=last_trading_dict,
+                n_algo_param_dict=n_algo_param_dict
+            )
+
+            # If not the first iteration, carry forward the final MTM from the previous summary
+            if idx_loop > 0:
+                prev_summary = summary_dict_arr[-1]["SLIDING_RF"]  # last summary from previous window
+                init_last_portf_size_dict={}
+                init_last_portf_size_dict["SLIDING_RF"] = prev_summary.portf_final_MTM
 
 
+            # Convert predictions to portfolio positions using backtester
+            backtester = DirectPredictionBacktester()
+            portf_pos_dict = backtester.backtest(
+                                                    symbol=symbol,
+                                                    symbol_prices_df=result_df,
+                                                    predictions_dic={"SLIDING_RF": result_df},
+                                                    bias=SlidingWindowStrategy.NONE.value,
+                                                    last_trading_dict=last_trading_dict,
+                                                    n_algo_param_dict=n_algo_param_dict,
+                                                    init_last_portf_size_dict=init_last_portf_size_dict
+                                                )
+            idx_loop+=1
+            # Wrap results into summary
+            summary = self.__wrap_positions_in_summary__("SLIDING_RF", portf_pos_dict["SLIDING_RF"],
+                                                         n_algo_param_dict, eval_d_from)
+            summary_dict_arr.append({"SLIDING_RF": summary})
+
+            curr_d_from = curr_d_from + relativedelta(months=sliding_window_months)
+            curr_d_to = curr_d_from + relativedelta(years=sliding_window_years) - relativedelta(days=1)
+            if curr_d_to > d_to:
+                curr_d_to = d_to
+            if curr_d_to <= curr_d_from:
+                break
+
+        return summary_dict_arr
 
     def evaluate_trading_performance(self,symbol,series_csv,d_from,d_to,bias,last_trading_dict=None,
                                      n_algo_param_dict={},algos_arr=None):
@@ -1145,6 +1288,7 @@ class AlgosOrchestationLogic:
 
         except Exception as e:
             msg = f"CRITICAL ERROR processing model @train_random_forest: {str(e)}"
+            traceback.print_exc()
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
 

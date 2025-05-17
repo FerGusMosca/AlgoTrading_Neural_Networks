@@ -47,11 +47,13 @@ class PortfSummary:
 
         return accum
 
-
     def update_max_drawdown(self):
-        self.max_daily_drawdown = min(self.max_cum_drawdowns) if len(self.max_cum_drawdowns) is None else 0
-        self.max_drawdown = FinancialCalculationsHelper.calculate_max_total_drawdown(self.daily_profits)
+        if isinstance(self.max_cum_drawdowns, list) and len(self.max_cum_drawdowns) > 0:
+            self.max_daily_drawdown = min(self.max_cum_drawdowns)
+        else:
+            self.max_daily_drawdown = 0
 
+        self.max_drawdown = FinancialCalculationsHelper.calculate_max_total_drawdown(self.daily_profits)
 
     def calculate_last_portf_position_summary(self,day):
         position_summary= PortfPnLSummary(day,self.daily_profits[-1],

@@ -1,6 +1,7 @@
 import traceback
 
 from business_entities.portf_position import PortfolioPosition
+from common.enums.sliding_window_strategy import SlidingWindowStrategy
 from common.util.date_handler import DateHandler
 from common.util.logger import Logger
 from common.util.ml_settings_loader import MLSettingsLoader
@@ -42,6 +43,7 @@ def show_commands():
     print("#17-CreateSintheticIndicator [comp_path] [model_candle] [from] [to] [slope_units]")
     print("#18-TrainRF [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [n_estimators] [max_depth] [min_samples_split] [criterion] [batch_size*] [grouping_unit*] [grouping_classif_criteria*] [group_as_mov_avg*] [grouping_mov_avg_unit*] [class_weight*] [make_stationary*] [interval*]")
     print("#19-TestDailyRF [symbol] [variables_csv] [from] [to] [model_to_use] [portf_size] [trade_comm] [trading_algo] [classif_threshold] [algo_params*]")
+    print("#20-EvalSlidingRandomForest [symbol] [series_csv] [from] [to] [classif_key] [init_portf_size] [trade_comm] [classif_threshold] [sliding_window_years] [sliding_window_months]")
     print("======================== UI ========================")
     print("#30-BiasMainLandingPage")
     print("#31-DisplayOrderRoutingScreen")
@@ -538,6 +540,30 @@ def run_train_ml_algo(cmd):
     process_train_ml_algos(series_csv, d_from, d_to, classif_key)
 
 
+def run_sliding_random_forest(cmd):
+    symbol = __get_param__(cmd, "symbol")
+    series_csv = __get_param__(cmd, "series_csv")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    classif_key = __get_param__(cmd, "classif_key")
+
+    trade_comm = __get_param__(cmd, "trade_comm", optional=True, def_value=5)
+    init_portf_size = __get_param__(cmd, "init_portf_size", optional=True, def_value=PortfolioPosition._DEF_PORTF_AMT)
+    sliding_window_years = __get_param__(cmd, "sliding_window_years", optional=True, def_value=2)
+    sliding_window_months = __get_param__(cmd, "sliding_window_months", optional=True, def_value=2)
+
+    n_algo_param_dict = {
+        "trade_comm": trade_comm,
+        "init_portf_size": init_portf_size,
+        "sliding_window_years": sliding_window_years,
+        "sliding_window_months": sliding_window_months,
+        "classif_key": classif_key,
+        "algos": "RF"
+    }
+
+    process_sliding_random_forest(symbol, series_csv, d_from, d_to, n_algo_param_dict)
+
+
 def run_sliding_biased_trading_algo(cmd):
     symbol = __get_param__(cmd, "symbol")
     series_csv = __get_param__(cmd, "series_csv")
@@ -613,6 +639,52 @@ def process_biased_trading_algo(symbol, cmd_series_csv, d_from, d_to, bias,n_alg
 
     except Exception as e:
         logger.print("CRITICAL ERROR bootstrapping the system:{}".format(str(e)), MessageType.ERROR)
+
+
+def process_sliding_random_forest(symbol, cmd_series_csv, d_from, d_to, n_algo_param_dict):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        global last_trading_dict
+        logger.print("Evaluating trading performance for Random Forest model from {} to {}".format(d_from, d_to),
+                     MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"],
+                                         config_settings["ml_reports_conn_str"],
+                                         n_algo_param_dict["classif_key"],
+                                         logger)
+
+        summary_dict_arr = dataMgm.sliding_train_and_evaluate_random_forest_performance(
+            symbol, cmd_series_csv, d_from, d_to,
+            last_trading_dict, n_algo_param_dict=n_algo_param_dict
+        )
+
+        last_trading_dict = summary_dict_arr[-1]
+
+        print("Displaying all the different models predictions for the different algos:")
+
+        for window in summary_dict_arr:
+            for key in window.keys():
+                print("============{}============ for {}".format(key, symbol))
+                summary = window[key]
+                print("From={} To={}".format(d_from, d_to))
+                print(f"Init Portfolio={round(summary.portf_init_MTM, 2)} $")
+                print(f"Final Portfolio={round(summary.portf_final_MTM, 2)} $")
+                print(f"Pct Profit. Size={summary.total_net_profit_str}")
+                print(f"Est. Max Drawdown={summary.max_drawdown_on_MTM_str}")
+                print("     =========== Portf Positions=========== ")
+                for portf_pos in summary.portf_pos_summary:
+                    print(f"    --Side={portf_pos.side} Open Date={portf_pos.date_open} Close Date={portf_pos.date_close} "
+                          f"Open Price={portf_pos.price_open} Close Price={portf_pos.price_close} --> Pct. Profit={portf_pos.calculate_pct_profit()}%")
+
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        print("Stack Trace:")
+        traceback.print_exc()
+        logger.print("CRITICAL ERROR running sliding RF evaluation: {}".format(str(e)), MessageType.ERROR)
 
 
 def process_sliding_biased_trading_algo(symbol, cmd_series_csv, d_from, d_to, bias,n_algo_param_dict):
@@ -1194,6 +1266,9 @@ def process_commands(cmd):
         process_display_order_routing_screen(cmd)
     elif cmd_param_list[0] == "BiasMainLandingPage":
         process_bias_main_landing_page(cmd)
+
+    elif cmd_param_list[0] == "EvalSlidingRandomForest":
+        run_sliding_random_forest(cmd)
 
     #TestDailyLSTM
 

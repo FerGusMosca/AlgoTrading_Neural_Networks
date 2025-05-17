@@ -3,7 +3,7 @@ import pickle
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 import pandas as pd
 import numpy as np
 import joblib
@@ -14,8 +14,8 @@ from logic_layer.model_creators.base_model_creator import BaseModelCreator
 _OUTPUT_DATE_FORMAT = '%m/%d/%Y %H:%M:%S'
 class RandomForestModelCreator(BaseModelCreator):
     def train_random_forest_daily(self, training_series_df, model_output, symbol, classif_key,
-                                   variables_csv, n_estimators=100, max_depth=None,
-                                   min_samples_split=2, criterion='gini', make_stationary=False,
+                                  variables_csv, n_estimators=100, max_depth=None,
+                                  min_samples_split=2, criterion='gini', make_stationary=False,
                                   class_weight=None):
         try:
             # Fill missing values in the dataset
@@ -29,29 +29,28 @@ class RandomForestModelCreator(BaseModelCreator):
             self.__preformat_training_set__(training_series_df)
 
             # Extract training features and labels
-            X_full, _, y_full, _ = self.__get_training_sets__(training_series_df,
-                                                              "trading_symbol", "date",
-                                                              classif_key,
-                                                              variables_csv=variables_csv,
-                                                              test_size=0.2)  # Use all data for training
+            X_train, X_test, y_train, y_test, label_encoder, scaler = self.__get_training_sets__(
+                training_series_df,
+                symbol_col="trading_symbol",
+                date_col="date",
+                classif_key=classif_key,
+                variables_csv=variables_csv,
+                test_size=0.2,
+                return_encoder_and_scaler=True
+            )
 
-            print("Class distribution in y_full:", np.bincount(y_full))
-
-            # Normalize the feature matrix
-            scaler = StandardScaler()
-            X_full = scaler.fit_transform(X_full)
+            print("Class distribution in y_train:", np.bincount(y_train))
 
             # Use TimeSeriesSplit to respect time dependency in validation
             tscv = TimeSeriesSplit(n_splits=3)
             val_accuracies, val_f1_scores = [], []
 
-            for fold, (train_idx, val_idx) in enumerate(tscv.split(X_full)):
+            for fold, (train_idx, val_idx) in enumerate(tscv.split(X_train)):
                 print(f"\nTraining fold {fold + 1}/{tscv.n_splits}...")
 
-                X_train, X_val = X_full[train_idx], X_full[val_idx]
-                y_train, y_val = y_full[train_idx], y_full[val_idx]
+                X_tr, X_val = X_train[train_idx], X_train[val_idx]
+                y_tr, y_val = y_train[train_idx], y_train[val_idx]
 
-                # Instantiate and train the model
                 model = RandomForestClassifier(
                     n_estimators=n_estimators,
                     max_depth=max_depth,
@@ -60,10 +59,8 @@ class RandomForestModelCreator(BaseModelCreator):
                     class_weight=class_weight,
                     random_state=42
                 )
+                model.fit(X_tr, y_tr)
 
-                model.fit(X_train, y_train)
-
-                # Predict and evaluate
                 y_pred = model.predict(X_val)
                 acc = accuracy_score(y_val, y_pred)
                 f1 = f1_score(y_val, y_pred, average='weighted')
@@ -86,8 +83,10 @@ class RandomForestModelCreator(BaseModelCreator):
                 criterion=criterion,
                 random_state=42
             )
+            final_model.fit(X_train, y_train)
 
-            final_model.fit(X_full, y_full)
+            print("Labels in y_train (raw):", y_train)
+            print("Unique encoded labels:", np.unique(y_train))
 
             # Save the model to disk
             joblib.dump(final_model, model_output)
@@ -144,7 +143,15 @@ class RandomForestModelCreator(BaseModelCreator):
             'trading_symbol': symbol,
             'date': dates,
             'formatted_date': formatted_dates,
-            'action': action_series
+            'Prediction': action_series
+        })
+
+        test_series_df = test_series_df.rename(columns={
+            "open": f"open_{symbol}",
+            "high": f"high_{symbol}",
+            "low": f"low_{symbol}",
+            "close": f"close_{symbol}",
+            "symbol": "trading_symbol"
         })
 
         result_df = self.__add_trading_prices__(test_series_df, result_df, f"{price_to_use}_{symbol}", dates,
