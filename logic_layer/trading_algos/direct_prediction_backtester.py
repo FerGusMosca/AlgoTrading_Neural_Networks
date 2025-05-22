@@ -12,32 +12,6 @@ class DirectPredictionBacktester(SlopeBacktester):
     def __init__(self):
         pass
 
-    def __validate_bias__(self,side,bias):
-        if bias==SlidingWindowStrategy.NONE.value:
-            return True
-        else:
-            return side==bias
-
-
-    def __eval_reuse_reference_price__(self,algo,last_trading_dict,side,new_date,new_ref_price):
-        try:
-            if(last_trading_dict is not None):
-                #1- We get the last trade of the algo
-                res = last_trading_dict[algo]
-
-                sorted_positions = sorted(res.portf_pos_summary, key=lambda x: x.date_close, reverse=True)
-
-                if sorted_positions is not None and len(sorted_positions)>0:
-                    last_pos = sorted_positions[0]
-                    if DateHandler.evaluate_consecutive_days(last_pos.date_close,new_date) and last_pos.side==side:
-                        #We have to consecutive days, we can use the old ref-price as opening price
-                        return last_pos.price_close
-        except Exception as e:
-            raise Exception("Error evaluating previous day for algo {} for date {}:{}".format( algo,new_date,str(e)))
-
-        return  new_ref_price
-
-
     def backtest(self, symbol, symbol_prices_df,predictions_dic,bias,last_trading_dict, n_algo_param_dict,
                  init_last_portf_size_dict=None):
         portf_pos_dict = {}

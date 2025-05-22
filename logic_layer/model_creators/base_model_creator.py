@@ -33,6 +33,35 @@ class BaseModelCreator:
         else:
             raise Exception("Missing column {} in df test_series_df ".format(symbol))
 
+    def __get_test_sets_with_scaler__(self, df, variables_csv, model_to_use):
+        """
+        Load and apply the scaler saved during training to the test data.
+
+        Parameters:
+        - df: pd.DataFrame, test data (already preformatted and stationary if needed)
+        - variables_csv: str, comma-separated list of feature names
+        - model_to_use: str, path to the saved model .pkl (used to locate corresponding scaler)
+
+        Returns:
+        - np.ndarray: normalized test data ready for prediction
+        """
+        # Load the scaler saved along with the model
+        scaler_filename = model_to_use.replace(".pkl", "_scaler.pkl")
+        scaler = joblib.load(scaler_filename)
+
+        # Extract the expected feature columns
+        expected_features = variables_csv.split(',')
+        X = df[expected_features].values
+
+        # Validate dimensions
+        if X.shape[1] != scaler.n_features_in_:
+            raise ValueError(
+                f"Dimension mismatch: X has {X.shape[1]} columns, but scaler expects {scaler.n_features_in_}")
+
+        # Normalize using the scaler
+        X_scaled = scaler.transform(X)
+        return X_scaled
+
     def __get_test_sets__(self, test_series_df, symbol_col='trading_symbol', date_col='date',
                           variables_csv=None,normalize=True):
         """
@@ -232,7 +261,9 @@ class BaseModelCreator:
         y_test_raw = test_df[classif_key].values
 
         label_encoder = LabelEncoder()
-        label_encoder.fit(["LONG", "SHORT", "FLAT"])  # Fit with all classes to avoid unseen error
+        present_classes = np.unique(df[classif_key])
+        label_encoder.fit(present_classes.tolist())
+        # Fit with all classes to avoid unseen error
         y_train = label_encoder.transform(y_train_raw)
         y_test = label_encoder.transform(y_test_raw)
 

@@ -9,10 +9,35 @@ import numpy as np
 import joblib
 
 from common.util.dataframe_filler import DataframeFiller
+from common.util.light_logger import LightLogger
 from logic_layer.model_creators.base_model_creator import BaseModelCreator
 
 _OUTPUT_DATE_FORMAT = '%m/%d/%Y %H:%M:%S'
 class RandomForestModelCreator(BaseModelCreator):
+
+
+
+
+    def __eval_class_distributions__(self,model,label_encoder,probs):
+        long_index = None
+        if label_encoder is not None:
+            class_labels = model.classes_
+            long_label = label_encoder.transform(["LONG"])[0]
+            if long_label in class_labels:
+                long_index = list(class_labels).index(long_label)
+                LightLogger.do_log(f"[RF TEST] Class index mapping → LONG={long_index}")
+            else:
+                LightLogger.do_log("[RF TEST] WARNING: Class 'LONG' not found in model.classes_")
+        else:
+            long_index = 0  # fallback default
+
+        if long_index is not None and probs.shape[1] > long_index:
+            prob_long = probs[:, long_index]
+        else:
+            prob_long = np.zeros(probs.shape[0])  # assume 0% prob of LONG
+            LightLogger.do_log("[RF TEST] WARNING: Missing LONG prob. Defaulting to 0% LONG.")
+
+
     def train_random_forest_daily(self, training_series_df, model_output, symbol, classif_key,
                                   variables_csv, n_estimators=100, max_depth=None,
                                   min_samples_split=2, criterion='gini', make_stationary=False,
@@ -90,14 +115,18 @@ class RandomForestModelCreator(BaseModelCreator):
 
             # Save the model to disk
             joblib.dump(final_model, model_output)
+            scaler_output = model_output.replace(".pkl", "_scaler.pkl")
+            joblib.dump(scaler, scaler_output)
             print(f"Random Forest model saved to {model_output}")
+
+            return label_encoder
 
         except Exception as e:
             raise Exception(f"Fatal error during Random Forest training: {e}")
 
     def test_RF_scalping(self, symbol, test_series_df, model_to_use, price_to_use="close",
                          make_stationary=True, normalize=True, variables_csv=None,
-                         threshold=0.5, preloaded_model=None):
+                         threshold=0.5, preloaded_model=None,label_encoder=None):
         """
         Test a Random Forest model on given data and return predicted actions.
 
@@ -121,8 +150,11 @@ class RandomForestModelCreator(BaseModelCreator):
 
         self.__preformat_test_sets__(test_series_df)
 
-        X_test = self.__get_test_sets__(test_series_df, symbol_col="trading_symbol", date_col="date",
-                                        variables_csv=variables_csv, normalize=normalize)
+        X_test = self.__get_test_sets_with_scaler__(
+            df=test_series_df,
+            variables_csv=variables_csv,
+            model_to_use=model_to_use
+        )
 
         if preloaded_model is None:
             model = joblib.load(model_to_use)
@@ -130,10 +162,36 @@ class RandomForestModelCreator(BaseModelCreator):
             model = preloaded_model
 
         probs = model.predict_proba(X_test)
-        prob_long = probs[:, 0]  # Assuming class 0 = LONG
-        actions = np.where(prob_long >= threshold, 0, 1)  # 0=LONG, 1=SHORT
-        action_labels = {0: "LONG", 1: "SHORT"}
-        action_series = pd.Series(actions).map(action_labels)
+        # Log raw probabilities
+        mean_probs = np.mean(probs, axis=0)
+        LightLogger.do_log(f"[RF TEST] Mean class probabilities: {mean_probs}")
+
+        # Log the model's class index and class labels
+        LightLogger.do_log(f"[RF TEST] Model classes_: {model.classes_}")
+        LightLogger.do_log(f"[RF TEST] LabelEncoder classes_: {label_encoder.classes_}")
+        self.__eval_class_distributions__(model,label_encoder,probs)
+        # Get the index for class "LONG" and "SHORT"
+        long_index = label_encoder.transform(["LONG"])[0]
+        short_index = label_encoder.transform(["SHORT"])[0]
+
+        LightLogger.do_log(f"[RF TEST] Class index mapping → LONG={long_index}, SHORT={short_index}")
+        LightLogger.do_log(f"[RF TEST] Model classes_ → {model.classes_}")
+
+        # Use correct column index from predict_proba
+        prob_long = probs[:, long_index]
+
+        # Apply threshold decision rule
+        actions = np.where(prob_long >= threshold, long_index, short_index)
+        # Log distribution of predicted probabilities
+        import matplotlib.pyplot as plt
+        plt.hist(prob_long, bins=50)
+        plt.title(f"Distribution of LONG probabilities (threshold={threshold})")
+        plt.xlabel("Probability of LONG")
+        plt.ylabel("Frequency")
+        plt.savefig("long_prob_distribution.png")  # O usá plt.show() si estás en un entorno interactivo
+
+        # Convert numeric predictions back to original labels
+        action_series = label_encoder.inverse_transform(actions)
 
         # Align dates (no timesteps shift needed)
         dates = pd.to_datetime(test_series_df['date'].reset_index(drop=True), unit='s')
@@ -158,5 +216,7 @@ class RandomForestModelCreator(BaseModelCreator):
                                                 "trading_symbol_price")
 
         states = {}  # no states for RF
+        LightLogger.do_log(f"[RF TEST] First 5 predictions:\n{result_df[['date', 'Prediction']].head()}")
+
         return result_df, states
 

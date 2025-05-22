@@ -466,7 +466,7 @@ class MLModelAnalyzer():
                                                n_algo_param_dict=n_algo_param_dict)
 
     def evaluate_trading_performance_last_model_RF(self, symbol_df, symbol, series_df, model_filename, bias,
-                                                   last_trading_dict, n_algo_param_dict):
+                                                   label_encoder,last_trading_dict, n_algo_param_dict):
         """
         Generate prediction DataFrame from RF model.
         Returns:
@@ -498,7 +498,8 @@ class MLModelAnalyzer():
             make_stationary=make_stationary,
             normalize=True,
             variables_csv=n_algo_param_dict["series_csv"],
-            threshold=classif_threshold
+            threshold=classif_threshold,
+            label_encoder=label_encoder
         )
 
         # Alias required for backtest compatibility

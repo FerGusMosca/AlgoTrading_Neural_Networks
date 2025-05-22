@@ -8,6 +8,8 @@ from business_entities.portf_position import PortfolioPosition
 from common.dto.etf_position_dto import ETFPositionDTO
 from common.dto.strategy_summary_dto import StrategySummaryDTO
 from common.enums.columns_prefix import ColumnsPrefix
+from common.enums.sliding_window_strategy import SlidingWindowStrategy
+from common.util.date_handler import DateHandler
 from common.util.financial_calculation_helper import FinancialCalculationsHelper
 
 
@@ -30,6 +32,32 @@ class BaseClassDailyTradingBacktester:
     _FLAT_POS="FLAT"
     def __init__(self):
         pass
+
+    def __eval_reuse_reference_price__(self,algo,last_trading_dict,side,new_date,new_ref_price):
+        try:
+            if(last_trading_dict is not None):
+                #1- We get the last trade of the algo
+                res = last_trading_dict[algo]
+
+                sorted_positions = sorted(res.portf_pos_summary, key=lambda x: x.date_close, reverse=True)
+
+                if sorted_positions is not None and len(sorted_positions)>0:
+                    last_pos = sorted_positions[0]
+                    if DateHandler.evaluate_consecutive_days(last_pos.date_close,new_date) and last_pos.side==side:
+                        #We have to consecutive days, we can use the old ref-price as opening price
+                        return last_pos.price_close
+        except Exception as e:
+            raise Exception("Error evaluating previous day for algo {} for date {}:{}".format( algo,new_date,str(e)))
+
+        return  new_ref_price
+
+
+    def __validate_bias__(self,side,bias):
+        if bias==SlidingWindowStrategy.NONE.value:
+            return True
+        else:
+            return side==bias
+
 
     def __eval_exists_value_on_df__(self,panda_df,key,key_val,val_col):
         if panda_df[key] is not None:

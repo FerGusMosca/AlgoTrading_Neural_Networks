@@ -35,6 +35,7 @@ from logic_layer.trading_algos.buy_and_hold_backtester import BuyAndHoldBacktest
 from logic_layer.trading_algos.direct_prediction_backtester import DirectPredictionBacktester
 from logic_layer.trading_algos.direct_slope_backtester import DirectSlopeBacktester
 from logic_layer.trading_algos.inv_slope_backtester import InvSlopeBacktester
+from logic_layer.trading_algos.n_flip_prediction_backtester import NFlipPredictionBacktester
 from logic_layer.trading_algos.n_min_buffer_w_flip_daily_trading_backtester import NMinBufferWFlipDailyTradingBacktester
 from logic_layer.trading_algos.on_off_backtester import OnOffBacktester
 from logic_layer.trading_algos.only_signal_n_min_plus_mov_avg import OnlySignalNMinMovAvgBacktester
@@ -237,23 +238,36 @@ class AlgosOrchestationLogic:
 
         summary.portf_pos_summary = portf_positions
 
-        # Daily MTMs
+        # Collect all detailed MTMs (date + MTM) from each portfolio position
         all_MTMs = []
         for pos in portf_positions:
             all_MTMs.extend(pos.detailed_MTMs)
 
+        # Sort and fill missing dates between trades to ensure continuity
         all_MTMs.sort(key=lambda x: x.date)
         filled = PortfolioPosition.fill_missing_dates(all_MTMs)
 
+        # Store daily profits for drawdown calculations
         summary.daily_profits = [m.MTM for m in filled]
         summary.max_cum_drawdowns.append(FinancialCalculationsHelper.max_drawdown_on_MTM(summary.daily_profits))
 
-        summary.portf_final_MTM = filled[-1].MTM if filled else 0
-        summary.portf_init_MTM = filled[0].MTM if filled else 0
+        # Use first and last MTM values as init and final portfolio value
+        summary.portf_init_MTM = all_MTMs[0].MTM
+        summary.portf_final_MTM = all_MTMs[-1].MTM
         summary.total_net_profit = summary.portf_final_MTM - summary.portf_init_MTM
         summary.total_net_profit_str = f"{round(summary.total_net_profit, 2)} $"
 
+        # Log position-level profit details
+        LightLogger.do_log("[SUMMARY DEBUG] Portfolio Positions Breakdown:")
+        for idx, pos in enumerate(portf_positions):
+            LightLogger.do_log(
+                f"  Position #{idx + 1}: {pos.side} | open={pos.price_open} | close={pos.price_close} | "
+                f"open_date={pos.date_open.date()} | close_date={pos.date_close.date()} | "
+                f"profit={pos.calculate_th_nom_profit():.2f} | pct={pos.calculate_pct_profit():.2f}%"
+            )
+
         summary.update_max_drawdown()
+
         return summary
 
     def __backtest_strategy__(self, series_df,indicator,portf_size,
@@ -567,6 +581,7 @@ class AlgosOrchestationLogic:
         classif_threshold = float(n_algo_param_dict.get("classif_threshold", 0.6))
         idx_loop=0
         init_last_portf_size_dict=None
+        class_weight = n_algo_param_dict["class_weight"]
 
         curr_d_from = d_from
         curr_d_to = curr_d_from + relativedelta(years=sliding_window_years) - relativedelta(days=1)
@@ -582,7 +597,7 @@ class AlgosOrchestationLogic:
 
             self.logger.do_log(f"Training RF from {curr_d_from} to {curr_d_to} → {model_filename}", MessageType.INFO)
 
-            self.process_train_RF(
+            label_encoder=self.process_train_RF(
                 symbol=symbol,
                 variables_csv=series_csv,
                 d_from=curr_d_from.strftime('%m/%d/%Y'),
@@ -595,7 +610,7 @@ class AlgosOrchestationLogic:
                 criterion="gini",
                 interval=DataSetBuilder._1_DAY_INTERVAL,
                 make_stationary=True,
-                class_weight="balanced"
+                class_weight=class_weight
             )
 
             eval_d_from = curr_d_to + relativedelta(days=1)
@@ -616,10 +631,15 @@ class AlgosOrchestationLogic:
                                                                                 add_classif_col=False)
             series_df = DataframeFiller.fill_missing_values(series_df)
 
+            print(f"[DEBUG] label_encoder: {label_encoder}")
+            print(f"[DEBUG] model_filename: {model_filename}")
+            print(f"[DEBUG] symbol_df shape: {symbol_df.shape}")
+            print(f"[DEBUG] last_trading_dict: {last_trading_dict}")
             result_df, test_series_df = mlAnalyzer.evaluate_trading_performance_last_model_RF(
                 symbol_df=symbol_df,
                 symbol=symbol,
                 series_df=series_df,
+                label_encoder=label_encoder,
                 model_filename=model_filename,
                 bias=None,
                 last_trading_dict=last_trading_dict,
@@ -634,12 +654,11 @@ class AlgosOrchestationLogic:
 
 
             # Convert predictions to portfolio positions using backtester
-            backtester = DirectPredictionBacktester()
+            backtester = NFlipPredictionBacktester()
             portf_pos_dict = backtester.backtest(
                                                     symbol=symbol,
                                                     symbol_prices_df=result_df,
                                                     predictions_dic={"SLIDING_RF": result_df},
-                                                    bias=SlidingWindowStrategy.NONE.value,
                                                     last_trading_dict=last_trading_dict,
                                                     n_algo_param_dict=n_algo_param_dict,
                                                     init_last_portf_size_dict=init_last_portf_size_dict
@@ -1272,7 +1291,7 @@ class AlgosOrchestationLogic:
 
             # Train Random Forest
             rf_model_trainer = RandomForestModelCreator()
-            rf_model_trainer.train_random_forest_daily(
+            label_encoder=rf_model_trainer.train_random_forest_daily(
                 training_series_df=training_series_df,
                 model_output=model_output,
                 symbol=symbol,
@@ -1285,6 +1304,8 @@ class AlgosOrchestationLogic:
                 make_stationary=make_stationary,
                 class_weight=class_weight
             )
+
+            return label_encoder
 
         except Exception as e:
             msg = f"CRITICAL ERROR processing model @train_random_forest: {str(e)}"

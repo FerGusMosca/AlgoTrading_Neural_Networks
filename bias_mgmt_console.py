@@ -551,6 +551,9 @@ def run_sliding_random_forest(cmd):
     init_portf_size = __get_param__(cmd, "init_portf_size", optional=True, def_value=PortfolioPosition._DEF_PORTF_AMT)
     sliding_window_years = __get_param__(cmd, "sliding_window_years", optional=True, def_value=2)
     sliding_window_months = __get_param__(cmd, "sliding_window_months", optional=True, def_value=2)
+    class_weight = __get_param__(cmd, "class_weight", optional=True, def_value="balanced")
+    bias = __get_param__(cmd, "bias", optional=True, def_value="NONE")
+    n_flip = __get_param__(cmd, "n_flip", optional=True, def_value=1)
 
     n_algo_param_dict = {
         "trade_comm": trade_comm,
@@ -558,6 +561,9 @@ def run_sliding_random_forest(cmd):
         "sliding_window_years": sliding_window_years,
         "sliding_window_months": sliding_window_months,
         "classif_key": classif_key,
+        "class_weight": class_weight,
+        "bias": bias,
+        "n_flip": n_flip,
         "algos": "RF"
     }
 
