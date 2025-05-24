@@ -1,27 +1,53 @@
 from datetime import datetime
 
+from common.enums.months import Months
+
 
 class DateHandler:
 
-
     @staticmethod
     def get_two_month_period_from_date(date):
-
+        """
+        Return a two-month period label (e.g., 'Jan-Feb', 'Mar-Apr') based on the month of the given date.
+        """
         month = date.month
-        if 1 <= month <= 2:
-            period = "Jan-Feb"
-        elif 3 <= month <= 4:
-            period = "Mar-Apr"
-        elif 5 <= month <= 6:
-            period = "May-Jun"
-        elif 7 <= month <= 8:
-            period = "Jul-Aug"
-        elif 9 <= month <= 10:
-            period = "Sep-Oct"
-        else:
-            period = "Nov-Dec"
 
-        return  period
+        if 1 <= month <= 2:
+            start, end = Months.JAN, Months.FEB
+        elif 3 <= month <= 4:
+            start, end = Months.MAR, Months.APR
+        elif 5 <= month <= 6:
+            start, end = Months.MAY, Months.JUN
+        elif 7 <= month <= 8:
+            start, end = Months.JUL, Months.AUG
+        elif 9 <= month <= 10:
+            start, end = Months.SEP, Months.OCT
+        else:
+            start, end = Months.NOV, Months.DEC
+
+        return f"{start.label}-{end.label}"
+
+    @staticmethod
+    def get_period_label_from_dates(start_date: datetime, end_date: datetime) -> str:
+        """
+        Return a string like 'Jan-Feb' or 'Jan-Dec' from two dates.
+
+        Args:
+            start_date (datetime): Period start date
+            end_date (datetime): Period end date
+
+        Returns:
+            str: Period label
+        """
+        if start_date.year != end_date.year:
+            raise ValueError("Start and end dates must be in the same year")
+
+        start_label = Months.label_from_number(start_date.month)
+        end_label = Months.label_from_number(end_date.month)
+
+        if start_label == end_label:
+            return start_label
+        return f"{start_label}-{end_label}"
 
     @staticmethod
     def evaluate_consecutive_days(day_1, day_2):

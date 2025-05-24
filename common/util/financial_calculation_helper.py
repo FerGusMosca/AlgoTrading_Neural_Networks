@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from common.util.light_logger import LightLogger
+
 
 class FinancialCalculationsHelper():
 
@@ -84,18 +86,22 @@ class FinancialCalculationsHelper():
         # Return the highest drawdown among all positions
         return max(max_drawdowns) if max_drawdowns else 0
 
-
     @staticmethod
     def max_drawdown_on_MTM(MT_values):
         """
-        Calcula el máximo drawdown de una serie de valores del portafolio.
+        Calculate the maximum drawdown from a list of portfolio MTM values.
 
-        :param MT_values: Lista o array con los valores del portafolio en el tiempo.
-        :return: Max Drawdown (float)
+        :param MT_values: List or array of portfolio values over time.
+        :return: Maximum drawdown as a float (e.g., -0.12 means -12%)
         """
         MT_values = np.array(MT_values)
-        max_values = np.maximum.accumulate(MT_values)  # Máximos acumulados
-        drawdowns = (MT_values - max_values) / max_values  # Caídas relativas
-        max_drawdown = np.min(drawdowns)  # La caída máxima
+
+        if len(MT_values) < 2:
+            LightLogger.do_log("[WARNING] Empty or insufficient MTM values — skipping drawdown calc.")
+            return 0.0  # No drawdown possible with 0 or 1 value
+
+        max_values = np.maximum.accumulate(MT_values)  # Running max
+        drawdowns = (MT_values - max_values) / max_values  # Relative drop from peak
+        max_drawdown = np.min(drawdowns)  # Most negative value is the max drawdown
 
         return max_drawdown

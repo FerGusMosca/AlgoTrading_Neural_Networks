@@ -225,14 +225,15 @@ class AlgosOrchestationLogic:
         else:
             raise Exception(f"NOT RECOGNIZED trading algo {portf_summary.trading_algo}")
 
-    def __wrap_positions_in_summary__(self, algo_name, portf_positions, n_algo_param_dict, eval_d_from):
+    def __wrap_positions_in_summary__(self, algo_name, portf_positions, n_algo_param_dict,
+                                      eval_d_from, eval_d_to):
         summary = PortfSummary(
             symbol=portf_positions[0].symbol if portf_positions else "UNKNOWN",
             p_portf_position_size=n_algo_param_dict["init_portf_size"],
             p_trade_comm=n_algo_param_dict["trade_comm"],
             p_trading_algo=algo_name,
             p_algo_params=n_algo_param_dict,
-            p_period=DateHandler.get_two_month_period_from_date(eval_d_from),
+            p_period=DateHandler.get_period_label_from_dates(eval_d_from, eval_d_to),
             p_year=eval_d_from.year
         )
 
@@ -243,21 +244,30 @@ class AlgosOrchestationLogic:
         for pos in portf_positions:
             all_MTMs.extend(pos.detailed_MTMs)
 
-        # Sort and fill missing dates between trades to ensure continuity
+        # Sort MTMs by date
         all_MTMs.sort(key=lambda x: x.date)
-        filled = PortfolioPosition.fill_missing_dates(all_MTMs)
 
-        # Store daily profits for drawdown calculations
-        summary.daily_profits = [m.MTM for m in filled]
+        if not all_MTMs:
+            summary.daily_profits = []
+            summary.max_cum_drawdowns.append(0.0)
+            summary.portf_init_MTM = getattr(self, "last_known_portf_value", n_algo_param_dict["init_portf_size"])
+            summary.portf_final_MTM = summary.portf_init_MTM
+            summary.total_net_profit = 0.0
+            summary.total_net_profit_str = "0.0 $"
+            LightLogger.do_log(f"[INFO] No positions opened in period {summary.period}. Portfolio unchanged.")
+            summary.update_max_drawdown()
+            return summary
+
+        summary.daily_profits = [m.MTM for m in all_MTMs]
         summary.max_cum_drawdowns.append(FinancialCalculationsHelper.max_drawdown_on_MTM(summary.daily_profits))
 
-        # Use first and last MTM values as init and final portfolio value
         summary.portf_init_MTM = all_MTMs[0].MTM
         summary.portf_final_MTM = all_MTMs[-1].MTM
         summary.total_net_profit = summary.portf_final_MTM - summary.portf_init_MTM
         summary.total_net_profit_str = f"{round(summary.total_net_profit, 2)} $"
 
-        # Log position-level profit details
+        self.last_known_portf_value = summary.portf_final_MTM
+
         LightLogger.do_log("[SUMMARY DEBUG] Portfolio Positions Breakdown:")
         for idx, pos in enumerate(portf_positions):
             LightLogger.do_log(
@@ -592,7 +602,15 @@ class AlgosOrchestationLogic:
 
         mlAnalyzer = MLModelAnalyzer(self.logger)
 
+
         while curr_d_from <= d_to:
+
+            if curr_d_from > d_to:
+                self.logger.do_log(
+                    f"Stopping loop: curr_d_from {curr_d_from.strftime('%Y-%m-%d')} > d_to {d_to.strftime('%Y-%m-%d')}",
+                    MessageType.INFO)
+                break
+
             model_filename = f"{Folders.OUTPUT_RF_FOLDER.value}/{FilenamePrefix.RF_MODEL.value }{symbol}_{curr_d_from.strftime('%Y%m%d')}_{curr_d_to.strftime('%Y%m%d')}.pkl"
 
             self.logger.do_log(f"Training RF from {curr_d_from} to {curr_d_to} → {model_filename}", MessageType.INFO)
@@ -627,6 +645,11 @@ class AlgosOrchestationLogic:
                 interval=DataSetBuilder._1_DAY_INTERVAL,
                 output_col=["symbol", "date", "open", "high", "low", "close"]
             )
+
+            if eval_d_from > d_to:
+                self.logger.do_log(f"Skipping out-of-bound eval window: {eval_d_from} to {eval_d_to}", MessageType.INFO)
+                break
+
             series_df = self.data_set_builder.build_daily_series_classification(series_csv, eval_d_from, eval_d_to,
                                                                                 add_classif_col=False)
             series_df = DataframeFiller.fill_missing_values(series_df)
@@ -666,8 +689,16 @@ class AlgosOrchestationLogic:
             idx_loop+=1
             # Wrap results into summary
             summary = self.__wrap_positions_in_summary__("SLIDING_RF", portf_pos_dict["SLIDING_RF"],
-                                                         n_algo_param_dict, eval_d_from)
+                                                         n_algo_param_dict, eval_d_from,eval_d_to)
+            summary.period = f"{eval_d_from.strftime('%b')}-{eval_d_to.strftime('%b')}"
             summary_dict_arr.append({"SLIDING_RF": summary})
+
+            PortfolioSummaryAnalyzer.convert_summary_dict_arr_to_dataframe(
+                summary_dict_arr,
+                strategy_key="SLIDING_RF",
+                init_portf=init_portf_size,
+                timestamp=timestamp
+            )
 
             curr_d_from = curr_d_from + relativedelta(months=sliding_window_months)
             curr_d_to = curr_d_from + relativedelta(years=sliding_window_years) - relativedelta(days=1)

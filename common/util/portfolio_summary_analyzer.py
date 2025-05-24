@@ -121,15 +121,9 @@ class PortfolioSummaryAnalyzer:
                 })
 
             # Update the CSV file with the formatted results and annual summary
-            PortfolioSummaryAnalyzer.strategy_results_to_csv(
-                formatted_results,  # Array de diccionarios
-                portfolio_value,
-                max_drawdown,
-                strategy,
-                timestamp,
-                annual_summary=annual_summary,  # Pasamos el annual_summary explícitamente
-                incremental=False
-            )
+            PortfolioSummaryAnalyzer.__strategy_results_to_csv__(formatted_results, portfolio_value, max_drawdown,
+                                                                 strategy, timestamp, annual_summary=annual_summary,
+                                                                 incremental=False)
 
             # Store the results for this strategy
             final_results[strategy] = {
@@ -142,7 +136,79 @@ class PortfolioSummaryAnalyzer:
         return final_results
 
     @staticmethod
-    def strategy_results_to_csv(formatted_results, portfolio_value, max_drawdown, strategy, timestamp,
+    def convert_summary_dict_arr_to_dataframe(summary_dict_arr, strategy_key="SLIDING_RF", init_portf=100000,
+                                              timestamp=""):
+        """
+        Converts summary_dict_arr to DataFrames and saves them to CSV, with correct cumulative metrics.
+        """
+        formatted_results = []
+        annual_portfolio_values = {}
+        annual_drawdowns = {}
+
+        max_drawdown_accum = float("inf")  # for cumulative min tracking
+
+        for entry in summary_dict_arr:
+            summary = entry[strategy_key]
+            year = summary.year
+            period = summary.period
+            portf_value = summary.portf_final_MTM
+            portf_init = summary.portf_init_MTM
+            max_drawdown = summary.max_daily_drawdown
+            profit_pct = ((portf_value / portf_init) - 1) * 100
+            cum_profit_nominal = portf_value - init_portf
+            max_drawdown_accum = min(max_drawdown_accum, max_drawdown)
+
+            formatted_results.append({
+                "Year": year,
+                "Period": period,
+                "Profit %": round(profit_pct, 2),
+                "Drawdown %": round(max_drawdown * 100, 2),
+                "Cum Profit $": round(cum_profit_nominal, 2),
+                "Max. Cum Drawdown %": round(max_drawdown_accum * 100, 2),
+                "Portfolio $": round(portf_value, 2)
+            })
+
+            if year not in annual_portfolio_values:
+                annual_portfolio_values[year] = []
+                annual_drawdowns[year] = []
+            annual_portfolio_values[year].append(portf_value)
+            annual_drawdowns[year].append(max_drawdown)
+
+        annual_summary = []
+        prev_portf = init_portf
+        for year in sorted(annual_portfolio_values.keys()):
+            y_end = annual_portfolio_values[year][-1]
+            y_start = prev_portf
+            cagr = ((y_end / y_start) ** 1 - 1) * 100
+            max_dd_year = min(annual_drawdowns[year]) * 100
+            annual_summary.append({
+                "Year": year,
+                "CAGR %": round(cagr, 2),
+                "Max DD %": round(max_dd_year, 2)
+            })
+            prev_portf = y_end
+
+        cumulative_max_drawdown = min([row["Max. Cum Drawdown %"] for row in formatted_results])
+        years_total = len(annual_summary)
+        final_portf = formatted_results[-1]["Portfolio $"]
+        cagr_total = ((final_portf / init_portf) ** (1 / years_total) - 1) * 100 if years_total > 0 else 0.0
+
+        PortfolioSummaryAnalyzer.__strategy_results_to_csv__(
+            formatted_results=formatted_results,
+            portfolio_value=final_portf,
+            max_drawdown=cumulative_max_drawdown / 100,
+            strategy=strategy_key,
+            timestamp=timestamp,
+            annual_summary=annual_summary + [
+                {'Year': 'Cumulative CAGR', 'Period': f"{round(cagr_total, 2)}%"}
+            ],
+            incremental=False
+        )
+
+        return formatted_results, annual_summary
+
+    @staticmethod
+    def __strategy_results_to_csv__(formatted_results, portfolio_value, max_drawdown, strategy, timestamp,
                                 annual_summary=None, incremental=False):
         """
         Export strategy results to a CSV file with the specified structure, including annual summaries.

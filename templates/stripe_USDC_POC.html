@@ -38,6 +38,7 @@
 
   <script>
     let clientSecretGlobal = "";
+    let hostedUrlGlobal = "";
 
     async function generateUsdcPaymentIntent() {
       const secretKey = document.getElementById("sk_input").value;
@@ -52,26 +53,24 @@
       const data = await response.json();
       if (data.client_secret) {
         clientSecretGlobal = data.client_secret;
-        document.getElementById("result").innerText = `✅ PaymentIntent created: ${data.payment_intent_id}`;
+        hostedUrlGlobal = data.payment_intent_url;
+
+        document.getElementById("result").innerText =
+          `✅ PaymentIntent created: ${data.payment_intent_id}`;
       } else {
         document.getElementById("result").innerText = `❌ Error: ${data.error}`;
       }
     }
 
     async function launchUsdcPayment() {
-      const pk = document.getElementById("pk_input").value;
-      const stripe = Stripe(pk);
-
-      const { error, paymentIntent } = await stripe.confirmUsdcPayment(clientSecretGlobal, {
-        payment_method: 'usdc'
-      });
-
-      if (error) {
-        document.getElementById("result").innerText = `❌ Error: ${error.message}`;
-      } else {
-        document.getElementById("result").innerText = `✅ Transaction succeeded with PaymentIntent ID: ${paymentIntent.id}`;
+      if (!hostedUrlGlobal) {
+        document.getElementById("result").innerText = "❌ No payment link available. Generate intent first.";
+        return;
       }
+
+      window.open(hostedUrlGlobal, '_blank');
     }
   </script>
+
 </body>
 </html>

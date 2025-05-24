@@ -32,20 +32,35 @@ class StripeUSDCDemoController(BaseController):
         try:
             stripe.api_key = payload.secret_key
 
+            # Crear un customer temporal (en producción, deberías usar uno real o existente)
+            customer = stripe.Customer.create(description="Temp customer for crypto test")
+
             intent = stripe.PaymentIntent.create(
                 amount=payload.amount,
                 currency='usd',
-                payment_method_types=['usdc'],
-                description='USDC test payment'
+                description='USDC test payment',
+                customer=customer.id,
+                automatic_payment_methods={"enabled": True}
             )
 
+            # Refrescamos para que incluya el next_action si aplica
+            intent = stripe.PaymentIntent.retrieve(intent.id)
+
             self.logger.do_log(f"✅ Created USDC PaymentIntent: {intent.id}", MessageType.INFO)
+            print(">> Stripe intent status:", intent.status)
+            print(">> Stripe next_action:", intent.next_action)
+
+            hosted_url = None
+            if intent.next_action and intent.next_action.get("type") == "verify_with_crypto":
+                hosted_url = intent.next_action["verify_with_crypto"]["hosted_url"]
 
             return JSONResponse(content={
                 "client_secret": intent.client_secret,
-                "payment_intent_id": intent.id
+                "payment_intent_id": intent.id,
+                "payment_intent_url": hosted_url
             })
 
         except Exception as e:
             self.logger.do_log(f"❌ Error creating USDC PaymentIntent: {str(e)}", MessageType.ERROR)
             return JSONResponse(status_code=500, content={"error": str(e)})
+
