@@ -6,6 +6,8 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from statsmodels.tsa.stattools import adfuller
 
+from common.util.light_logger import LightLogger
+
 _OUTPUT_DATE_FORMAT = '%m/%d/%Y %H:%M:%S'
 _OUTPUT_PATH = "./output/"
 
@@ -174,6 +176,14 @@ class BaseModelCreator:
         Returns:
         pd.DataFrame: Stationary DataFrame.
         """
+
+        # Inside __make_stationary__ or preprocessing
+        for var in df.columns:
+            series = df[var].dropna()
+            if len(series.unique()) <= 1:
+                LightLogger.do_log(f"[WARNING] Variable {var} is constant or has no variation. Skipping...")
+                df.drop(columns=[var], inplace=True)
+
         # List to store columns that were differenced
         differenced_columns = []
 

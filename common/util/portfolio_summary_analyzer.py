@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from common.util.date_handler import DateHandler
+from common.util.financial_calculation_helper import FinancialCalculationsHelper
 
 
 class PortfolioSummaryAnalyzer:
@@ -13,6 +14,29 @@ class PortfolioSummaryAnalyzer:
 
     def __init__(self):
         pass
+
+    @staticmethod
+    def __group_returns_n_drawdown__(summary_dict_arr, strategy_key):
+        all_max_MTMs_dict = {}
+        all_max_drawdowns_dict = {}
+
+        for entry in summary_dict_arr:
+            if strategy_key in entry:
+                summary = entry[strategy_key]
+                year = summary.year
+
+                mtm_return = (summary.portf_final_MTM / summary.portf_init_MTM) - 1
+                drawdown = summary.max_daily_drawdown
+
+                if year not in all_max_MTMs_dict:
+                    all_max_MTMs_dict[year] = []
+                if year not in all_max_drawdowns_dict:
+                    all_max_drawdowns_dict[year] = []
+
+                all_max_MTMs_dict[year].append(mtm_return)
+                all_max_drawdowns_dict[year].append(drawdown)
+
+        return all_max_MTMs_dict, all_max_drawdowns_dict
 
     @staticmethod
     def calculate_portfolio_metrics(result, init_portf, start, end, timestamp):
@@ -120,6 +144,13 @@ class PortfolioSummaryAnalyzer:
                     'Max DD %': round(max_dd_year, 2)
                 })
 
+            #CAGR
+            num_years_total = len(years)
+            cagr_total = ((portfolio_value / init_portf) ** (
+                        1 / num_years_total) - 1) * 100 if num_years_total > 0 else 0.0
+
+            annual_summary.append({'Year': 'Cumulative CAGR', 'Period': f"{round(cagr_total, 2)}%"})
+
             # Update the CSV file with the formatted results and annual summary
             PortfolioSummaryAnalyzer.__strategy_results_to_csv__(formatted_results, portfolio_value, max_drawdown,
                                                                  strategy, timestamp, annual_summary=annual_summary,
@@ -136,8 +167,8 @@ class PortfolioSummaryAnalyzer:
         return final_results
 
     @staticmethod
-    def convert_summary_dict_arr_to_dataframe(summary_dict_arr, strategy_key="SLIDING_RF", init_portf=100000,
-                                              timestamp=""):
+    def convert_summary_dict_arr_to_dataframe(summary_dict_arr,symbol, series_csv, strategy_key="SLIDING_RF", init_portf=100000,
+                                              timestamp="",):
         """
         Converts summary_dict_arr to DataFrames and saves them to CSV, with correct cumulative metrics.
         """
@@ -146,6 +177,8 @@ class PortfolioSummaryAnalyzer:
         annual_drawdowns = {}
 
         max_drawdown_accum = float("inf")  # for cumulative min tracking
+
+        all_max_MTMs_dict, all_max_drawdowns_dict= PortfolioSummaryAnalyzer.__group_returns_n_drawdown__(summary_dict_arr, strategy_key)
 
         for entry in summary_dict_arr:
             summary = entry[strategy_key]
@@ -180,7 +213,9 @@ class PortfolioSummaryAnalyzer:
             y_end = annual_portfolio_values[year][-1]
             y_start = prev_portf
             cagr = ((y_end / y_start) ** 1 - 1) * 100
-            max_dd_year = min(annual_drawdowns[year]) * 100
+            max_dd_year = FinancialCalculationsHelper.get_max_cum_yearly_drawdown(year,all_max_MTMs_dict,all_max_drawdowns_dict) * 100
+            #max_dd_year = min(annual_drawdowns[year]) * 100
+
             annual_summary.append({
                 "Year": year,
                 "CAGR %": round(cagr, 2),
@@ -202,14 +237,16 @@ class PortfolioSummaryAnalyzer:
             annual_summary=annual_summary + [
                 {'Year': 'Cumulative CAGR', 'Period': f"{round(cagr_total, 2)}%"}
             ],
-            incremental=False
+            incremental=False,
+            symbol=symbol,
+            series_csv=series_csv
         )
 
         return formatted_results, annual_summary
 
     @staticmethod
     def __strategy_results_to_csv__(formatted_results, portfolio_value, max_drawdown, strategy, timestamp,
-                                annual_summary=None, incremental=False):
+                                annual_summary=None, incremental=False,symbol="?",series_csv="?"):
         """
         Export strategy results to a CSV file with the specified structure, including annual summaries.
 
@@ -228,9 +265,15 @@ class PortfolioSummaryAnalyzer:
 
         # Create a DataFrame for the header rows
         header_data = [
+            {'Year': 'Cumulative CAGR', 'Period': cagr_label if (
+                cagr_label := next((row["Period"] for row in annual_summary if row["Year"] == 'Cumulative CAGR'),
+                                   '')) else ''},
             {'Year': 'Final Portfolio Value', 'Period': formatted_portfolio_value},
-            {'Year': 'Cumulative Max Drawdown', 'Period': formatted_max_drawdown}
+            {'Year': 'Cumulative Max Drawdown', 'Period': formatted_max_drawdown},
+            {'Year': 'Symbol', 'Period': symbol},
+            {'Year': 'Series CSV', 'Period': series_csv}
         ]
+
         header_df = pd.DataFrame(header_data)
 
         # Add empty columns to header_df to match the main DataFrame's columns

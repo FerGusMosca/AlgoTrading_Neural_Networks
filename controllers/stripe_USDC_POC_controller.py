@@ -28,8 +28,49 @@ class StripeUSDCDemoController(BaseController):
     async def display_page(self, request: Request):
         return self.templates.TemplateResponse("stripe_USDC_POC.html", {"request": request})
 
+    def create_usdc_payment_intent_manual(self, payload: UsdcPaymentIntentRequest):
+
+
+        # Your test secret key
+        stripe.api_key = payload.secret_key
+
+        # 1. Create a temporary customer
+        customer = stripe.Customer.create(
+            email="test-crypto@example.com",
+            description="Manual test customer for USDC"
+        )
+
+        # 2. Create the PaymentIntent with payment_method_types=["crypto"]
+        intent = stripe.PaymentIntent.create(
+            amount=1000,  # $10 USD
+            currency="usd",
+            customer=customer.id,
+            payment_method_types=["crypto"],
+            description="Manual USDC test intent"
+        )
+
+        print(">> Created PaymentIntent:", intent.id)
+        print(">> Initial status:", intent.status)
+
+        # 3. Manually confirm the intent
+        confirmed_intent = stripe.PaymentIntent.confirm(
+            intent.id,
+            payment_method="crypto"
+        )
+
+        print(">> Confirmed")
+        print(">> Status:", confirmed_intent.status)
+        print(">> next_action:", confirmed_intent.next_action)
+
+        if confirmed_intent.next_action and confirmed_intent.next_action["type"] == "verify_with_crypto":
+            print("✅ Hosted checkout URL:", confirmed_intent.next_action["verify_with_crypto"]["hosted_url"])
+        else:
+            print("❌ No hosted_url generated")
+
     async def create_usdc_payment_intent(self, payload: UsdcPaymentIntentRequest):
         try:
+
+            #self.create_usdc_payment_intent_manual(payload)
             stripe.api_key = payload.secret_key
 
             # Crear un customer temporal (en producción, deberías usar uno real o existente)

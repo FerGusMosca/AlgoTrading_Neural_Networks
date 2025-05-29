@@ -105,3 +105,56 @@ class FinancialCalculationsHelper():
         max_drawdown = np.min(drawdowns)  # Most negative value is the max drawdown
 
         return max_drawdown
+
+    @staticmethod
+    def get_max_cum_drawdown_in_arr(returns_arr):
+        """
+        Calculates the maximum cumulative drawdown from a list of periodic returns.
+
+        :param returns_arr: List of returns (e.g., [r1, r2, ..., rn] where r = (P_t/P_{t-1}) - 1)
+        :return: Maximum cumulative drawdown as float (e.g., -0.25 for -25%)
+        """
+        if not returns_arr:
+            return 0.0
+
+        # Reconstruct portfolio values starting at 1
+        portf_vals = [1.0]
+        for r in returns_arr:
+            portf_vals.append(portf_vals[-1] * (1 + r))
+
+        # Compute cumulative max drawdown on that reconstructed portfolio series
+        max_val = portf_vals[0]
+        max_drawdown = 0.0
+        for val in portf_vals:
+            if val > max_val:
+                max_val = val
+            drawdown = (val - max_val) / max_val
+            max_drawdown = min(max_drawdown, drawdown)
+
+        return max_drawdown
+
+    @staticmethod
+    def get_max_cum_yearly_drawdown(year, mtm_dict, dd_dict):
+        monthly_returns = mtm_dict.get(year, [])
+        monthly_drawdowns = dd_dict.get(year, [])
+
+        if not monthly_returns or not monthly_drawdowns:
+            return 0
+
+        assert len(monthly_returns) == len(monthly_drawdowns), "Mismatch in lengths"
+
+        n = len(monthly_returns)
+        min_combined = float('inf')
+
+        for j in range(n):
+            # Sumar desde i hasta j-1, luego agregar dd[j]
+            for i in range(j + 1):
+                cum_return = sum(monthly_returns[i:j])
+                combined = cum_return + monthly_drawdowns[j]
+                min_combined = min(min_combined, combined)
+
+        return min_combined
+
+
+
+

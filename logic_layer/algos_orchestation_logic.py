@@ -694,7 +694,7 @@ class AlgosOrchestationLogic:
             summary_dict_arr.append({"SLIDING_RF": summary})
 
             PortfolioSummaryAnalyzer.convert_summary_dict_arr_to_dataframe(
-                summary_dict_arr,
+                summary_dict_arr,symbol, series_csv,
                 strategy_key="SLIDING_RF",
                 init_portf=init_portf_size,
                 timestamp=timestamp
