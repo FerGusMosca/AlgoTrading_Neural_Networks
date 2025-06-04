@@ -36,41 +36,48 @@
 
   <h3 id="result"></h3>
 
-  <script>
-    let clientSecretGlobal = "";
-    let hostedUrlGlobal = "";
+<script>
+  let clientSecretGlobal = "";
+  let hostedUrlGlobal = "";
 
-    async function generateUsdcPaymentIntent() {
-      const secretKey = document.getElementById("sk_input").value;
-      const amount = document.getElementById("amount_input").value;
+  async function generateUsdcPaymentIntent() {
+    const secretKey = document.getElementById("sk_input").value;
+    const amount = document.getElementById("amount_input").value;
 
-      const response = await fetch('/stripe_USDC_POC/create_usdc_payment_intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret_key: secretKey, amount: parseInt(amount) })
-      });
+    const response = await fetch('/stripe_USDC_POC/create_usdc_payment_intent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret_key: secretKey, amount: parseInt(amount) })
+    });
 
-      const data = await response.json();
-      if (data.client_secret) {
-        clientSecretGlobal = data.client_secret;
-        hostedUrlGlobal = data.payment_intent_url;
+    const data = await response.json();
 
-        document.getElementById("result").innerText =
-          `✅ PaymentIntent created: ${data.payment_intent_id}`;
-      } else {
-        document.getElementById("result").innerText = `❌ Error: ${data.error}`;
-      }
+    if (!data || data.error) {
+      document.getElementById("result").innerText = `❌ Error: ${data?.error || "Unknown error"}`;
+      return;
     }
 
-    async function launchUsdcPayment() {
-      if (!hostedUrlGlobal) {
-        document.getElementById("result").innerText = "❌ No payment link available. Generate intent first.";
-        return;
-      }
+    clientSecretGlobal = data.client_secret;
+    hostedUrlGlobal = data.payment_intent_url;
 
-      window.open(hostedUrlGlobal, '_blank');
+    let message = `✅ PaymentIntent created: ${data.payment_intent_id}\n🔑 Client Secret: ${data.client_secret}`;
+    if (hostedUrlGlobal) {
+      message += `\n🔗 Hosted URL: ${hostedUrlGlobal}`;
+    } else {
+      message += `\n⚠️ No hosted_url yet. You can retry or check the Stripe Dashboard.`;
     }
-  </script>
+
+    document.getElementById("result").innerText = message;
+  }
+
+  async function launchUsdcPayment() {
+    if (!hostedUrlGlobal) {
+      document.getElementById("result").innerText = "❌ No payment link available. Generate intent first.";
+      return;
+    }
+    window.open(hostedUrlGlobal, '_blank');
+  }
+</script>
 
 </body>
 </html>

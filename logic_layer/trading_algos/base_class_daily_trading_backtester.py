@@ -118,6 +118,9 @@ class BaseClassDailyTradingBacktester:
         else:
             return 0
 
+    def __apply_commisions__(self,MTM, net_commissions):
+        return MTM-net_commissions
+
 
     def __extract_trading_symbols_from_multiple_portf__(self,df, col_prefix="close_"):
         """

@@ -64,8 +64,9 @@ class NFlipPredictionBacktester(SlopeBacktester):
                         # Only close if the opposite signal appears at least n_flip times
                         if flip_counter[current_pred] >= n_flip:
                             final_MTM = curr_portf_pos.calculate_and_append_MTM(current_date, current_price)
-                            last_portf_size = final_MTM - net_commissions
+                            last_portf_size=self.__apply_commisions__(final_MTM,net_commissions)
                             curr_portf_pos.close_pos(current_date, current_price)
+                            curr_portf_pos.append_MTM(current_date,last_portf_size)
                             LightLogger.do_log(f"-Closing {last_side} pos for ref_price= {current_price} on {current_date} "
                                                f"for pct profit={curr_portf_pos.calculate_pct_profit()}% "
                                                f"(nom. profit={curr_portf_pos.calculate_th_nom_profit()})")
@@ -92,8 +93,9 @@ class NFlipPredictionBacktester(SlopeBacktester):
 
             if curr_portf_pos is not None:
                 final_MTM = curr_portf_pos.calculate_and_append_MTM(current_date, current_price)
-                last_portf_size = final_MTM - net_commissions
+                last_portf_size=self.__apply_commisions__(final_MTM,net_commissions)
                 curr_portf_pos.close_pos(current_date, current_price)
+                curr_portf_pos.append_MTM(current_date,last_portf_size)
                 portf_positions.append(curr_portf_pos)
 
                 LightLogger.do_log(f"-Closing last {curr_portf_pos.side} pos for ref_price= {current_price} on {current_date} "

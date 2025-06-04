@@ -154,7 +154,7 @@ class PortfolioSummaryAnalyzer:
             # Update the CSV file with the formatted results and annual summary
             PortfolioSummaryAnalyzer.__strategy_results_to_csv__(formatted_results, portfolio_value, max_drawdown,
                                                                  strategy, timestamp, annual_summary=annual_summary,
-                                                                 incremental=False)
+                                                                 incremental=False, cagr_total=cagr_total)
 
             # Store the results for this strategy
             final_results[strategy] = {
@@ -234,9 +234,8 @@ class PortfolioSummaryAnalyzer:
             max_drawdown=cumulative_max_drawdown / 100,
             strategy=strategy_key,
             timestamp=timestamp,
-            annual_summary=annual_summary + [
-                {'Year': 'Cumulative CAGR', 'Period': f"{round(cagr_total, 2)}%"}
-            ],
+            annual_summary=annual_summary ,
+            cagr_total=round(cagr_total,2),
             incremental=False,
             symbol=symbol,
             series_csv=series_csv
@@ -246,7 +245,7 @@ class PortfolioSummaryAnalyzer:
 
     @staticmethod
     def __strategy_results_to_csv__(formatted_results, portfolio_value, max_drawdown, strategy, timestamp,
-                                annual_summary=None, incremental=False,symbol="?",series_csv="?"):
+                                annual_summary=None,cagr_total=None, incremental=False,symbol="?",series_csv="?"):
         """
         Export strategy results to a CSV file with the specified structure, including annual summaries.
 
@@ -261,15 +260,11 @@ class PortfolioSummaryAnalyzer:
         """
         # Format portfolio_value with commas and max_drawdown as a percentage
         formatted_portfolio_value = f"${portfolio_value:,.2f}"  # e.g., $1,029,997.59
-        formatted_max_drawdown = f"{round(max_drawdown * 100, 2)}%"  # e.g., -5.20%
 
         # Create a DataFrame for the header rows
         header_data = [
-            {'Year': 'Cumulative CAGR', 'Period': cagr_label if (
-                cagr_label := next((row["Period"] for row in annual_summary if row["Year"] == 'Cumulative CAGR'),
-                                   '')) else ''},
+            {'Year': 'Cumulative CAGR', 'Period': f"{round(cagr_total, 2)}%"},
             {'Year': 'Final Portfolio Value', 'Period': formatted_portfolio_value},
-            {'Year': 'Cumulative Max Drawdown', 'Period': formatted_max_drawdown},
             {'Year': 'Symbol', 'Period': symbol},
             {'Year': 'Series CSV', 'Period': series_csv}
         ]

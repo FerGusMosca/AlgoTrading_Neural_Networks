@@ -38,8 +38,7 @@ class PortfolioPosition():
         else:
             self.price_open=float(price)
         if self.units is not None:
-            self.daily_MTMs.append(price*units)
-            self.detailed_MTMs.append(DetailedMTM(date,price*units))
+            self.append_MTM(date,price*units)
 
     def close_pos(self,date,price):
 
@@ -50,16 +49,18 @@ class PortfolioPosition():
         else:
             self.price_close=float(price)
         if self.units is not None:
-            self.daily_MTMs.append(price * self.units)
-            self.detailed_MTMs.append(DetailedMTM(date,price*self.units))
+            self.append_MTM(date,price*self.units)
+
+    def append_MTM(self, date,MTM):
+        self.daily_MTMs.append(MTM)
+        self.detailed_MTMs.append(DetailedMTM(date,MTM))
 
 
     def calculate_and_append_MTM(self,date,price):
 
         if price is not None and self.units is not None:
             final_MTM=price*self.units
-            self.daily_MTMs.append(final_MTM)
-            self.detailed_MTMs.append(DetailedMTM(date,final_MTM))
+            self.append_MTM(date,final_MTM)
             return final_MTM
 
         return price
