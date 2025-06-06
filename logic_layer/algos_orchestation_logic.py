@@ -10,6 +10,7 @@ from common.dto.indicator_type_dto import IndicatorTypeDTO
 from common.enums.filename_prefix import FilenamePrefix
 from common.enums.folders import Folders
 from common.enums.grouping_criterias import GroupCriteria as gc
+from common.enums.intervals import Intervals
 from common.enums.parameters.parameters_keys import ParametersKeys
 from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws, SlidingWindowStrategy
 from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas, TradingAlgoStrategy
@@ -23,7 +24,9 @@ from common.util.image_handler import ImageHandler
 from common.util.light_logger import LightLogger
 from common.util.portfolio_summary_analyzer import PortfolioSummaryAnalyzer
 from common.util.random_walk_generator import RandomWalkGenerator
+from common.util.slope_calculator import SlopeCalculator
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
+from data_access_layer.economic_series_manager import EconomicSeriesManager
 from data_access_layer.timestamp_classification_manager import TimestampClassificationManager
 
 from framework.common.logger.message_type import MessageType
@@ -1426,6 +1429,35 @@ class AlgosOrchestationLogic:
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
 
+
+
+    def detect_and_save_regime_switch(self, variables, d_from, d_to, regime_filter, regime_candle, regime_window,
+                                      slope_threshold):
+        """
+        Detects regime switch conditions on the given variables and saves them as an economic candle.
+        """
+        df = self.data_set_builder.build_daily_series_classification(",".join(variables), d_from, d_to,
+                                                                     add_classif_col=False)
+
+        for var in variables:
+            self.logger.print(f"🔍 Evaluating regime filter '{regime_filter}' on variable: {var}", MessageType.INFO)
+
+            values = df[var].tolist()
+            dates = df["date"].tolist()
+
+            regime_signals = SlopeCalculator.classify_slope_regime(
+                values=values,
+                dates=dates,
+                regime_filter=regime_filter,
+                window=regime_window,
+                slope_threshold=slope_threshold
+            )
+
+            for date, signal in zip(dates, regime_signals):
+                self.data_set_builder.economic_series_mgr.persist_economic_series(regime_candle, date,
+                                                                                  Intervals.DAY.value, signal)
+
+        self.logger.print(f"✅ Finished saving regime signal '{regime_candle}'", MessageType.INFO)
 
     def process_daily_candles_graph(self,symbol, date, interval,mov_avg_unit):
         start_of_day = datetime(date.year, date.month, date.day)

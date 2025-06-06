@@ -2,7 +2,9 @@ import numpy as np
 from scipy.stats import linregress
 
 from common.enums.columns_prefix import ColumnsPrefix
+from common.enums.market_regimes import MarketRegimes
 from common.enums.on_off_indicator_values import OnOffIndicatorValue
+from common.enums.regime_zones import RegimeZones
 from logic_layer.trading_algos.base_class_daily_trading_backtester import BaseClassDailyTradingBacktester
 
 
@@ -106,3 +108,40 @@ class SlopeCalculator(BaseClassDailyTradingBacktester):
         series_df[slope_column_name] = series_df[slope_column_name].interpolate(method='linear')
 
         return series_df
+
+    @staticmethod
+    def classify_slope_regime(values, dates, regime_filter, window, slope_threshold=0.3):
+        signals = []
+
+        for i in range(len(values)):
+            if i < window:
+                signals.append(0)
+                continue
+
+            window_vals = values[i - window:i]
+
+            if any(v is None or np.isnan(v) for v in window_vals):
+                signals.append(0)
+                continue
+
+            x = np.arange(window)
+            y = np.array(window_vals)
+            slope = np.polyfit(x, y, 1)[0]
+
+            avg_val = np.mean(y)
+            dynamic_threshold = slope_threshold * abs(avg_val)
+
+            if regime_filter == MarketRegimes.HIGH_VOLATILITY.value:
+                if slope > dynamic_threshold:
+                    signal = 1
+                elif slope < -dynamic_threshold:
+                    signal = -1
+                else:
+                    signal = 0
+            else:
+                signal = 0
+
+            signals.append(signal)
+
+        return signals
+

@@ -43,6 +43,7 @@ def show_commands():
     print("#18-TrainRF [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [n_estimators] [max_depth] [min_samples_split] [criterion] [batch_size*] [grouping_unit*] [grouping_classif_criteria*] [group_as_mov_avg*] [grouping_mov_avg_unit*] [class_weight*] [make_stationary*] [interval*]")
     print("#19-TestDailyRF [symbol] [variables_csv] [from] [to] [model_to_use] [portf_size] [trade_comm] [trading_algo] [classif_threshold] [algo_params*]")
     print("#20-EvalSlidingRandomForest [symbol] [series_csv] [from] [to] [classif_key] [init_portf_size] [trade_comm] [classif_threshold] [sliding_window_years] [sliding_window_months]")
+    print("#21-CustomRegimeSwitchDetector [variables] [from] [to] [regime_switch_filter] [regime_candle] [regime_window]")
     print("======================== UI ========================")
     print("#30-BiasMainLandingPage")
     print("#31-DisplayOrderRoutingScreen")
@@ -539,6 +540,23 @@ def run_train_ml_algo(cmd):
     process_train_ml_algos(series_csv, d_from, d_to, classif_key)
 
 
+
+
+def run_custom_regime_switch_detector(cmd):
+    variables = __get_param__(cmd, "variables").split(",")
+    d_from = __get_param__(cmd, "from")
+    d_to = __get_param__(cmd, "to")
+    regime_filter = __get_param__(cmd, "regime_switch_filter")
+    regime_candle = __get_param__(cmd, "regime_candle")
+    regime_window = int(__get_param__(cmd, "regime_window", optional=True, def_value=20))
+    slope_threshold = float(__get_param__(cmd, "slope_threshold", optional=True, def_value=0.3))
+
+    process_custom_regime_switch_detector(
+        variables, d_from, d_to, regime_filter, regime_candle, regime_window, slope_threshold
+    )
+
+
+
 def run_sliding_random_forest(cmd):
     symbol = __get_param__(cmd, "symbol")
     series_csv = __get_param__(cmd, "series_csv")
@@ -951,6 +969,40 @@ def process_train_neural_network_algo(symbol, variables_csv, str_from, str_to, d
         logger.print("CRITICAL ERROR running proces_train_neural_network_algo:{}".format(str(e)), MessageType.ERROR)
 
 
+def process_custom_regime_switch_detector(variables, d_from, d_to, regime_filter, regime_candle, regime_window,slope_threshold):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print(f"Running Regime Switch Detector from {d_from} to {d_to}", MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"],
+                                         config_settings["ml_reports_conn_str"],
+                                         None,
+                                         logger=logger)
+
+
+
+        dataMgm.detect_and_save_regime_switch(
+            variables=variables,
+            d_from=d_from,
+            d_to=d_to,
+            regime_filter=regime_filter,
+            regime_candle=regime_candle,
+            regime_window=regime_window,
+            slope_threshold=slope_threshold
+        )
+
+        logger.print(f"✅ Regime switch detection saved for candle: {regime_candle}", MessageType.INFO)
+
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        traceback.print_exc()
+        logger.print("CRITICAL ERROR running CustomRegimeSwitchDetector: {}".format(str(e)), MessageType.ERROR)
+
+
 def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classification_key,
                        epochs, timestamps, n_neurons, learning_rate, reg_rate, dropout_rate,clipping_rate,
                        threshold_stop,grouping_unit=None,grouping_classif_criteria=None,
@@ -1274,6 +1326,8 @@ def process_commands(cmd):
 
     elif cmd_param_list[0] == "EvalSlidingRandomForest":
         run_sliding_random_forest(cmd)
+    elif cmd_param_list[0] == "CustomRegimeSwitchDetector":
+        run_custom_regime_switch_detector(cmd)
 
     #TestDailyLSTM
 
