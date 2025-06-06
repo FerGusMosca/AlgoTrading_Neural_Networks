@@ -1432,7 +1432,7 @@ class AlgosOrchestationLogic:
 
 
     def detect_and_save_regime_switch(self, variables, d_from, d_to, regime_filter, regime_candle, regime_window,
-                                      slope_threshold):
+                                      slope_threshold=0.3, abs_value_threshold=10):
         """
         Detects regime switch conditions on the given variables and saves them as an economic candle.
         """
@@ -1450,7 +1450,8 @@ class AlgosOrchestationLogic:
                 dates=dates,
                 regime_filter=regime_filter,
                 window=regime_window,
-                slope_threshold=slope_threshold
+                slope_threshold=slope_threshold,
+                abs_value_threshold=abs_value_threshold
             )
 
             for date, signal in zip(dates, regime_signals):

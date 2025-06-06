@@ -110,7 +110,7 @@ class SlopeCalculator(BaseClassDailyTradingBacktester):
         return series_df
 
     @staticmethod
-    def classify_slope_regime(values, dates, regime_filter, window, slope_threshold=0.3):
+    def classify_slope_regime(values, dates, regime_filter, window, slope_threshold=0.3, abs_value_threshold=None):
         signals = []
 
         for i in range(len(values)):
@@ -126,7 +126,10 @@ class SlopeCalculator(BaseClassDailyTradingBacktester):
 
             x = np.arange(window)
             y = np.array(window_vals)
-            slope = np.polyfit(x, y, 1)[0]
+            if np.any(np.isnan(y)) or np.all(y == y[0]):
+                slope = 0.0
+            else:
+                slope = np.polyfit(x, y, 1)[0]
 
             avg_val = np.mean(y)
             dynamic_threshold = slope_threshold * abs(avg_val)
@@ -138,6 +141,10 @@ class SlopeCalculator(BaseClassDailyTradingBacktester):
                     signal = -1
                 else:
                     signal = 0
+            elif regime_filter == MarketRegimes.ABS_VALUE.value:
+                current_val = values[i]
+                signal = 1 if current_val is not None and not np.isnan(
+                    current_val) and current_val > abs_value_threshold else 0
             else:
                 signal = 0
 

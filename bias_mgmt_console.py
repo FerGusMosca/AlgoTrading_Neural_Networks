@@ -550,9 +550,10 @@ def run_custom_regime_switch_detector(cmd):
     regime_candle = __get_param__(cmd, "regime_candle")
     regime_window = int(__get_param__(cmd, "regime_window", optional=True, def_value=20))
     slope_threshold = float(__get_param__(cmd, "slope_threshold", optional=True, def_value=0.3))
+    abs_value_threshold = float(__get_param__(cmd, "abs_value_threshold", optional=True, def_value=None))
 
     process_custom_regime_switch_detector(
-        variables, d_from, d_to, regime_filter, regime_candle, regime_window, slope_threshold
+        variables, d_from, d_to, regime_filter, regime_candle, regime_window, slope_threshold,abs_value_threshold
     )
 
 
@@ -969,7 +970,7 @@ def process_train_neural_network_algo(symbol, variables_csv, str_from, str_to, d
         logger.print("CRITICAL ERROR running proces_train_neural_network_algo:{}".format(str(e)), MessageType.ERROR)
 
 
-def process_custom_regime_switch_detector(variables, d_from, d_to, regime_filter, regime_candle, regime_window,slope_threshold):
+def process_custom_regime_switch_detector(variables, d_from, d_to, regime_filter, regime_candle, regime_window,slope_threshold,abs_value_threshold):
     loader = MLSettingsLoader()
     logger = Logger()
 
@@ -992,7 +993,8 @@ def process_custom_regime_switch_detector(variables, d_from, d_to, regime_filter
             regime_filter=regime_filter,
             regime_candle=regime_candle,
             regime_window=regime_window,
-            slope_threshold=slope_threshold
+            slope_threshold=slope_threshold,
+            abs_value_threshold=abs_value_threshold
         )
 
         logger.print(f"✅ Regime switch detection saved for candle: {regime_candle}", MessageType.INFO)
