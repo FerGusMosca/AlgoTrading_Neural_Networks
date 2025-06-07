@@ -12,7 +12,7 @@ from logic_layer.trading_algos.slope_backtester import SlopeBacktester
 class NFlipPredictionBacktester(SlopeBacktester):
 
     def backtest(self, symbol, symbol_prices_df, predictions_dic, last_trading_dict, n_algo_param_dict,
-                 init_last_portf_size_dict=None):
+                 init_last_portf_size_dict=None, pos_regime_df=None):
 
         portf_pos_dict = {}
 
@@ -49,33 +49,57 @@ class NFlipPredictionBacktester(SlopeBacktester):
                 flip_counter[opposite_side] = 0
 
                 try:
+                    # Regime validation: if regime switch is active, close position and skip trading
+                    if not self.__validate_regime__(pos_regime_df, current_date):
+                        if curr_portf_pos is not None:
+                            final_MTM = curr_portf_pos.calculate_and_append_MTM(current_date, current_price)
+                            last_portf_size = self.__apply_commisions__(final_MTM, net_commissions)
+                            curr_portf_pos.close_pos(current_date, current_price)
+                            curr_portf_pos.append_MTM(current_date, last_portf_size)
+                            portf_positions.append(curr_portf_pos)
+
+                            LightLogger.do_log(f"-Closing position due to REGIME SWITCH on {current_date} "
+                                               f"for pct profit={curr_portf_pos.calculate_pct_profit()}% "
+                                               f"(nom. profit={curr_portf_pos.calculate_th_nom_profit()})")
+
+                            curr_portf_pos = None
+                            last_side = None
+                        continue  # Skip trading decisions on this date
+
+                    # Open new position if signal is stable and no position is open
                     if curr_portf_pos is None and flip_counter[current_pred] >= n_flip:
                         if self.__validate_bias__(current_pred, bias):
                             current_price = self.__eval_reuse_reference_price__(algo, last_trading_dict,
-                                                                                current_pred, current_date, current_price)
-                            LightLogger.do_log(f"-Opening {current_pred} pos for ref_price= {current_price} on {current_date}")
+                                                                                current_pred, current_date,
+                                                                                current_price)
+                            LightLogger.do_log(
+                                f"-Opening {current_pred} pos for ref_price= {current_price} on {current_date}")
                             curr_portf_pos = PortfolioPosition(symbol)
-                            new_portf_size, net_commissions = self.__extract_commission__(last_portf_size, n_algo_param_dict)
+                            new_portf_size, net_commissions = self.__extract_commission__(last_portf_size,
+                                                                                          n_algo_param_dict)
                             curr_portf_pos.open_pos(current_pred, current_date, current_price,
                                                     units=new_portf_size / current_price)
                             last_side = current_pred
 
+                    # Close position if opposite signal is strong enough
                     elif curr_portf_pos is not None and current_pred != last_side:
-                        # Only close if the opposite signal appears at least n_flip times
                         if flip_counter[current_pred] >= n_flip:
                             final_MTM = curr_portf_pos.calculate_and_append_MTM(current_date, current_price)
-                            last_portf_size=self.__apply_commisions__(final_MTM,net_commissions)
+                            last_portf_size = self.__apply_commisions__(final_MTM, net_commissions)
                             curr_portf_pos.close_pos(current_date, current_price)
-                            curr_portf_pos.append_MTM(current_date,last_portf_size)
-                            LightLogger.do_log(f"-Closing {last_side} pos for ref_price= {current_price} on {current_date} "
-                                               f"for pct profit={curr_portf_pos.calculate_pct_profit()}% "
-                                               f"(nom. profit={curr_portf_pos.calculate_th_nom_profit()})")
+                            curr_portf_pos.append_MTM(current_date, last_portf_size)
+                            LightLogger.do_log(
+                                f"-Closing {last_side} pos for ref_price= {current_price} on {current_date} "
+                                f"for pct profit={curr_portf_pos.calculate_pct_profit()}% "
+                                f"(nom. profit={curr_portf_pos.calculate_th_nom_profit()})")
                             portf_positions.append(curr_portf_pos)
 
                             if self.__validate_bias__(current_pred, bias):
-                                LightLogger.do_log(f"-Opening new {current_pred} pos for ref_price= {current_price} on {current_date}")
+                                LightLogger.do_log(
+                                    f"-Opening new {current_pred} pos for ref_price= {current_price} on {current_date}")
                                 curr_portf_pos = PortfolioPosition(symbol)
-                                new_portf_size, net_commissions = self.__extract_commission__(last_portf_size, n_algo_param_dict)
+                                new_portf_size, net_commissions = self.__extract_commission__(last_portf_size,
+                                                                                              n_algo_param_dict)
                                 curr_portf_pos.open_pos(current_pred, current_date, current_price,
                                                         units=new_portf_size / current_price)
                                 last_side = current_pred
@@ -85,23 +109,27 @@ class NFlipPredictionBacktester(SlopeBacktester):
                         else:
                             curr_portf_pos.calculate_and_append_MTM(current_date, current_price)
 
+                    # Update MTM if holding position and no trade happens
                     elif curr_portf_pos is not None:
                         curr_portf_pos.calculate_and_append_MTM(current_date, current_price)
 
                 except Exception as e:
                     raise Exception(f"Error processing day {current_date} for algo {algo}:{str(e)}")
 
+            # Final position closure at end of period
             if curr_portf_pos is not None:
                 final_MTM = curr_portf_pos.calculate_and_append_MTM(current_date, current_price)
-                last_portf_size=self.__apply_commisions__(final_MTM,net_commissions)
+                last_portf_size = self.__apply_commisions__(final_MTM, net_commissions)
                 curr_portf_pos.close_pos(current_date, current_price)
-                curr_portf_pos.append_MTM(current_date,last_portf_size)
+                curr_portf_pos.append_MTM(current_date, last_portf_size)
                 portf_positions.append(curr_portf_pos)
 
-                LightLogger.do_log(f"-Closing last {curr_portf_pos.side} pos for ref_price= {current_price} on {current_date} "
-                                   f"for pct profit={curr_portf_pos.calculate_pct_profit()}% "
-                                   f"(nom. profit={curr_portf_pos.calculate_th_nom_profit()})")
+                LightLogger.do_log(
+                    f"-Closing last {curr_portf_pos.side} pos for ref_price= {current_price} on {current_date} "
+                    f"for pct profit={curr_portf_pos.calculate_pct_profit()}% "
+                    f"(nom. profit={curr_portf_pos.calculate_th_nom_profit()})")
 
             portf_pos_dict[algo] = portf_positions
 
         return portf_pos_dict
+

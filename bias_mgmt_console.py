@@ -572,6 +572,7 @@ def run_sliding_random_forest(cmd):
     class_weight = __get_param__(cmd, "class_weight", optional=True, def_value="balanced")
     bias = __get_param__(cmd, "bias", optional=True, def_value="NONE")
     n_flip = __get_param__(cmd, "n_flip", optional=True, def_value=1)
+    pos_regime_filters_csv = __get_param__(cmd, "pos_regime_filters_csv", optional=True, def_value="")
 
     n_algo_param_dict = {
         "trade_comm": trade_comm,
@@ -582,6 +583,7 @@ def run_sliding_random_forest(cmd):
         "class_weight": class_weight,
         "bias": bias,
         "n_flip": n_flip,
+        "pos_regime_filters_csv": pos_regime_filters_csv,
         "algos": "RF"
     }
 

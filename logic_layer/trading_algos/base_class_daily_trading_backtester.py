@@ -11,7 +11,7 @@ from common.enums.columns_prefix import ColumnsPrefix
 from common.enums.sliding_window_strategy import SlidingWindowStrategy
 from common.util.date_handler import DateHandler
 from common.util.financial_calculation_helper import FinancialCalculationsHelper
-
+from common.util.light_logger import LightLogger
 
 
 class BaseClassDailyTradingBacktester:
@@ -51,6 +51,35 @@ class BaseClassDailyTradingBacktester:
 
         return  new_ref_price
 
+    def __validate_regime__(self, pos_regime_df, current_date):
+        """
+        Returns False if any regime-switch indicator is active (non-zero) as of current_date.
+        Assumes each regime symbol reports data at different frequencies (daily or monthly).
+        """
+        if pos_regime_df is None or pos_regime_df.empty:
+            return True  # No regime filters, always valid
+
+        current_date = pd.to_datetime(current_date)
+        symbols = pos_regime_df["symbol"].unique()
+
+        for symbol in symbols:
+            # Filter data for this symbol up to the current date
+            symbol_df = pos_regime_df[(pos_regime_df["symbol"] == symbol) & (pos_regime_df["date"] <= current_date)]
+
+            if symbol_df.empty:
+                continue  # No data available yet for this regime variable
+
+            # Use the most recent value up to this date (important for monthly data like FEDFUNDS)
+            last_row = symbol_df.sort_values("date").iloc[-1]
+
+            # If any OHLC value is non-zero and not NaN, we consider a regime switch is active
+            for col in ["open", "high", "low", "close"]:
+                val = last_row[col]
+                if pd.notna(val) and val != 0:
+                    LightLogger.do_log(f"Regime switch triggered by {symbol} on {last_row['date']}")
+                    return False
+
+        return True  # No regime switch detected
 
     def __validate_bias__(self,side,bias):
         if bias==SlidingWindowStrategy.NONE.value:

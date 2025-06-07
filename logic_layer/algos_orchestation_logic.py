@@ -590,6 +590,7 @@ class AlgosOrchestationLogic:
         sliding_window_months = int(n_algo_param_dict["sliding_window_months"])
         init_portf_size = float(n_algo_param_dict["init_portf_size"])
         classif_key = n_algo_param_dict["classif_key"]
+        pos_regime_filters_csv=n_algo_param_dict["pos_regime_filters_csv"]
         trade_comm = float(n_algo_param_dict["trade_comm"])
         classif_threshold = float(n_algo_param_dict.get("classif_threshold", 0.6))
         idx_loop=0
@@ -649,6 +650,13 @@ class AlgosOrchestationLogic:
                 output_col=["symbol", "date", "open", "high", "low", "close"]
             )
 
+
+            pos_regime_df = self.data_set_builder.build_interval_series(
+                pos_regime_filters_csv, eval_d_from, eval_d_to,
+                interval=DataSetBuilder._1_DAY_INTERVAL,
+                output_col=["symbol", "date", "open", "high", "low", "close"]
+            )
+
             if eval_d_from > d_to:
                 self.logger.do_log(f"Skipping out-of-bound eval window: {eval_d_from} to {eval_d_to}", MessageType.INFO)
                 break
@@ -657,10 +665,6 @@ class AlgosOrchestationLogic:
                                                                                 add_classif_col=False)
             series_df = DataframeFiller.fill_missing_values(series_df)
 
-            print(f"[DEBUG] label_encoder: {label_encoder}")
-            print(f"[DEBUG] model_filename: {model_filename}")
-            print(f"[DEBUG] symbol_df shape: {symbol_df.shape}")
-            print(f"[DEBUG] last_trading_dict: {last_trading_dict}")
             result_df, test_series_df = mlAnalyzer.evaluate_trading_performance_last_model_RF(
                 symbol_df=symbol_df,
                 symbol=symbol,
@@ -687,7 +691,8 @@ class AlgosOrchestationLogic:
                                                     predictions_dic={"SLIDING_RF": result_df},
                                                     last_trading_dict=last_trading_dict,
                                                     n_algo_param_dict=n_algo_param_dict,
-                                                    init_last_portf_size_dict=init_last_portf_size_dict
+                                                    init_last_portf_size_dict=init_last_portf_size_dict,
+                                                    pos_regime_df=pos_regime_df
                                                 )
             idx_loop+=1
             # Wrap results into summary
