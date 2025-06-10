@@ -51,7 +51,7 @@ class BaseClassDailyTradingBacktester:
 
         return  new_ref_price
 
-    def __validate_regime__(self, pos_regime_df, current_date):
+    def __validate_regime__(self, pos_regime_df, current_date,is_pos=True):
         """
         Returns False if any regime-switch indicator is active (non-zero) as of current_date.
         Assumes each regime symbol reports data at different frequencies (daily or monthly).
@@ -75,7 +75,12 @@ class BaseClassDailyTradingBacktester:
             # If any OHLC value is non-zero and not NaN, we consider a regime switch is active
             for col in ["open", "high", "low", "close"]:
                 val = last_row[col]
-                if pd.notna(val) and val != 0:
+
+                if is_pos and  pd.notna(val) and (val < 0):
+                    LightLogger.do_log(f"Positive Regime switch triggered by {symbol} on {last_row['date']}")
+                    return False
+
+                if not is_pos and pd.notna(val) and ( val!=0):
                     LightLogger.do_log(f"Regime switch triggered by {symbol} on {last_row['date']}")
                     return False
 

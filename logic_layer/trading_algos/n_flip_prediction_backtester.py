@@ -50,7 +50,7 @@ class NFlipPredictionBacktester(SlopeBacktester):
 
                 try:
                     # Regime validation: if regime switch is active, close position and skip trading
-                    if not self.__validate_regime__(pos_regime_df, current_date):
+                    if not self.__validate_regime__(pos_regime_df, current_date,is_pos=True):
                         if curr_portf_pos is not None:
                             final_MTM = curr_portf_pos.calculate_and_append_MTM(current_date, current_price)
                             last_portf_size = self.__apply_commisions__(final_MTM, net_commissions)
