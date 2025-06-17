@@ -1,14 +1,10 @@
-from fastapi import Request
-from fastapi import FastAPI, Request, APIRouter
+from fastapi import FastAPI, Request
 from fastapi.params import Form
-from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
-from fastapi import Response
 from itsdangerous import TimestampSigner
-from starlette.responses import RedirectResponse, JSONResponse
+from starlette.responses import RedirectResponse
 
 from controllers.account_controller import AccountController
 from controllers.auth_middleware import AuthMiddleware
@@ -18,8 +14,8 @@ from controllers.global_m2_indicator_controller import GlobalM2IndicatorControll
 from controllers.load_series_controller import LoadSeriesController
 from controllers.routing_dashboard_controller import RoutingDashboardController
 from controllers.simulate_indicator_strategy_controller import SimulateIndicatorStrategy
-from controllers.stripe_ACH_POC_controller import StripeAchDemoController
-from controllers.stripe_USDC_POC_controller import StripeUSDCDemoController
+from POC.stripe_ACH_POC_controller import StripeAchDemoController
+from POC.stripe_USDC_POC_controller import StripeUSDCDemoController
 from data_access_layer.account_manager import AccountManager
 from data_access_layer.user_manager import UserManager
 from framework.common.logger.message_type import MessageType

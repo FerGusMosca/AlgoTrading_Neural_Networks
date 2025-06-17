@@ -19,15 +19,15 @@ class StripeUSDCDemoController(BaseController):
         self.logger = logger
         self.router = APIRouter()
 
-        templates_path = Path(__file__).parent.parent / "templates"
+        templates_path = Path(__file__).parent / "templates"
         self.templates = Jinja2Templates(directory=templates_path)
 
+        # Registrar handlers
         self.router.get("/", response_class=HTMLResponse)(self.display_page)
         self.router.post("/create_usdc_payment_intent")(self.create_usdc_payment_intent)
 
     async def display_page(self, request: Request):
         return self.templates.TemplateResponse("stripe_USDC_POC.html", {"request": request})
-
     def create_usdc_payment_intent_autom(self, payload: UsdcPaymentIntentRequest):
         try:
 

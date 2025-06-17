@@ -1,5 +1,4 @@
 from pathlib import Path
-
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -21,7 +20,8 @@ class StripeAchDemoController(BaseController):
         self.logger = logger
         self.router = APIRouter()
 
-        templates_path = Path(__file__).parent.parent / "templates"
+        # ✅ Aseguramos que mire dentro de POC/templates
+        templates_path = Path(__file__).parent / "templates"
         self.templates = Jinja2Templates(directory=templates_path)
 
         self.router.get("/", response_class=HTMLResponse)(self.display_page)
@@ -34,13 +34,13 @@ class StripeAchDemoController(BaseController):
         try:
             stripe.api_key = payload.secret_key
 
-            # Create customer first
+            # Crear cliente
             customer = stripe.Customer.create(
                 email=payload.email,
                 name=payload.name
             )
 
-            # Then create SetupIntent with the customer
+            # Crear SetupIntent
             setup_intent = stripe.SetupIntent.create(
                 customer=customer.id,
                 payment_method_types=["us_bank_account"],

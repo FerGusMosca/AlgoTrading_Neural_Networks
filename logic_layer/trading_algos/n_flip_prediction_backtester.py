@@ -12,7 +12,7 @@ from logic_layer.trading_algos.slope_backtester import SlopeBacktester
 class NFlipPredictionBacktester(SlopeBacktester):
 
     def backtest(self, symbol, symbol_prices_df, predictions_dic, last_trading_dict, n_algo_param_dict,
-                 init_last_portf_size_dict=None, pos_regime_df=None):
+                 init_last_portf_size_dict=None, regime_df=None, pos_regime=True):
 
         portf_pos_dict = {}
 
@@ -50,7 +50,7 @@ class NFlipPredictionBacktester(SlopeBacktester):
 
                 try:
                     # Regime validation: if regime switch is active, close position and skip trading
-                    if not self.__validate_regime__(pos_regime_df, current_date,is_pos=True):
+                    if not self.__validate_regime__(regime_df, current_date,is_pos=pos_regime):
                         if curr_portf_pos is not None:
                             final_MTM = curr_portf_pos.calculate_and_append_MTM(current_date, current_price)
                             last_portf_size = self.__apply_commisions__(final_MTM, net_commissions)

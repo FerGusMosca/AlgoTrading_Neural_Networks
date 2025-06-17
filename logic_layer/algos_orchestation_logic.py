@@ -591,6 +591,7 @@ class AlgosOrchestationLogic:
         init_portf_size = float(n_algo_param_dict["init_portf_size"])
         classif_key = n_algo_param_dict["classif_key"]
         pos_regime_filters_csv=n_algo_param_dict["pos_regime_filters_csv"]
+        neg_regime_filters_csv = n_algo_param_dict["neg_regime_filters_csv"]
         trade_comm = float(n_algo_param_dict["trade_comm"])
         classif_threshold = float(n_algo_param_dict.get("classif_threshold", 0.6))
         idx_loop=0
@@ -655,7 +656,13 @@ class AlgosOrchestationLogic:
                 pos_regime_filters_csv, eval_d_from, eval_d_to,
                 interval=DataSetBuilder._1_DAY_INTERVAL,
                 output_col=["symbol", "date", "open", "high", "low", "close"]
-            )
+            ).dropna()
+
+            neg_regime_df = self.data_set_builder.build_interval_series(
+                neg_regime_filters_csv, eval_d_from, eval_d_to,
+                interval=DataSetBuilder._1_DAY_INTERVAL,
+                output_col=["symbol", "date", "open", "high", "low", "close"]
+            ).dropna()
 
             if eval_d_from > d_to:
                 self.logger.do_log(f"Skipping out-of-bound eval window: {eval_d_from} to {eval_d_to}", MessageType.INFO)
@@ -684,6 +691,9 @@ class AlgosOrchestationLogic:
 
 
             # Convert predictions to portfolio positions using backtester
+            reg_df= pos_regime_df if not pos_regime_df.empty else neg_regime_df if not neg_regime_df.empty else None
+            pos_df = True if not pos_regime_df.empty else False if not neg_regime_df.empty or reg_df is None else None
+
             backtester = NFlipPredictionBacktester()
             portf_pos_dict = backtester.backtest(
                                                     symbol=symbol,
@@ -692,7 +702,8 @@ class AlgosOrchestationLogic:
                                                     last_trading_dict=last_trading_dict,
                                                     n_algo_param_dict=n_algo_param_dict,
                                                     init_last_portf_size_dict=init_last_portf_size_dict,
-                                                    pos_regime_df=pos_regime_df
+                                                    regime_df=reg_df,
+                                                    pos_regime=pos_df
                                                 )
             idx_loop+=1
             # Wrap results into summary
