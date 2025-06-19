@@ -70,12 +70,28 @@
     document.getElementById("result").innerText = message;
   }
 
-  async function launchUsdcPayment() {
+  let popupWindow = null;
+
+  function launchUsdcPayment() {
     if (!hostedUrlGlobal) {
       document.getElementById("result").innerText = "❌ No payment link available. Generate intent first.";
       return;
     }
-    window.open(hostedUrlGlobal, '_blank');
+
+    const width = 500;
+    const height = 700;
+    const left = (screen.width / 2) - (width / 2);
+    const top = (screen.height / 2) - (height / 2);
+
+    popupWindow = window.open(
+      hostedUrlGlobal + "?locale=en",  // 👈 idioma forzado acá también
+      "USDC Checkout",
+      `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes`
+    );
+
+    if (!popupWindow) {
+      alert("⚠️ Popup blocked! Please allow popups for this site.");
+    }
   }
 </script>
 

@@ -76,24 +76,34 @@ class StripeUSDCDemoController(BaseController):
             description="Manual test customer for USDC"
         )
 
-        # 2. Create PaymentIntent (manual flow)
+        # 2. Create & confirm PaymentIntent en un solo paso
         intent = stripe.PaymentIntent.create(
             amount=payload.amount,
             currency="usd",
             customer=customer.id,
             payment_method_types=["crypto"],
+            payment_method_data={"type": "crypto"},
+            return_url="https://yourdomain.com/payment-return",  # REQUIRED FOR CRYPTO CONFIRM
+            confirm=True,
             description="USDC test intent"
         )
 
-        print("✅ Created PaymentIntent:", intent.id)
+        print("✅ Created + Confirmed PaymentIntent:", intent.id)
         print("📄 Status:", intent.status)
 
         hosted_url = None
-        if intent.next_action and intent.next_action.get("type") == "verify_with_crypto":
-            hosted_url = intent.next_action["verify_with_crypto"]["hosted_url"]
-            print("🔗 Hosted checkout URL:", hosted_url)
+        if intent.next_action:
+            if intent.next_action.get("type") == "verify_with_crypto":
+                hosted_url = intent.next_action["verify_with_crypto"]["hosted_url"]
+                hosted_url += "?locale=en"
+                print("🔗 Hosted checkout URL:", hosted_url)
+            elif intent.next_action.get("type") == "redirect_to_url":
+                hosted_url = intent.next_action["redirect_to_url"]["url"]
+                hosted_url += "?locale=en"
+                print("🔗 Hosted checkout URL:", hosted_url)
         else:
-            print("ℹ️ No hosted_url available at this stage (expected in manual flow)")
+            print("ℹ️ No hosted_url available (unexpected)")
+
 
         # Optional: Stripe debug link
         if intent.last_response and hasattr(intent.last_response, "request_id"):
@@ -103,7 +113,7 @@ class StripeUSDCDemoController(BaseController):
         return JSONResponse(content={
             "client_secret": intent.client_secret,
             "payment_intent_id": intent.id,
-            "payment_intent_url": hosted_url  # May be None initially
+            "payment_intent_url": hosted_url
         })
 
     async def create_usdc_payment_intent(self, payload: UsdcPaymentIntentRequest):
