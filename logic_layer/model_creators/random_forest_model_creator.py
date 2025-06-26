@@ -39,7 +39,7 @@ class RandomForestModelCreator(BaseModelCreator):
 
 
     def train_random_forest_daily(self, training_series_df, model_output, symbol, classif_key,
-                                  variables_csv, n_estimators=100, max_depth=None,
+                                  series_csv, n_estimators=100, max_depth=None,
                                   min_samples_split=2, criterion='gini', make_stationary=False,
                                   class_weight=None):
         try:
@@ -59,7 +59,7 @@ class RandomForestModelCreator(BaseModelCreator):
                 symbol_col="trading_symbol",
                 date_col="date",
                 classif_key=classif_key,
-                variables_csv=variables_csv,
+                variables_csv=series_csv,
                 test_size=0.2,
                 return_encoder_and_scaler=True
             )
@@ -130,7 +130,7 @@ class RandomForestModelCreator(BaseModelCreator):
             raise Exception(f"Fatal error during Random Forest training: {e}")
 
     def test_RF_scalping(self, symbol, test_series_df, model_to_use, price_to_use="close",
-                         make_stationary=True, normalize=True, variables_csv=None,
+                         make_stationary=True, normalize=True, series_csv=None,
                          threshold=0.5, preloaded_model=None,label_encoder=None):
         """
         Test a Random Forest model on given data and return predicted actions.
@@ -157,7 +157,7 @@ class RandomForestModelCreator(BaseModelCreator):
 
         X_test = self.__get_test_sets_with_scaler__(
             df=test_series_df,
-            variables_csv=variables_csv,
+            variables_csv=series_csv,
             model_to_use=model_to_use
         )
 

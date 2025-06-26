@@ -491,16 +491,10 @@ class MLModelAnalyzer():
             raise Exception(f"Empty test set for {symbol} → Check data availability or date range.")
 
         # Run RF prediction
-        result_df, _ = rf_creator.test_RF_scalping(
-            symbol=symbol,
-            test_series_df=test_series_df,
-            model_to_use=model_file,
-            make_stationary=make_stationary,
-            normalize=True,
-            variables_csv=n_algo_param_dict["series_csv"],
-            threshold=classif_threshold,
-            label_encoder=label_encoder
-        )
+        result_df, _ = rf_creator.test_RF_scalping(symbol=symbol, test_series_df=test_series_df,
+                                                   model_to_use=model_file, make_stationary=make_stationary,
+                                                   normalize=True, series_csv=n_algo_param_dict["series_csv"],
+                                                   threshold=classif_threshold, label_encoder=label_encoder)
 
         # Alias required for backtest compatibility
         result_df[symbol] = result_df["trading_symbol_price"]

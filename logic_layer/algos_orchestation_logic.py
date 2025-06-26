@@ -413,16 +413,13 @@ class AlgosOrchestationLogic:
                 if test_series_df['trading_symbol'].isna().any():
                     continue
 
-                rf_predictions_df_today,states = rf_model_processor.test_RF_scalping(
-                    symbol=symbol,
-                    test_series_df=test_series_df,
-                    model_to_use=model_to_use,
-                    price_to_use="close",
-                    make_stationary=make_stationary,
-                    normalize=True,
-                    variables_csv=variables_csv,
-                    threshold=classif_threshold
-                )
+                rf_predictions_df_today,states = rf_model_processor.test_RF_scalping(symbol=symbol,
+                                                                                     test_series_df=test_series_df,
+                                                                                     model_to_use=model_to_use,
+                                                                                     price_to_use="close",
+                                                                                     make_stationary=make_stationary,
+                                                                                     normalize=True,
+                                                                                     threshold=classif_threshold)
 
                 rf_predictions_df_today = rf_predictions_df_today[rf_predictions_df_today['date'] == day]
 
@@ -592,7 +589,7 @@ class AlgosOrchestationLogic:
         classif_key = n_algo_param_dict["classif_key"]
         pos_regime_filters_csv=n_algo_param_dict["pos_regime_filters_csv"]
         neg_regime_filters_csv = n_algo_param_dict["neg_regime_filters_csv"]
-        classif_threshold = float(n_algo_param_dict.get("classif_threshold", 0.6))
+
         idx_loop=0
         init_last_portf_size_dict=None
         class_weight = n_algo_param_dict["class_weight"]
@@ -619,21 +616,13 @@ class AlgosOrchestationLogic:
 
             self.logger.do_log(f"Training RF from {curr_d_from} to {curr_d_to} → {model_filename}", MessageType.INFO)
 
-            label_encoder=self.process_train_RF(
-                symbol=symbol,
-                variables_csv=series_csv,
-                d_from=curr_d_from.strftime('%m/%d/%Y'),
-                d_to=curr_d_to.strftime('%m/%d/%Y'),
-                model_output=model_filename,
-                classif_key=classif_key,
-                n_estimators=200,
-                max_depth=5,
-                min_samples_split=10,
-                criterion="gini",
-                interval=DataSetBuilder._1_DAY_INTERVAL,
-                make_stationary=True,
-                class_weight=class_weight
-            )
+            label_encoder= self.process_train_RF(symbol=symbol, series_csv=series_csv,
+                                                 d_from=curr_d_from.strftime('%m/%d/%Y'),
+                                                 d_to=curr_d_to.strftime('%m/%d/%Y'), model_output=model_filename,
+                                                 classif_key=classif_key, n_estimators=200, max_depth=5,
+                                                 min_samples_split=10, criterion="gini",
+                                                 interval=DataSetBuilder._1_DAY_INTERVAL, make_stationary=True,
+                                                 class_weight=class_weight)
 
             eval_d_from = curr_d_to + relativedelta(days=1)
             eval_d_to = eval_d_from + relativedelta(months=sliding_window_months) - relativedelta(days=1)
@@ -1275,7 +1264,7 @@ class AlgosOrchestationLogic:
             self.logger.do_log(msg, MessageType.ERROR)
             raise Exception(msg)
 
-    def process_train_RF(self, symbol, variables_csv, d_from, d_to, model_output, classif_key,
+    def process_train_RF(self, symbol, series_csv, d_from, d_to, model_output, classif_key,
                          n_estimators, max_depth, min_samples_split, criterion,
                          interval=DataSetBuilder._1_MIN_INTERVAL,
                          grouping_unit=None, grouping_classif_criteria=None,
@@ -1309,7 +1298,7 @@ class AlgosOrchestationLogic:
 
             # Load feature variables
             variables_min_series_df = self.data_set_builder.build_interval_series(
-                variables_csv, d_from, d_to,
+                series_csv, d_from, d_to,
                 interval=interval,
                 output_col=["symbol", "date", "open", "high", "low", "close"]
             )
@@ -1322,37 +1311,32 @@ class AlgosOrchestationLogic:
             # Optional: compute moving averages
             if group_as_mov_avg:
                 training_series_df = self.data_set_builder.group_as_mov_avgs(
-                    training_series_df, variables_csv, grouping_mov_avg_unit
+                    training_series_df, series_csv, grouping_mov_avg_unit
                 )
 
             # Optional: apply grouping logic (e.g., weekly bars)
             if grouping_unit is not None:
                 training_series_df = self.__group_dataframe__(
                     training_series_df, grouping_unit,
-                    variables_csv, grouping_classif_criteria, classif_key
+                    series_csv, grouping_classif_criteria, classif_key
                 )
 
             # Logging for inspection
             DataframePrinter.print_dataframe_head_values_w_time(
-                variables_min_series_df, "symbol", variables_csv, 10, "date", "10:30:00"
+                variables_min_series_df, "symbol", series_csv, 10, "date", "10:30:00"
             )
             DataframePrinter.print_data_farme_head(training_series_df, 10)
 
             # Train Random Forest
             rf_model_trainer = RandomForestModelCreator()
-            label_encoder=rf_model_trainer.train_random_forest_daily(
-                training_series_df=training_series_df,
-                model_output=model_output,
-                symbol=symbol,
-                classif_key=classif_key,
-                variables_csv=variables_csv,
-                n_estimators=n_estimators,
-                max_depth=max_depth,
-                min_samples_split=min_samples_split,
-                criterion=criterion,
-                make_stationary=make_stationary,
-                class_weight=class_weight
-            )
+            label_encoder= rf_model_trainer.train_random_forest_daily(training_series_df=training_series_df,
+                                                                      model_output=model_output, symbol=symbol,
+                                                                      classif_key=classif_key, series_csv=series_csv,
+                                                                      n_estimators=n_estimators, max_depth=max_depth,
+                                                                      min_samples_split=min_samples_split,
+                                                                      criterion=criterion,
+                                                                      make_stationary=make_stationary,
+                                                                      class_weight=class_weight)
 
             return label_encoder
 

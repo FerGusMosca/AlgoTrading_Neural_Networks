@@ -381,7 +381,7 @@ def process_test_LSTM_cmd(cmd):
     print(f"Test LSTM successfully finished...")
 
 
-def process_train_RF(symbol, variables_csv, d_from, d_to, model_output, classification_key,
+def process_train_RF(symbol, series_csv, d_from, d_to, model_output, classification_key,
                      n_estimators, max_depth, min_samples_split, criterion,
                      grouping_unit=None, grouping_classif_criteria=None,
                      group_as_mov_avg=False, grouping_mov_avg_unit=100,
@@ -390,7 +390,7 @@ def process_train_RF(symbol, variables_csv, d_from, d_to, model_output, classifi
     logger = Logger()
 
     try:
-        logger.print(f"Initializing dataframe creation for series : {variables_csv}", MessageType.INFO)
+        logger.print(f"Initializing dataframe creation for series : {series_csv}", MessageType.INFO)
 
         config_settings = loader.load_settings("./configs/commands_mgr.ini")
 
@@ -401,27 +401,20 @@ def process_train_RF(symbol, variables_csv, d_from, d_to, model_output, classifi
             logger
         )
 
-        dataMgm.process_train_RF(
-            symbol=symbol,
-            variables_csv=variables_csv,
-            d_from=d_from,
-            d_to=d_to,
-            model_output=model_output.replace('"', ""),
-            classif_key=classification_key,
-            n_estimators=int(n_estimators),
-            max_depth=None if str(max_depth).lower() == "none" else int(max_depth),
-            min_samples_split=int(min_samples_split),
-            criterion=criterion,
-            grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
-            grouping_classif_criteria=grouping_classif_criteria,
-            group_as_mov_avg=bool(group_as_mov_avg),
-            grouping_mov_avg_unit=int(grouping_mov_avg_unit),
-            interval=interval.replace('_', " ") if interval is not None else None,
-            make_stationary=make_stationary,
-            class_weight=None if class_weight is None or str(class_weight).lower() == "none" else class_weight
-        )
+        dataMgm.process_train_RF(symbol=symbol, series_csv= series_csv, d_from=d_from, d_to=d_to,
+                                 model_output=model_output.replace('"', ""), classif_key=classification_key,
+                                 n_estimators=int(n_estimators),
+                                 max_depth=None if str(max_depth).lower() == "none" else int(max_depth),
+                                 min_samples_split=int(min_samples_split), criterion=criterion,
+                                 interval=interval.replace('_', " ") if interval is not None else None,
+                                 grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
+                                 grouping_classif_criteria=grouping_classif_criteria,
+                                 group_as_mov_avg=bool(group_as_mov_avg),
+                                 grouping_mov_avg_unit=int(grouping_mov_avg_unit), make_stationary=make_stationary,
+                                 class_weight=None if class_weight is None or str(
+                                     class_weight).lower() == "none" else class_weight)
 
-        logger.print(f"Random Forest model successfully trained for symbol {symbol} and variables {variables_csv}",
+        logger.print(f"Random Forest model successfully trained for symbol {symbol} and variables {series_csv}",
                      MessageType.INFO)
 
     except Exception as e:
@@ -430,7 +423,7 @@ def process_train_RF(symbol, variables_csv, d_from, d_to, model_output, classifi
 def process_train_RF_cmd(cmd, cmd_param_list):
     # Required parameters
     symbol = __get_param__(cmd, "symbol")
-    variables_csv = __get_param__(cmd, "variables_csv")
+    series_csv = __get_param__(cmd, "series_csv")
     d_from = __get_param__(cmd, "from")
     d_to = __get_param__(cmd, "to")
     model_output = __get_param__(cmd, "model_output")
@@ -447,7 +440,7 @@ def process_train_RF_cmd(cmd, cmd_param_list):
     criterion = __get_param__(cmd, "criterion", True, def_value="gini")
 
     # Optional common flags
-    interval = __get_param__(cmd, "interval", True, def_value=None)
+    interval = __get_param__(cmd, "interval", True, def_value=DataSetBuilder._1_DAY_INTERVAL)
     grouping_unit = __get_param__(cmd, "grouping_unit", True)
     grouping_classif_criteria = __get_param__(cmd, "grouping_classif_criteria", True)
     group_as_mov_avg = __get_bool_param__(cmd, "group_as_mov_avg", True, def_value=False)
@@ -456,7 +449,7 @@ def process_train_RF_cmd(cmd, cmd_param_list):
 
     # Call processing method with parsed params
     process_train_RF(symbol=symbol,
-                     variables_csv=variables_csv,
+                     series_csv=series_csv,
                      d_from=d_from,
                      d_to=d_to,
                      model_output=model_output,
