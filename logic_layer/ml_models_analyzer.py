@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-
+from joblib import load
 from sklearn.model_selection import train_test_split
 import numpy as np
 import pandas as pd
@@ -464,6 +464,20 @@ class MLModelAnalyzer():
         return direct_pred_backtester.backtest(symbol,symbol_df,predictions_dic,bias,
                                                last_trading_dict,
                                                n_algo_param_dict=n_algo_param_dict)
+
+
+
+    def extract_label_encoder_from_model(self, model_to_use):
+        try:
+            model_bundle = load(model_to_use)
+
+            if "label_encoder" not in model_bundle:
+                raise ValueError(f"[RF Test] No 'label_encoder' found in model file: {model_to_use}")
+
+            return model_bundle["label_encoder"]
+
+        except Exception as e:
+            raise Exception(f"[RF Test] Failed to extract label_encoder from model: {e}")
 
     def evaluate_trading_performance_last_model_RF(self, symbol_df, symbol, series_df, model_filename, bias,
                                                    label_encoder,last_trading_dict, n_algo_param_dict):

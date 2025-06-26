@@ -1,11 +1,13 @@
 import os
 
-import joblib
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from statsmodels.tsa.stattools import adfuller
-
+import joblib
+from joblib import load
+from sklearn.ensemble import RandomForestClassifier
+from typing import Tuple, Union
 from common.util.light_logger import LightLogger
 
 _OUTPUT_DATE_FORMAT = '%m/%d/%Y %H:%M:%S'
@@ -120,6 +122,36 @@ class BaseModelCreator:
         test_series_df (pd.DataFrame): DataFrame containing the test time series data.
         """
         test_series_df.dropna(inplace=True)
+
+    def __load_rf_model_bundle__(self,model_path: str) -> Tuple[
+        RandomForestClassifier, Union[object, None], Union[object, None]]:
+        """
+        Loads a Random Forest model and its components (label_encoder, scaler) if available.
+
+        Returns:
+            - model: RandomForestClassifier
+            - label_encoder: Optional, if present in bundle
+            - scaler: Optional, if present in bundle
+        """
+        try:
+            loaded_obj = load(model_path)
+
+            # If it's a bundle dict
+            if isinstance(loaded_obj, dict) and "model" in loaded_obj:
+                model = loaded_obj["model"]
+                label_encoder = loaded_obj.get("label_encoder", None)
+                scaler = loaded_obj.get("scaler", None)
+                return model, label_encoder, scaler
+
+            # If it's just a RandomForestClassifier
+            elif isinstance(loaded_obj, RandomForestClassifier):
+                return loaded_obj, None, None
+
+            else:
+                raise ValueError(f"Unrecognized format for model file: {model_path}")
+
+        except Exception as e:
+            raise Exception(f"Failed to load model from {model_path}: {e}")
 
     def __make_stationary_with_memory__(self, df, state=None):
         """

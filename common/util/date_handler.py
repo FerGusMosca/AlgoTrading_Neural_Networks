@@ -31,6 +31,7 @@ class DateHandler:
     def get_period_label_from_dates(start_date: datetime, end_date: datetime) -> str:
         """
         Return a string like 'Jan-Feb' or 'Jan-Dec' from two dates.
+        If dates span different years, include the year in the label.
 
         Args:
             start_date (datetime): Period start date
@@ -39,15 +40,15 @@ class DateHandler:
         Returns:
             str: Period label
         """
-        if start_date.year != end_date.year:
-            raise ValueError("Start and end dates must be in the same year")
-
         start_label = Months.label_from_number(start_date.month)
         end_label = Months.label_from_number(end_date.month)
 
+        if start_date.year != end_date.year:
+            return f"{start_label} {start_date.year} - {end_label} {end_date.year}"
+
         if start_label == end_label:
-            return start_label
-        return f"{start_label}-{end_label}"
+            return f"{start_label} {start_date.year}"
+        return f"{start_label}-{end_label} {start_date.year}"
 
     @staticmethod
     def evaluate_consecutive_days(day_1, day_2):

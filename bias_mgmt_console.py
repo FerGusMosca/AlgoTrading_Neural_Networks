@@ -319,30 +319,51 @@ def process_test_RF_cmd(cmd):
     d_from = __get_param__(cmd, "from")
     d_to = __get_param__(cmd, "to")
     model_to_use = __get_param__(cmd, "model_to_use")
-    portf_size = float(__get_param__(cmd, "portf_size"))
-    trade_comm = float(__get_param__(cmd, "trade_comm"))
-    interval = __get_param__(cmd, "interval", True, "1_day")
-    trading_algo = __get_param__(cmd, "trading_algo")
-    grouping_unit = __get_param__(cmd, "grouping_unit", True, None)
-    make_stationary = __get_bool_param__(cmd, "make_stationary", True, False)
-    classif_threshold = float(__get_param__(cmd, "classif_threshold", True, 0.5))
 
+    # Optional parameters
+    interval = __get_param__(cmd, "interval", True, DataSetBuilder._1_DAY_INTERVAL)
+    init_portf_size = float(__get_param__(cmd, "init_portf_size"))
+    trade_comm = float(__get_param__(cmd, "trade_comm"))
+    grouping_unit = __get_param__(cmd, "grouping_unit", True)
+    grouping_classif_criteria = __get_param__(cmd, "grouping_classif_criteria", True, def_value=None)
+    group_as_mov_avg = __get_bool_param__(cmd, "group_as_mov_avg", True, def_value=False)
+    grouping_mov_avg_unit = __get_param__(cmd, "grouping_mov_avg_unit", True, def_value=100)
+    make_stationary = __get_bool_param__(cmd, "make_stationary", True, False)
+    n_flip = int(__get_param__(cmd, "n_flip", True, 3))
+    bias = __get_param__(cmd, "bias", True, None)
+    pos_regime_filters_csv = __get_param__(cmd, "pos_regime_filters_csv", True, None)
+    neg_regime_filters_csv = __get_param__(cmd, "neg_regime_filters_csv", True, None)
+
+    # Create parameter dictionary to be passed to test logic
+    n_algo_param_dict = {
+        "interval": interval.replace("_", " "),
+        "init_portf_size": init_portf_size,
+        "series_csv": series_csv,
+        "trade_comm": trade_comm,
+        "grouping_unit": int(grouping_unit) if grouping_unit is not None else None,
+        "grouping_classif_criteria": grouping_classif_criteria,
+        "group_as_mov_avg":group_as_mov_avg,
+        "grouping_mov_avg_unit": int(grouping_mov_avg_unit) if grouping_mov_avg_unit is not None else None,
+        "make_stationary": make_stationary,
+        "n_flip": n_flip,
+        "bias": bias,
+        "pos_regime_filters_csv": pos_regime_filters_csv,
+        "neg_regime_filters_csv": neg_regime_filters_csv
+    }
+
+    # Run the daily RF test process
     process_test_daily_RF(
         symbol=symbol,
         series_csv=series_csv,
         d_from=d_from,
         d_to=d_to,
         model_to_use=model_to_use,
-        portf_size=portf_size,
-        trade_comm=trade_comm,
-        trading_algo=trading_algo,
-        interval=interval,
-        grouping_unit=grouping_unit,
-        make_stationary=make_stationary,
-        classif_threshold=classif_threshold
+        n_algo_param_dict=n_algo_param_dict
     )
 
-    print(f"Test RF successfully finished...")
+    print("Test RF successfully finished...")
+
+
 
 
 def process_test_LSTM_cmd(cmd):
@@ -1038,47 +1059,41 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
     except Exception as e:
         logger.print("CRITICAL ERROR running process_train_LSTM:{}".format(str(e)), MessageType.ERROR)
 
-
-
-def process_test_daily_RF(symbol, series_csv, d_from, d_to, model_to_use, portf_size, trade_comm,
-                          trading_algo, grouping_unit=None, n_params=[], interval=None,
-                          use_sliding_window=None, make_stationary=True, classif_threshold=0.5):
+def process_test_daily_RF(symbol, series_csv, d_from, d_to, model_to_use,  n_algo_param_dict):
     loader = MLSettingsLoader()
     logger = Logger()
 
     try:
-        logger.print("Initializing RF model testing for symbol {} and model {} on {}".format(symbol, model_to_use, d_from),
-                     MessageType.INFO)
+        logger.print(
+            f"Initializing RF model testing for symbol {symbol} and model {model_to_use} on {d_from}",
+            MessageType.INFO
+        )
 
         config_settings = loader.load_settings("./configs/commands_mgr.ini")
 
-        dataMgm = AlgosOrchestationLogic(config_settings["hist_data_conn_str"], config_settings["ml_reports_conn_str"],
-                                         None,
-                                         logger)
-        interval = interval.replace('_', " ")
+        dataMgm = AlgosOrchestationLogic(
+            config_settings["hist_data_conn_str"],
+            config_settings["ml_reports_conn_str"],
+            None,
+            logger
+        )
 
-        if interval == DataSetBuilder._1_DAY_INTERVAL:
-            dataMgm.process_test_scalping_RF(symbol=symbol, series_csv=series_csv,
-                                             model_to_use=model_to_use.replace('"', ""),
-                                             d_from=d_from,
-                                             d_to=d_to,
-                                             portf_size=float(portf_size),
-                                             trade_comm=float(trade_comm),
-                                             trading_algo=trading_algo,
-                                             grouping_unit=int(grouping_unit) if grouping_unit is not None else None,
-                                             n_algo_params=n_params,
-                                             interval=interval if interval is not None else None,
-                                             make_stationary=make_stationary,
-                                             classif_threshold=classif_threshold)
-        else:
-            raise Exception(f"Unknown interval for RF testing: {interval}")
+        dataMgm.process_test_scalping_RF(
+            symbol=symbol,
+            series_csv=series_csv,
+            model_to_use=model_to_use.replace('"', ""),
+            d_from=d_from,
+            d_to=d_to,
+            n_algo_param_dict=n_algo_param_dict
+        )
 
-        logger.print("Displaying predictions for RF model: symbol {} and model {} on {}".format(symbol, model_to_use, d_from),
-                     MessageType.INFO)
+        logger.print(
+            f"Displaying predictions for RF model: symbol {symbol} and model {model_to_use} on {d_from}",
+            MessageType.INFO
+        )
 
     except Exception as e:
-        logger.print("CRITICAL ERROR running process_test_daily_RF: {}".format(str(e)), MessageType.ERROR)
-
+        logger.print(f"CRITICAL ERROR running process_test_daily_RF: {str(e)}", MessageType.ERROR)
 
 
 def process_test_daily_LSTM(symbol, variables_csv, d_from,d_to, timesteps, model_to_use, portf_size, trade_comm,

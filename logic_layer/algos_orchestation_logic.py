@@ -376,66 +376,96 @@ class AlgosOrchestationLogic:
 
         return None
 
-    def process_test_scalping_RF(self, symbol, series_csv, model_to_use, d_from, d_to, portf_size, trade_comm,
-                                 trading_algo, interval=None, grouping_unit=None, n_algo_params=[],
-                                 make_stationary=True, classif_threshold=0.5):
-        try:
-            self.logger.do_log(
-                f"Initializing RF backtest for symbol {symbol} from {d_from} to {d_to} (portf_size={portf_size}, comm={trade_comm})",
-                MessageType.INFO)
+    def process_test_scalping_RF(self, symbol, series_csv, model_to_use, d_from, d_to, n_algo_param_dict):
+        """
+        Evaluate a Random Forest model over a single period, run backtest, and return summary.
+        """
 
-            rf_model_processor = RandomForestModelCreator()
-            rf_predictions_df = None
+        self.logger.do_log(
+            f"Initializing RF backtest for symbol {symbol} from {d_from} to {d_to}",
+            MessageType.INFO
+        )
 
-            for day in self.__get_business_days_in_range__(d_from, d_to):
-                self.logger.do_log(f"Processing day {day}", MessageType.INFO)
-                LOOKBACK_RF_DAYS = 60
-                symbol_int_series_df, start_period_all_ind, start_period, end_period = self.__build_symbol_series__(
-                    symbol, day, LOOKBACK_RF_DAYS, interval
-                )
+        # Parameters
+        init_portf_size = float(n_algo_param_dict["init_portf_size"])
+        pos_regime_filters_csv = n_algo_param_dict.get("pos_regime_filters_csv", None)
+        neg_regime_filters_csv = n_algo_param_dict.get("neg_regime_filters_csv", None)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        summary_dict_arr=[]
 
-                if symbol_int_series_df is None:
-                    self.logger.do_log(f"Skipping day {day} due to missing values (possible holiday)",
-                                       MessageType.WARNING)
-                    continue
+        # Load price series of target symbol
+        symbol_df = self.data_set_builder.build_interval_series(
+            symbol, d_from, d_to,
+            interval=DataSetBuilder._1_DAY_INTERVAL,
+            output_col=["symbol", "date", "open", "high", "low", "close"]
+        )
 
-                variables_int_series_df = self.data_set_builder.build_interval_series(
-                    series_csv, start_period_all_ind, end_period,
-                    interval=interval, output_col=["symbol", "date", "open", "high", "low", "close"])
+        # Load feature variables for classification
+        series_df = self.data_set_builder.build_daily_series_classification(
+            series_csv, d_from, d_to, add_classif_col=False
+        )
+        series_df = DataframeFiller.fill_missing_values(series_df)
 
-                test_series_df = self.data_set_builder.merge_series(symbol_int_series_df, variables_int_series_df,
-                                                                    "symbol", "date", symbol)
+        # Optional: Load regime filter series
+        pos_regime_df = self.data_set_builder.build_interval_series(
+            pos_regime_filters_csv, d_from, d_to,
+            interval=DataSetBuilder._1_DAY_INTERVAL,
+            output_col=["symbol", "date", "open", "high", "low", "close"]
+        ).dropna() if pos_regime_filters_csv else pd.DataFrame()
 
-                test_series_df = DataframeFiller.fill_missing_values(test_series_df)
-                test_series_df = self.__eval_df_grouping__(test_series_df, grouping_unit, series_csv)
-                test_series_df = test_series_df[test_series_df['date'] >= start_period]
+        neg_regime_df = self.data_set_builder.build_interval_series(
+            neg_regime_filters_csv, d_from, d_to,
+            interval=DataSetBuilder._1_DAY_INTERVAL,
+            output_col=["symbol", "date", "open", "high", "low", "close"]
+        ).dropna() if neg_regime_filters_csv else pd.DataFrame()
 
-                if test_series_df['trading_symbol'].isna().any():
-                    continue
+        reg_df = pos_regime_df if not pos_regime_df.empty else neg_regime_df if not neg_regime_df.empty else None
+        pos_df = True if not pos_regime_df.empty else False if not neg_regime_df.empty or reg_df is None else None
 
-                rf_predictions_df_today,states = rf_model_processor.test_RF_scalping(symbol=symbol,
-                                                                                     test_series_df=test_series_df,
-                                                                                     model_to_use=model_to_use,
-                                                                                     price_to_use="close",
-                                                                                     make_stationary=make_stationary,
-                                                                                     normalize=True,
-                                                                                     threshold=classif_threshold)
+        # Load model and label encoder
+        ml_analyzer = MLModelAnalyzer(self.logger)
+        label_encoder = ml_analyzer.extract_label_encoder_from_model(model_to_use)
 
-                rf_predictions_df_today = rf_predictions_df_today[rf_predictions_df_today['date'] == day]
+        # Run prediction
+        result_df, test_series_df = ml_analyzer.evaluate_trading_performance_last_model_RF(
+            symbol_df=symbol_df,
+            symbol=symbol,
+            series_df=series_df,
+            model_filename=model_to_use,
+            bias=n_algo_param_dict.get("bias", "LONG"),
+            label_encoder=label_encoder,
+            last_trading_dict=None,
+            n_algo_param_dict=n_algo_param_dict
+        )
 
-                if rf_predictions_df is None:
-                    rf_predictions_df = pd.DataFrame(columns=rf_predictions_df_today.columns).astype(
-                        rf_predictions_df_today.dtypes)
+        # Backtest predictions
+        backtester = NFlipPredictionBacktester()
+        portf_pos_dict = backtester.backtest(
+            symbol=symbol,
+            symbol_prices_df=result_df,
+            predictions_dic={"DAILY_RF": result_df},
+            last_trading_dict=None,
+            n_algo_param_dict=n_algo_param_dict,
+            init_last_portf_size_dict={"DAILY_RF": init_portf_size},
+            regime_df=reg_df,
+            pos_regime=pos_df
+        )
 
-                rf_predictions_df = pd.concat([rf_predictions_df, rf_predictions_df_today], ignore_index=True)
+        # Generate portfolio summary
+        summary = self.__wrap_positions_in_summary__("DAILY_RF", portf_pos_dict["DAILY_RF"],
+                                                     n_algo_param_dict, d_from, d_to)
+        summary.period = f"{d_from.strftime('%b')}-{d_to.strftime('%b')}"
 
-            self.__backtest_scalping__("RF_SCALPING", symbol, rf_predictions_df, symbol_int_series_df)
+        summary_dict_arr.append({"RANDOM_FOREST": summary})
 
-        except Exception as e:
-            msg = f"CRITICAL ERROR @process_test_scalping_RF: {str(e)}"
-            traceback.print_exc()
-            self.logger.do_log(msg, MessageType.ERROR)
-            raise Exception(msg)
+        # PortfolioSummaryAnalyzer.convert_summary_dict_arr_to_dataframe(
+        #     summary_dict_arr, symbol, series_csv,
+        #     strategy_key="RANDOM_FOREST",
+        #     init_portf=init_portf_size,
+        #     timestamp=timestamp
+        # )
+
+        return {"DAILY_RF": summary}
 
     def train_algos(self,series_csv,d_from,d_to,p_classif_key,algos_arr=None):
 
