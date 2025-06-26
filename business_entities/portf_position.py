@@ -40,27 +40,32 @@ class PortfolioPosition():
         if self.units is not None:
             self.append_MTM(date,price*units)
 
-    def close_pos(self,date,price):
-
-        self.date_close=date
+    def close_pos(self, date, price):
+        self.date_close = date
 
         if isinstance(price, pd.Series):
             self.price_close = float(price.iloc[0])
         else:
-            self.price_close=float(price)
+            self.price_close = float(price)
+
         if self.units is not None:
-            self.append_MTM(date,price*self.units)
+            self.calculate_and_append_MTM(date, self.price_close)
 
     def append_MTM(self, date,MTM):
         self.daily_MTMs.append(MTM)
         self.detailed_MTMs.append(DetailedMTM(date,MTM))
 
-
-    def calculate_and_append_MTM(self,date,price):
-
+    def calculate_and_append_MTM(self, date, price):
         if price is not None and self.units is not None:
-            final_MTM=price*self.units
-            self.append_MTM(date,final_MTM)
+            if self.side == PortfolioPosition._SIDE_LONG:
+                final_MTM = price * self.units
+            elif self.side == PortfolioPosition._SIDE_SHORT:
+                price_diff = self.price_open - price
+                final_MTM = self.price_open * self.units + price_diff * self.units
+            else:
+                raise Exception(f"Unknown position side for symbol {self.symbol}")
+
+            self.append_MTM(date, final_MTM)
             return final_MTM
 
         return price
@@ -85,19 +90,19 @@ class PortfolioPosition():
         else :
             raise Exception("Position for symbol {} not properly closed!  cannot calculate the pct profit".format(self.symbol))
 
-
-    def calculate_th_nom_profit(self,portf_amt=_DEF_PORTF_AMT):
+    def calculate_th_nom_profit(self, portf_amt=_DEF_PORTF_AMT):
+        pct_profit = self.calculate_pct_profit()
 
         if portf_amt is not None:
-            pct_profit=self.calculate_pct_profit()
-            return  round((pct_profit/100)*portf_amt)
-        elif self.units is not None:
-            portf_amt= self.units*self.price_open
-            pct_profit = self.calculate_pct_profit()
             return round((pct_profit / 100) * portf_amt)
-        else:
-            raise Exception("Cannot calculate th. nominal profit when portf_amt and positions units are NONE")
 
+        elif self.units is not None and self.price_open is not None:
+            implied_portf_amt = self.units * self.price_open
+            return round((pct_profit / 100) * implied_portf_amt)
+
+        else:
+            raise Exception(f"Cannot calculate theoretical nominal profit: "
+                            f"missing portf_amt, price_open or units for symbol {self.symbol}")
 
     @staticmethod
     def fill_missing_dates(portfolio_list: list) -> list:

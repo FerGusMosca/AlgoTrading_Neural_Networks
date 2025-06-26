@@ -30,7 +30,7 @@ class NFlipPredictionBacktester(SlopeBacktester):
                 if init_last_portf_size_dict is None
                 else init_last_portf_size_dict[algo]
             )
-            net_commissions = 0
+            net_commissions = n_algo_param_dict["trade_comm"]
             current_date = None
             current_price = None
 
@@ -67,7 +67,7 @@ class NFlipPredictionBacktester(SlopeBacktester):
                         continue  # Skip trading decisions on this date
 
                     # Open new position if signal is stable and no position is open
-                    if curr_portf_pos is None and flip_counter[current_pred] >= n_flip:
+                    if curr_portf_pos is None and (flip_counter[current_pred] >= n_flip ):
                         if self.__validate_bias__(current_pred, bias):
                             current_price = self.__eval_reuse_reference_price__(algo, last_trading_dict,
                                                                                 current_pred, current_date,

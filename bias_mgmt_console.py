@@ -41,7 +41,7 @@ def show_commands():
     print("#16-BacktestSlopeModelOnCustomETF [ETF_path] [model_candle] [from] [to] [portf_size] [trade_comm] [trading_algo] [algo_params*]")
     print("#17-CreateSintheticIndicator [comp_path] [model_candle] [from] [to] [slope_units]")
     print("#18-TrainRF [symbol] [variables_csv] [from] [to] [model_output] [classif_key] [n_estimators] [max_depth] [min_samples_split] [criterion] [batch_size*] [grouping_unit*] [grouping_classif_criteria*] [group_as_mov_avg*] [grouping_mov_avg_unit*] [class_weight*] [make_stationary*] [interval*]")
-    print("#19-TestDailyRF [symbol] [variables_csv] [from] [to] [model_to_use] [portf_size] [trade_comm] [trading_algo] [classif_threshold] [algo_params*]")
+    print("#19-TestDailyRF [symbol] [series_csv] [from] [to] [model_to_use] [portf_size] [trade_comm] [trading_algo] [classif_threshold] [algo_params*]")
     print("#20-EvalSlidingRandomForest [symbol] [series_csv] [from] [to] [classif_key] [init_portf_size] [trade_comm] [classif_threshold] [sliding_window_years] [sliding_window_months]")
     print("#21-CustomRegimeSwitchDetector [variables] [from] [to] [regime_switch_filter] [regime_candle] [regime_window]")
     print("======================== UI ========================")
@@ -315,12 +315,12 @@ def process_backtest_slope_model_on_custom_etf(cmd):
 
 def process_test_RF_cmd(cmd):
     symbol = __get_param__(cmd, "symbol")
-    variables_csv = __get_param__(cmd, "variables_csv")
+    series_csv = __get_param__(cmd, "series_csv")
     d_from = __get_param__(cmd, "from")
     d_to = __get_param__(cmd, "to")
     model_to_use = __get_param__(cmd, "model_to_use")
     portf_size = float(__get_param__(cmd, "portf_size"))
-    comm = float(__get_param__(cmd, "comm"))
+    trade_comm = float(__get_param__(cmd, "trade_comm"))
     interval = __get_param__(cmd, "interval", True, "1_day")
     trading_algo = __get_param__(cmd, "trading_algo")
     grouping_unit = __get_param__(cmd, "grouping_unit", True, None)
@@ -329,12 +329,12 @@ def process_test_RF_cmd(cmd):
 
     process_test_daily_RF(
         symbol=symbol,
-        variables_csv=variables_csv,
+        series_csv=series_csv,
         d_from=d_from,
         d_to=d_to,
         model_to_use=model_to_use,
         portf_size=portf_size,
-        trade_comm=comm,
+        trade_comm=trade_comm,
         trading_algo=trading_algo,
         interval=interval,
         grouping_unit=grouping_unit,
@@ -1047,7 +1047,7 @@ def process_train_LSTM(symbol, variables_csv, d_from, d_to, model_output, classi
 
 
 
-def process_test_daily_RF(symbol, variables_csv, d_from, d_to, model_to_use, portf_size, trade_comm,
+def process_test_daily_RF(symbol, series_csv, d_from, d_to, model_to_use, portf_size, trade_comm,
                           trading_algo, grouping_unit=None, n_params=[], interval=None,
                           use_sliding_window=None, make_stationary=True, classif_threshold=0.5):
     loader = MLSettingsLoader()
@@ -1065,7 +1065,7 @@ def process_test_daily_RF(symbol, variables_csv, d_from, d_to, model_to_use, por
         interval = interval.replace('_', " ")
 
         if interval == DataSetBuilder._1_DAY_INTERVAL:
-            dataMgm.process_test_scalping_RF(symbol=symbol, variables_csv=variables_csv,
+            dataMgm.process_test_scalping_RF(symbol=symbol, series_csv=series_csv,
                                              model_to_use=model_to_use.replace('"', ""),
                                              d_from=d_from,
                                              d_to=d_to,

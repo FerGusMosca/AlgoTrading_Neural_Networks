@@ -80,7 +80,7 @@ class BaseClassDailyTradingBacktester:
                     LightLogger.do_log(f"Positive Regime switch triggered by {symbol} on {last_row['date']}")
                     return False
 
-                if not is_pos and pd.notna(val) and ( val!=0):
+                if not is_pos and pd.notna(val) and ( val>0):
                     LightLogger.do_log(f"Regime switch triggered by {symbol} on {last_row['date']}")
                     return False
 

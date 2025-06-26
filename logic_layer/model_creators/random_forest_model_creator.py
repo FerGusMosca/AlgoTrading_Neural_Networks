@@ -86,6 +86,11 @@ class RandomForestModelCreator(BaseModelCreator):
                 )
                 model.fit(X_tr, y_tr)
 
+                importances = model.feature_importances_
+                for name, imp in zip(training_series_df.columns, importances):
+                    if name not in ['symbol', 'date', classif_key]:
+                        LightLogger.do_log(f"[RF TRAIN] Feature importance → {name}: {imp:.5f}")
+
                 y_pred = model.predict(X_val)
                 acc = accuracy_score(y_val, y_pred)
                 f1 = f1_score(y_val, y_pred, average='weighted')

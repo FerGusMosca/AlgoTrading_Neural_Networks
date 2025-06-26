@@ -376,7 +376,7 @@ class AlgosOrchestationLogic:
 
         return None
 
-    def process_test_scalping_RF(self, symbol, variables_csv, model_to_use, d_from, d_to, portf_size, trade_comm,
+    def process_test_scalping_RF(self, symbol, series_csv, model_to_use, d_from, d_to, portf_size, trade_comm,
                                  trading_algo, interval=None, grouping_unit=None, n_algo_params=[],
                                  make_stationary=True, classif_threshold=0.5):
         try:
@@ -400,14 +400,14 @@ class AlgosOrchestationLogic:
                     continue
 
                 variables_int_series_df = self.data_set_builder.build_interval_series(
-                    variables_csv, start_period_all_ind, end_period,
+                    series_csv, start_period_all_ind, end_period,
                     interval=interval, output_col=["symbol", "date", "open", "high", "low", "close"])
 
                 test_series_df = self.data_set_builder.merge_series(symbol_int_series_df, variables_int_series_df,
                                                                     "symbol", "date", symbol)
 
                 test_series_df = DataframeFiller.fill_missing_values(test_series_df)
-                test_series_df = self.__eval_df_grouping__(test_series_df, grouping_unit, variables_csv)
+                test_series_df = self.__eval_df_grouping__(test_series_df, grouping_unit, series_csv)
                 test_series_df = test_series_df[test_series_df['date'] >= start_period]
 
                 if test_series_df['trading_symbol'].isna().any():
@@ -592,7 +592,6 @@ class AlgosOrchestationLogic:
         classif_key = n_algo_param_dict["classif_key"]
         pos_regime_filters_csv=n_algo_param_dict["pos_regime_filters_csv"]
         neg_regime_filters_csv = n_algo_param_dict["neg_regime_filters_csv"]
-        trade_comm = float(n_algo_param_dict["trade_comm"])
         classif_threshold = float(n_algo_param_dict.get("classif_threshold", 0.6))
         idx_loop=0
         init_last_portf_size_dict=None
