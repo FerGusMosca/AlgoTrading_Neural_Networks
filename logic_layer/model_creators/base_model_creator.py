@@ -49,9 +49,25 @@ class BaseModelCreator:
         Returns:
         - np.ndarray: normalized test data ready for prediction
         """
-        # Load the scaler saved along with the model
+        scaler = None
+
+        # Try loading separate scaler file first
         scaler_filename = model_to_use.replace(".pkl", "_scaler.pkl")
-        scaler = joblib.load(scaler_filename)
+        try:
+            scaler = joblib.load(scaler_filename)
+        except Exception:
+            # If not found, try extracting from model bundle
+            try:
+                loaded_obj = joblib.load(model_to_use)
+                if isinstance(loaded_obj, dict) and "scaler" in loaded_obj:
+                    scaler = loaded_obj["scaler"]
+                else:
+                    raise ValueError("Scaler not found in model bundle.")
+            except Exception as e:
+                raise Exception(f"Scaler could not be loaded from separate file or model bundle: {e}")
+
+        if scaler is None:
+            raise Exception("Scaler is missing and cannot proceed with normalization.")
 
         # Extract the expected feature columns
         expected_features = variables_csv.split(',')

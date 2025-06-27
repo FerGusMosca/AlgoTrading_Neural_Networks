@@ -263,6 +263,7 @@ class AlgosOrchestationLogic:
 
         summary.daily_profits = [m.MTM for m in all_MTMs]
         summary.max_cum_drawdowns.append(FinancialCalculationsHelper.max_drawdown_on_MTM(summary.daily_profits))
+        summary.max_drawdown=FinancialCalculationsHelper.max_drawdown_on_MTM(summary.daily_profits)
 
         summary.portf_init_MTM = all_MTMs[0].MTM
         summary.portf_final_MTM = all_MTMs[-1].MTM
@@ -270,8 +271,17 @@ class AlgosOrchestationLogic:
         summary.total_net_profit_str = f"{round(summary.total_net_profit, 2)} $"
 
         self.last_known_portf_value = summary.portf_final_MTM
+        total_profit = summary.portf_final_MTM - summary.portf_init_MTM
+        profit_pct = (total_profit / summary.portf_init_MTM) * 100
+        drawdown_pct = summary.max_drawdown * 100
 
-        LightLogger.do_log("[SUMMARY DEBUG] Portfolio Positions Breakdown:")
+        LightLogger.do_log(
+            f"[SUMMARY] Portfolio Positions Breakdown: "
+            f"Init={summary.portf_init_MTM:.2f} | "
+            f"Final={summary.portf_final_MTM:.2f} | "
+            f"Profit={profit_pct:.2f}% | "
+            f"Max. Drawdown={drawdown_pct:.2f}%"
+        )
         for idx, pos in enumerate(portf_positions):
             LightLogger.do_log(
                 f"  Position #{idx + 1}: {pos.side} | open={pos.price_open} | close={pos.price_close} | "
