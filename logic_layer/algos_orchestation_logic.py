@@ -282,6 +282,7 @@ class AlgosOrchestationLogic:
             f"Profit={profit_pct:.2f}% | "
             f"Max. Drawdown={drawdown_pct:.2f}%"
         )
+
         for idx, pos in enumerate(portf_positions):
             LightLogger.do_log(
                 f"  Position #{idx + 1}: {pos.side} | open={pos.price_open} | close={pos.price_close} | "
