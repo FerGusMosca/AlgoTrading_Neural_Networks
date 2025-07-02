@@ -630,6 +630,7 @@ class AlgosOrchestationLogic:
         classif_key = n_algo_param_dict["classif_key"]
         pos_regime_filters_csv=n_algo_param_dict["pos_regime_filters_csv"]
         neg_regime_filters_csv = n_algo_param_dict["neg_regime_filters_csv"]
+        draw_predictions = n_algo_param_dict["draw_predictions"]
 
         idx_loop=0
         init_last_portf_size_dict=None
@@ -637,6 +638,7 @@ class AlgosOrchestationLogic:
 
         curr_d_from = d_from
         curr_d_to = curr_d_from + relativedelta(years=sliding_window_years) - relativedelta(days=1)
+        draw_d_from=curr_d_to
         if curr_d_to > d_to:
             curr_d_to = d_to
 
@@ -644,6 +646,11 @@ class AlgosOrchestationLogic:
 
         mlAnalyzer = MLModelAnalyzer(self.logger)
 
+        symbol_prices_df = self.data_set_builder.build_interval_series(
+            symbol, d_from, d_to,
+            interval=DataSetBuilder._1_DAY_INTERVAL,
+            output_col=["symbol", "date", "open", "high", "low", "close"]
+        )
 
         while curr_d_from <= d_to:
 
@@ -674,13 +681,6 @@ class AlgosOrchestationLogic:
 
             n_algo_param_dict["series_csv"] = series_csv
 
-            symbol_df = self.data_set_builder.build_interval_series(
-                symbol, d_from, d_to,
-                interval=DataSetBuilder._1_DAY_INTERVAL,
-                output_col=["symbol", "date", "open", "high", "low", "close"]
-            )
-
-
             pos_regime_df = self.data_set_builder.build_interval_series(
                 pos_regime_filters_csv, eval_d_from, eval_d_to,
                 interval=DataSetBuilder._1_DAY_INTERVAL,
@@ -702,7 +702,7 @@ class AlgosOrchestationLogic:
             series_df = DataframeFiller.fill_missing_values(series_df)
 
             result_df, test_series_df = mlAnalyzer.evaluate_trading_performance_last_model_RF(
-                symbol_df=symbol_df,
+                symbol_df=symbol_prices_df,
                 symbol=symbol,
                 series_df=series_df,
                 label_encoder=label_encoder,
@@ -754,6 +754,11 @@ class AlgosOrchestationLogic:
                 curr_d_to = d_to
             if curr_d_to <= curr_d_from:
                 break
+
+        if draw_predictions:
+            symbol_prices_df = symbol_prices_df[symbol_prices_df['date'] >= draw_d_from]
+            GraphBuilder.plot_prices_with_trades(symbol_prices_df,summary_dict_arr,"SLIDING_RF")
+
 
         return summary_dict_arr
 

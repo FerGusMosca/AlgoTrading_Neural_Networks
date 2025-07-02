@@ -1,5 +1,9 @@
 import pandas as pd
 import plotly.graph_objs as go
+import matplotlib.pyplot as plt
+
+from common.enums.side import Side
+
 
 class GraphBuilder:
 
@@ -36,3 +40,35 @@ class GraphBuilder:
 
         # Show the final chart
         fig.show()
+
+    @staticmethod
+    def plot_prices_with_trades(symbol_prices_df, summary_dict_arr, strategy_name):
+        # Ensure 'date' column is in datetime format
+        symbol_prices_df['date'] = pd.to_datetime(symbol_prices_df['date'])
+
+        # Create base price plot in blue
+        plt.figure(figsize=(16, 6))
+        plt.plot(symbol_prices_df['date'], symbol_prices_df['close'], label='Price', color='blue')
+
+        # Loop through all trade summaries
+        for summary in summary_dict_arr:
+            for pos in summary[strategy_name].portf_pos_summary:
+                start = pos.date_open
+                end = pos.date_close
+                color = 'green' if pos.side == Side.LONG.value else 'red'
+
+                # Highlight the segment corresponding to each trade
+                mask = (symbol_prices_df['date'] >= start) & (symbol_prices_df['date'] <= end)
+                plt.plot(
+                    symbol_prices_df.loc[mask, 'date'],
+                    symbol_prices_df.loc[mask, 'close'],
+                    linewidth=3,
+                    color=color
+                )
+
+        plt.title("Prices with Trade Periods")
+        plt.xlabel("Date")
+        plt.ylabel("Price")
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show(block=True)

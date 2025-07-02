@@ -1,9 +1,8 @@
 differenced_columns
-open_XLF
-high_XLF
-low_XLF
-close_XLF
-BAA10YM
+open_XLK
+high_XLK
+low_XLK
+close_XLK
 DGS10
 DGS1MO
 DGS2
@@ -13,11 +12,4 @@ DGS6MO
 EFFR
 FEDFUNDS
 M2SL
-REALLN
 SPY
-T10Y2Y
-T10Y3M
-T10YIE
-T5YIE
-TOTBKCR
-WALCL

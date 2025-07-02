@@ -580,6 +580,7 @@ def run_sliding_random_forest(cmd):
     classif_key = __get_param__(cmd, "classif_key")
 
     trade_comm = __get_param__(cmd, "trade_comm", optional=True, def_value=5)
+    draw_predictions = __get_param__(cmd, "draw_predictions", optional=True, def_value=False)
     init_portf_size = __get_param__(cmd, "init_portf_size", optional=True, def_value=PortfolioPosition._DEF_PORTF_AMT)
     sliding_window_years = __get_param__(cmd, "sliding_window_years", optional=True, def_value=2)
     sliding_window_months = __get_param__(cmd, "sliding_window_months", optional=True, def_value=2)
@@ -597,6 +598,7 @@ def run_sliding_random_forest(cmd):
         "classif_key": classif_key,
         "class_weight": class_weight,
         "bias": bias,
+        "draw_predictions": draw_predictions,
         "n_flip": n_flip,
         "pos_regime_filters_csv": pos_regime_filters_csv,
         "neg_regime_filters_csv": neg_regime_filters_csv,
