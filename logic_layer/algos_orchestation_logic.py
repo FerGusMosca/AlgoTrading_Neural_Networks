@@ -401,11 +401,12 @@ class AlgosOrchestationLogic:
         init_portf_size = float(n_algo_param_dict["init_portf_size"])
         pos_regime_filters_csv = n_algo_param_dict.get("pos_regime_filters_csv", None)
         neg_regime_filters_csv = n_algo_param_dict.get("neg_regime_filters_csv", None)
+        draw_predictions = n_algo_param_dict.get("draw_predictions", False)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         summary_dict_arr=[]
 
         # Load price series of target symbol
-        symbol_df = self.data_set_builder.build_interval_series(
+        symbol_prices_df = self.data_set_builder.build_interval_series(
             symbol, d_from, d_to,
             interval=DataSetBuilder._1_DAY_INTERVAL,
             output_col=["symbol", "date", "open", "high", "low", "close"]
@@ -439,7 +440,7 @@ class AlgosOrchestationLogic:
 
         # Run prediction
         result_df, test_series_df = ml_analyzer.evaluate_trading_performance_last_model_RF(
-            symbol_df=symbol_df,
+            symbol_df=symbol_prices_df,
             symbol=symbol,
             series_df=series_df,
             model_filename=model_to_use,
@@ -475,6 +476,10 @@ class AlgosOrchestationLogic:
         #     init_portf=init_portf_size,
         #     timestamp=timestamp
         # )
+
+        if draw_predictions:
+            symbol_prices_df = symbol_prices_df[symbol_prices_df['date'] >= d_from]
+            GraphBuilder.plot_prices_with_trades(symbol_prices_df, summary_dict_arr, "RANDOM_FOREST")
 
         return {"DAILY_RF": summary}
 

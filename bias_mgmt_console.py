@@ -324,6 +324,7 @@ def process_test_RF_cmd(cmd):
     interval = __get_param__(cmd, "interval", True, DataSetBuilder._1_DAY_INTERVAL)
     init_portf_size = float(__get_param__(cmd, "init_portf_size"))
     trade_comm = float(__get_param__(cmd, "trade_comm"))
+    draw_predictions = __get_param__(cmd, "draw_predictions", optional=True, def_value=False)
     grouping_unit = __get_param__(cmd, "grouping_unit", True)
     grouping_classif_criteria = __get_param__(cmd, "grouping_classif_criteria", True, def_value=None)
     group_as_mov_avg = __get_bool_param__(cmd, "group_as_mov_avg", True, def_value=False)
@@ -347,6 +348,7 @@ def process_test_RF_cmd(cmd):
         "make_stationary": make_stationary,
         "n_flip": n_flip,
         "bias": bias,
+        "draw_predictions": draw_predictions,
         "pos_regime_filters_csv": pos_regime_filters_csv,
         "neg_regime_filters_csv": neg_regime_filters_csv
     }
