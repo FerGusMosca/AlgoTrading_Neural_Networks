@@ -329,6 +329,7 @@ def process_test_RF_cmd(cmd):
     grouping_classif_criteria = __get_param__(cmd, "grouping_classif_criteria", True, def_value=None)
     group_as_mov_avg = __get_bool_param__(cmd, "group_as_mov_avg", True, def_value=False)
     grouping_mov_avg_unit = __get_param__(cmd, "grouping_mov_avg_unit", True, def_value=100)
+    classif_threshold = __get_param__(cmd, "classif_threshold", True, def_value=0.5)
     make_stationary = __get_bool_param__(cmd, "make_stationary", True, False)
     n_flip = int(__get_param__(cmd, "n_flip", True, 3))
     bias = __get_param__(cmd, "bias", True, None)
@@ -347,6 +348,7 @@ def process_test_RF_cmd(cmd):
         "grouping_mov_avg_unit": int(grouping_mov_avg_unit) if grouping_mov_avg_unit is not None else None,
         "make_stationary": make_stationary,
         "n_flip": n_flip,
+        "classif_threshold": classif_threshold,
         "bias": bias,
         "draw_predictions": draw_predictions,
         "pos_regime_filters_csv": pos_regime_filters_csv,
@@ -589,6 +591,7 @@ def run_sliding_random_forest(cmd):
     class_weight = __get_param__(cmd, "class_weight", optional=True, def_value="balanced")
     bias = __get_param__(cmd, "bias", optional=True, def_value="NONE")
     n_flip = __get_param__(cmd, "n_flip", optional=True, def_value=1)
+    classif_threshold = __get_param__(cmd, "classif_threshold", optional=True, def_value=0.5)
     pos_regime_filters_csv = __get_param__(cmd, "pos_regime_filters_csv", optional=True, def_value="")
     neg_regime_filters_csv = __get_param__(cmd, "neg_regime_filters_csv", optional=True, def_value="")
 
@@ -601,6 +604,7 @@ def run_sliding_random_forest(cmd):
         "class_weight": class_weight,
         "bias": bias,
         "draw_predictions": draw_predictions,
+        "classif_threshold": classif_threshold,
         "n_flip": n_flip,
         "pos_regime_filters_csv": pos_regime_filters_csv,
         "neg_regime_filters_csv": neg_regime_filters_csv,

@@ -1,9 +1,0 @@
-Year,Period,Profit %,Drawdown %,Cum Profit $,Max. Cum Drawdown %,Portfolio $,CAGR %,Max DD %
-2025,Jan-Feb,0.0,0.0,0.0,0.0,100000.0,,
-2025,Mar-Apr,-6.51,-16.42,-6508.85,-16.42,93491.15,,
-2025,May-Jun,0.0,0.0,-6508.85,-16.42,93491.15,,
-2025,,,,,,,-6.51,-16.42
-Cumulative CAGR,-6.51%,,,,,,,
-Final Portfolio Value,"$93,491.15",,,,,,,
-Symbol,XLY,,,,,,,
-Series CSV,"SPY,VIXCLS,DGS2,DGS10,DGS30,DGS1MO,DGS3MO,DGS6MO,EFFR,FEDFUNDS,T10YIE,M2SL",,,,,,,

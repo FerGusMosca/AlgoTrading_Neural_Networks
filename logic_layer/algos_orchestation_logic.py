@@ -284,10 +284,11 @@ class AlgosOrchestationLogic:
         )
 
         for idx, pos in enumerate(portf_positions):
+            pos_MTM=FinancialCalculationsHelper.max_drawdown_on_MTM(pos.daily_MTMs)*100
             LightLogger.do_log(
                 f"  Position #{idx + 1}: {pos.side} | open={pos.price_open} | close={pos.price_close} | "
                 f"open_date={pos.date_open.date()} | close_date={pos.date_close.date()} | "
-                f"profit={pos.calculate_th_nom_profit():.2f} | pct={pos.calculate_pct_profit():.2f}%"
+                f"profit={pos.calculate_th_nom_profit():.2f} | pct={pos.calculate_pct_profit():.2f}% | Drawdown={pos_MTM:.2f}%"
             )
 
         summary.update_max_drawdown()
