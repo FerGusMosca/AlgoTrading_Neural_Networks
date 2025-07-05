@@ -1,9 +1,8 @@
 import pandas as pd
 import plotly.graph_objs as go
 import matplotlib.pyplot as plt
-
 from common.enums.side import Side
-
+import numpy as np
 
 class GraphBuilder:
 
@@ -72,3 +71,26 @@ class GraphBuilder:
         plt.grid(True)
         plt.tight_layout()
         plt.show(block=True)
+
+
+    @staticmethod
+    def plot_long_probability_distributions(prob,threshold):
+        # Log distribution of predicted probabilities
+        plt.hist(prob, bins=50)
+        plt.title(f"Distribution of LONG probabilities (threshold={threshold})")
+        plt.xlabel("Probability of LONG")
+        plt.ylabel("Frequency")
+        plt.savefig("long_prob_distribution.png")
+
+    @staticmethod
+    def plot_feature_importances(model, feature_names, output_path="feature_importance.png"):
+        importances = model.feature_importances_
+        indices = np.argsort(importances)[::-1]
+        sorted_features = [feature_names[i] for i in indices]
+
+        plt.figure(figsize=(12, 6))
+        plt.title("Feature Importances")
+        plt.bar(range(len(importances)), importances[indices], align="center")
+        plt.xticks(range(len(importances)), sorted_features, rotation=45, ha="right")
+        plt.tight_layout()
+        plt.savefig(output_path)  # o plt.show()

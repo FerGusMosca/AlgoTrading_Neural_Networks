@@ -480,7 +480,8 @@ class MLModelAnalyzer():
             raise Exception(f"[RF Test] Failed to extract label_encoder from model: {e}")
 
     def evaluate_trading_performance_last_model_RF(self, symbol_df, symbol, series_df, model_filename, bias,
-                                                   label_encoder,last_trading_dict, n_algo_param_dict):
+                                                   label_encoder,last_trading_dict, n_algo_param_dict,
+                                                   draw_statistics=False):
         """
         Generate prediction DataFrame from RF model.
         Returns:
@@ -508,7 +509,8 @@ class MLModelAnalyzer():
         result_df, _ = rf_creator.test_RF_scalping(symbol=symbol, test_series_df=test_series_df,
                                                    model_to_use=model_file, make_stationary=make_stationary,
                                                    normalize=True, series_csv=n_algo_param_dict["series_csv"],
-                                                   threshold=classif_threshold, label_encoder=label_encoder)
+                                                   threshold=classif_threshold, label_encoder=label_encoder,
+                                                   draw_statistics=draw_statistics)
 
         # Alias required for backtest compatibility
         result_df[symbol] = result_df["trading_symbol_price"]

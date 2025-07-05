@@ -448,7 +448,8 @@ class AlgosOrchestationLogic:
             bias=n_algo_param_dict.get("bias", "LONG"),
             label_encoder=label_encoder,
             last_trading_dict=None,
-            n_algo_param_dict=n_algo_param_dict
+            n_algo_param_dict=n_algo_param_dict,
+            draw_statistics=draw_predictions
         )
 
         # Backtest predictions
@@ -715,7 +716,8 @@ class AlgosOrchestationLogic:
                 model_filename=model_filename,
                 bias=None,
                 last_trading_dict=last_trading_dict,
-                n_algo_param_dict=n_algo_param_dict
+                n_algo_param_dict=n_algo_param_dict,
+                draw_statistics=draw_predictions
             )
 
             # If not the first iteration, carry forward the final MTM from the previous summary
