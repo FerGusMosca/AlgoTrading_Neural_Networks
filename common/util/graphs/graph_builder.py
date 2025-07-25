@@ -1,8 +1,8 @@
-import pandas as pd
 import plotly.graph_objs as go
-import matplotlib.pyplot as plt
 from common.enums.side import Side
-import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import mplcursors
 
 class GraphBuilder:
 
@@ -72,7 +72,6 @@ class GraphBuilder:
         plt.tight_layout()
         plt.show(block=True)
 
-
     @staticmethod
     def plot_long_probability_distributions(prob,threshold):
         # Log distribution of predicted probabilities
@@ -111,4 +110,73 @@ class GraphBuilder:
         plt.xticks(range(len(importances)), sorted_features, rotation=45, ha="right")
         plt.tight_layout()
         plt.savefig(output_path)  # Use plt.show() if running interactively
+
+    @staticmethod
+    def plot_2_series_overlapped(pivot_df, benchmark_df, benchmark_symbol, output_symbol):
+        import matplotlib.dates as mdates
+
+        # Ensure datetime index
+        pivot_df.index = pd.to_datetime(pivot_df["date"])
+
+        # Create base figure
+        fig, ax1 = plt.subplots(figsize=(12, 6))
+
+        # Plot Lightweight Indicator (left axis)
+        ax1.plot(
+            pivot_df.index,
+            pivot_df[output_symbol],
+            label=output_symbol,
+            color="blue"
+        )
+        ax1.set_ylabel("Lightweight Indicator", color="blue")
+        ax1.tick_params(axis='y', labelcolor='blue')
+
+        # Plot Benchmark (right axis)
+        if benchmark_df is not None:
+            benchmark_df["date"] = pd.to_datetime(benchmark_df["date"])
+            benchmark_pivot = benchmark_df.pivot(index="date", columns="symbol", values="close")
+
+            # Align to common date range
+            common_start = pivot_df.index.min()
+            common_end = pivot_df.index.max()
+            benchmark_pivot = benchmark_pivot[
+                (benchmark_pivot.index >= common_start) & (benchmark_pivot.index <= common_end)
+                ]
+
+            ax2 = ax1.twinx()
+            ax2.plot(
+                benchmark_pivot.index,
+                benchmark_pivot[benchmark_symbol],
+                label=benchmark_symbol,
+                color="orange",
+                linestyle="--"
+            )
+            ax2.set_ylabel(benchmark_symbol, color="orange")
+            ax2.tick_params(axis='y', labelcolor='orange')
+
+        # Combined legend
+        lines_1, labels_1 = ax1.get_legend_handles_labels()
+        if benchmark_df is not None:
+            lines_2, labels_2 = ax2.get_legend_handles_labels()
+            ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper left")
+        else:
+            ax1.legend(loc="upper left")
+
+        # Improve X-axis date formatting
+        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+        fig.autofmt_xdate()
+
+        # Final tweaks
+        ax1.set_title("Lightweight Indicator vs Benchmark (dual axis)")
+        ax1.grid(True)
+
+        # Enable interactive hover (optional)
+        try:
+            mplcursors.cursor(ax1.lines + (ax2.lines if benchmark_df is not None else []), hover=True)
+        except Exception:
+            pass
+
+        plt.tight_layout()
+        plt.show()
+
 

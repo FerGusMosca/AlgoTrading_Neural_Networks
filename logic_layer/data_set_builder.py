@@ -248,6 +248,29 @@ class DataSetBuilder():
 
         return merged_df
 
+    def pivot_and_merge_indicators(self,df):
+        """
+        Takes a dataframe with columns [symbol, date, close] (and possibly others),
+        and returns a pivoted dataframe with one row per date and one column per symbol.
+        It first normalizes the date to ensure daily alignment, then groups and pivots.
+        """
+        # 1. Normalize date to remove time (keep only date component)
+        df["date"] = pd.to_datetime(df["date"]).dt.normalize()
+
+        # 2. Group by symbol and date, keeping the last value (e.g., if multiple values per day)
+        df_grouped = df.groupby(["symbol", "date"], as_index=False).last()
+
+        # 3. Pivot to wide format (symbols as columns)
+        pivot_df = df_grouped.pivot(index="date", columns="symbol", values="close")
+
+        # 4. Rename columns for clarity
+        pivot_df.columns = [f"close_{col}" for col in pivot_df.columns]
+
+        # 5. Reset index to have 'date' as a column
+        pivot_df = pivot_df.reset_index()
+
+        return pivot_df
+
     def merge_series(sel,symbol_min_series_df,variables_min_series_df,symbol_col,date_col, symbol):
         # Step 1: Pivot the variables_min_series_df to turn 'symbol_col' values into columns
         variables_pivot_df = variables_min_series_df.pivot(index=date_col, columns=symbol_col, values='open')

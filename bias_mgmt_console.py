@@ -44,6 +44,7 @@ def show_commands():
     print("#20-EvalSlidingRandomForest [symbol] [series_csv] [from] [to] [classif_key] [init_portf_size] [trade_comm] [classif_threshold] [sliding_window_years] [sliding_window_months]")
     print("#21-CustomRegimeSwitchDetector [variables] [from] [to] [regime_switch_filter] [regime_candle] [regime_window]")
     print("#22-DownloadFinancialData [symbol] [from*] [to*] [vendor_params*]")
+    print("#33-CreateLightweightIndicator [csv_indicators] [from*] [to*] [benchmark*] [plot_result*]")
     print("======================== UI ========================")
     print("#30-BiasMainLandingPage")
     print("#31-DisplayOrderRoutingScreen")
@@ -239,6 +240,23 @@ def process_download_financial_data(cmd):
                                           d_from=d_from,
                                           d_to=d_to,
                                           algo_params=cmd_param_dict)
+
+
+def process_create_lightweight_indicator(cmd):
+    # Required
+    csv_indicators = __get_param__(cmd, "csv_indicators")
+
+
+    # Optional
+    plot_result = __get_param__(cmd, "plot_result", True, False)
+    benchmark = __get_param__(cmd, "benchmark", True, None)
+    d_from = __get_param__(cmd, "from", True, None)
+    d_to = __get_param__(cmd, "to", True, None)
+    output_symbol = __get_param__(cmd, "output_symbol", True, "LIGHTWEIGHT_INDICATOR")
+
+    # Run core logic
+    process_create_lightweight_indicator_logic(csv_indicators=csv_indicators, d_from=d_from, d_to=d_to,
+                                               benchmark=benchmark, plot_result=plot_result,output_symbol=output_symbol)
 
 
 def process_create_sinthetic_indicator(cmd):
@@ -1244,6 +1262,33 @@ def process_backtest_slope_model_logic(symbol,model_candle,d_from,d_to,portf_siz
         print(traceback.format_exc())
         logger.print("CRITICAL ERROR running process_backtest_slope_model:{}".format(str(e)), MessageType.ERROR)
 
+def process_create_lightweight_indicator_logic(csv_indicators, d_from, d_to,output_symbol, benchmark=None, plot_result=True):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print(f"🧪 Starting lightweight indicator creation with {len(csv_indicators.split(','))} input variables", MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        trd_algos = AlgosOrchestationLogic(
+            config_settings["hist_data_conn_str"],
+            config_settings["ml_reports_conn_str"],
+            None,
+            logger
+        )
+
+        trd_algos.process_create_lightweight_indicator(csv_indicators=csv_indicators, d_from=d_from, d_to=d_to,
+                                                       benchmark=benchmark, plot_result=plot_result,
+                                                       output_symbol=output_symbol)
+
+        logger.print("✅ Lightweight indicator successfully created and persisted", MessageType.INFO)
+
+    except Exception as e:
+        print(traceback.format_exc())
+        logger.print(f"CRITICAL ERROR running process_create_lightweight_indicator_logic: {str(e)}", MessageType.ERROR)
+
+
 def process_download_financial_data_logic(symbol, d_from, d_to, algo_params):
     loader = MLSettingsLoader()
     logger = Logger()
@@ -1430,6 +1475,8 @@ def process_commands(cmd):
         run_sliding_random_forest(cmd)
     elif cmd_param_list[0] == "CustomRegimeSwitchDetector":
         run_custom_regime_switch_detector(cmd)
+    elif cmd_param_list[0] == "CreateLightweightIndicator":
+        process_create_lightweight_indicator(cmd)
 
     #TestDailyLSTM
 

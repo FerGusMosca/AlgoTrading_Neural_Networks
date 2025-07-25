@@ -15,6 +15,7 @@ from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws, S
 from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas, TradingAlgoStrategy
 from common.util.downloaders.FRED_downloader import FredDownloader
 from common.util.downloaders.tradingview_downloader import TradingViewDownloader
+from common.util.financial_calculations.PCA_calculator import PCACalcualtor
 from common.util.pandas_dataframes.dataframe_filler import DataframeFiller
 from common.util.pandas_dataframes.dataframe_printer import DataframePrinter
 from common.util.financial_calculations.date_handler import DateHandler
@@ -1624,12 +1625,74 @@ class AlgosOrchestationLogic:
             for index, row in df.iterrows():
                 date = row["date"]
                 value = row["value"]
-                self.economic_series_mgr.persist_economic_series(symbol, date, Intervals.DAY.value, value)
+                try:
+
+                    print(f"[DEBUG] Persisting FRED row: symbol={symbol}, date={date}, value={value} ({type(value)})")
+                    if pd.isna(value):
+                        print(f"[WARNING] Skipping NaN value for symbol={symbol} at date={date}")
+                        continue
+                    value = float(value)
+                    self.economic_series_mgr.persist_economic_series(symbol, date, Intervals.DAY.value, value)
+
+                except Exception as e:
+                    print(f"[ERROR] Failed to persist row for symbol={symbol}, date={date}, value={value}")
+                    print(traceback.format_exc())
 
         else:
             raise Exception(f"❌ Unknown data vendor '{vendor}'. Supported: TRADINGVIEW, FRED")
 
        #TODO --> Convertir a EconomicValues y persistir
+
+    def process_create_lightweight_indicator(self, csv_indicators, d_from, d_to,output_symbol, benchmark=None, plot_result=True):
+        print(f"🧩 Building DataFrame with indicators: {csv_indicators}")
+
+        indicators_series_df = self.data_set_builder.build_interval_series(
+            series_csv=csv_indicators,
+            d_from=d_from,
+            d_to=d_to,
+            interval=DataSetBuilder._1_DAY_INTERVAL,
+            output_col=["symbol", "date", "close"]
+        )
+
+        if indicators_series_df.empty:
+            raise Exception("❌ No data returned for selected indicators")
+
+        # Pivot to wide format
+        pivot_df=self.data_set_builder.pivot_and_merge_indicators(indicators_series_df)
+        pivot_df = DataframeFiller.fill_missing_values(pivot_df)
+        pivot_df.dropna(inplace=True)
+
+        print(f"📊 Running PCA on {pivot_df.shape[1]} variables and {pivot_df.shape[0]} rows")
+        pivot_df=PCACalcualtor.calculate_PCA(pivot_df,output_symbol)
+
+        # Persist each row
+        for _, row in pivot_df.iterrows():
+            date = row["date"]
+            value = row[output_symbol]
+            self.economic_series_mgr.persist_economic_series(
+                output_symbol,
+                date if isinstance(date, datetime) else pd.to_datetime(date),
+                Intervals.DAY.value,
+                value
+            )
+
+        print(f"✅ Persisted {len(pivot_df)} values for {output_symbol}")
+
+        benchmark_df=None
+        if benchmark:
+            benchmark_df = self.data_set_builder.build_interval_series(
+                series_csv=benchmark,
+                d_from=d_from,
+                d_to=d_to,
+                interval=DataSetBuilder._1_DAY_INTERVAL,
+                output_col=["symbol", "date", "close"]
+            )
+
+        # Plot result (optional) --> Take to graph
+        if plot_result:
+            GraphBuilder.plot_2_series_overlapped(pivot_df,benchmark_df,benchmark,output_symbol)
+
+
 
     def process_create_sinthetic_indicator_logic(self,comp_path,model_candle,d_from,d_to,algo_params):
         start_of_day = datetime(d_from.year, d_from.month, d_from.day)
