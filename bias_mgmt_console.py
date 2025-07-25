@@ -1,10 +1,9 @@
 import traceback
 
 from business_entities.portf_position import PortfolioPosition
-from common.enums.sliding_window_strategy import SlidingWindowStrategy
-from common.util.date_handler import DateHandler
-from common.util.logger import Logger
-from common.util.ml_settings_loader import MLSettingsLoader
+from common.util.financial_calculations.date_handler import DateHandler
+from common.util.logging.logger import Logger
+from common.util.std_in_out.ml_settings_loader import MLSettingsLoader
 from controllers.main_dashboard_controller import MainDashboardController
 from framework.common.logger.message_type import MessageType
 from logic_layer.algos_orchestation_logic import AlgosOrchestationLogic
@@ -44,6 +43,7 @@ def show_commands():
     print("#19-TestDailyRF [symbol] [series_csv] [from] [to] [model_to_use] [portf_size] [trade_comm] [trading_algo] [classif_threshold] [algo_params*]")
     print("#20-EvalSlidingRandomForest [symbol] [series_csv] [from] [to] [classif_key] [init_portf_size] [trade_comm] [classif_threshold] [sliding_window_years] [sliding_window_months]")
     print("#21-CustomRegimeSwitchDetector [variables] [from] [to] [regime_switch_filter] [regime_candle] [regime_window]")
+    print("#22-DownloadFinancialData [symbol] [from*] [to*] [vendor_params*]")
     print("======================== UI ========================")
     print("#30-BiasMainLandingPage")
     print("#31-DisplayOrderRoutingScreen")
@@ -202,6 +202,43 @@ def process_display_order_routing_screen(cmd):
 
     wmc.display_order_routing_screen()
     print(f"Web Manager Logic successfully shown...")
+
+def process_download_financial_data(cmd):
+    # Required parameters
+    symbol = __get_param__(cmd, "symbol")
+    d_from = __get_param__(cmd, "from", True, None)
+    d_to = __get_param__(cmd, "to", True, None)
+
+    # Required vendor
+    vendor = __get_param__(cmd, "vendor")
+
+    # Build vendor_params dict from known optional parameters
+    vendor_params = {}
+
+    if vendor == "FRED":
+        # No additional inline parameters expected for now
+        pass
+
+    elif vendor == "TRADINGVIEW":
+        for key in ["session", "token", "username", "password", "interval", "exchange"]:
+            val = __get_param__(cmd, key, True, None)
+            if val is not None:
+                vendor_params[key] = val
+    else:
+        raise Exception(f"Unsupported vendor: {vendor}")
+
+    # Compose param dictionary to pass to logic
+    cmd_param_dict = {
+        "symbol": symbol,
+        "vendor": vendor,
+        "vendor_params": vendor_params
+    }
+
+    # Call core logic method
+    process_download_financial_data_logic(symbol=symbol,
+                                          d_from=d_from,
+                                          d_to=d_to,
+                                          algo_params=cmd_param_dict)
 
 
 def process_create_sinthetic_indicator(cmd):
@@ -1207,6 +1244,46 @@ def process_backtest_slope_model_logic(symbol,model_candle,d_from,d_to,portf_siz
         print(traceback.format_exc())
         logger.print("CRITICAL ERROR running process_backtest_slope_model:{}".format(str(e)), MessageType.ERROR)
 
+def process_download_financial_data_logic(symbol, d_from, d_to, algo_params):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print(f"Initializing financial data download for symbol '{symbol}' from {d_from} to {d_to}", MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        # Inject vendor-specific config parameters here if needed
+        if "vendor" in algo_params and algo_params["vendor"].upper() == "FRED":
+            fred_key = config_settings["FRED_API_KEY"]
+            if "vendor_params" not in algo_params:
+                algo_params["vendor_params"] = {}
+            algo_params["vendor_params"]["api_key"] = fred_key
+
+        if "vendor" in algo_params and algo_params["vendor"].upper() == "TRADINGVIEW":
+            tradingview_user = config_settings["TRADING_VIEW_USER"]
+            tradingview_pwd = config_settings["TRADING_VIEW_PWD"]
+            if "vendor_params" not in algo_params:
+                algo_params["vendor_params"] = {}
+            algo_params["vendor_params"]["tradingview_user"] = tradingview_user
+            algo_params["vendor_params"]["tradingview_pwd"] = tradingview_pwd
+
+        trd_algos = AlgosOrchestationLogic(
+            config_settings["hist_data_conn_str"],
+            config_settings["ml_reports_conn_str"],
+            None,
+            logger
+        )
+
+        trd_algos.process_download_financial_data(symbol, d_from, d_to, algo_params)
+
+        logger.print(f"Financial data for symbol '{symbol}' successfully downloaded from {d_from} to {d_to}",
+                     MessageType.INFO)
+
+    except Exception as e:
+        print(traceback.format_exc())
+        logger.print(f"CRITICAL ERROR running process_download_financial_data_logic: {str(e)}", MessageType.ERROR)
+
 
 def process_create_sinthetic_indicator_logic(comp_path,model_candle,d_from,d_to,algo_params):
     loader = MLSettingsLoader()
@@ -1341,6 +1418,9 @@ def process_commands(cmd):
 
     elif cmd_param_list[0] == "CreateSintheticIndicator":
         process_create_sinthetic_indicator(cmd)
+    elif cmd_param_list[0] == "DownloadFinancialData":
+        process_download_financial_data(cmd)
+    #
     elif cmd_param_list[0] == "DisplayOrderRoutingScreen":
         process_display_order_routing_screen(cmd)
     elif cmd_param_list[0] == "BiasMainLandingPage":

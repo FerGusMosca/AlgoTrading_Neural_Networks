@@ -1,6 +1,5 @@
 from business_entities.portf_pnl_summary import PortfPnLSummary
-from business_entities.portf_position_summary import PortfPositionSummary
-from common.util.financial_calculation_helper import FinancialCalculationsHelper
+from common.util.financial_calculations.financial_calculation_helper import FinancialCalculationsHelper
 
 
 class PortfSummary:

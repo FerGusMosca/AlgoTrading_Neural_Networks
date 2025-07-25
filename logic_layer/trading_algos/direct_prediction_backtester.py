@@ -1,9 +1,5 @@
-import pandas as pd
-
 from business_entities.portf_position import PortfolioPosition
-from common.enums.sliding_window_strategy import SlidingWindowStrategy
-from common.util.date_handler import DateHandler
-from common.util.light_logger import LightLogger
+from common.util.logging.light_logger import LightLogger
 from logic_layer.trading_algos.slope_backtester import SlopeBacktester
 
 

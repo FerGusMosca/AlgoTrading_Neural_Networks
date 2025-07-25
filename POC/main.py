@@ -8,8 +8,8 @@ from starlette.responses import HTMLResponse
 
 from stripe_ACH_POC_controller import StripeAchDemoController
 from stripe_USDC_POC_controller import StripeUSDCDemoController
-from common.util.logger import Logger
-from common.util.ml_settings_loader import MLSettingsLoader
+from common.util.logging.logger import Logger
+from common.util.std_in_out.ml_settings_loader import MLSettingsLoader
 
 # Init
 app = FastAPI()

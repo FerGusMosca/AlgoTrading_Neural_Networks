@@ -3,7 +3,7 @@ import csv
 
 import numpy as np
 
-from common.util.light_logger import LightLogger
+from common.util.logging.light_logger import LightLogger
 
 
 class DeepNeuralNetwork():

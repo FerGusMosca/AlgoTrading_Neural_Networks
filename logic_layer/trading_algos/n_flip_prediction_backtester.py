@@ -1,10 +1,7 @@
 from common.enums.side import Side
-from logic_layer.trading_algos.direct_prediction_backtester import DirectPredictionBacktester
 from business_entities.portf_position import PortfolioPosition
 from common.enums.sliding_window_strategy import SlidingWindowStrategy
-from common.util.light_logger import LightLogger
-from common.util.date_handler import DateHandler
-from enum import Enum
+from common.util.logging.light_logger import LightLogger
 
 from logic_layer.trading_algos.slope_backtester import SlopeBacktester
 

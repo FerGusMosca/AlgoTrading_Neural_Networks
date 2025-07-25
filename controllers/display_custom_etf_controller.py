@@ -1,14 +1,12 @@
-from datetime import date, datetime
+from datetime import datetime
 
 import pandas as pd
-from fastapi import APIRouter, Request, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
-from starlette.responses import JSONResponse
-
-from common.util.csv_reader import CSVReader
+from common.util.std_in_out.csv_reader import CSVReader
 from controllers.base_controller import BaseController
 from framework.common.logger.message_type import MessageType
 from logic_layer.algos_orchestation_logic import AlgosOrchestationLogic
@@ -34,8 +32,7 @@ class DisplayCustomETFController(BaseController):
         """Renders the custom ETF upload page."""
         return self.templates.TemplateResponse("display_custom_etf.html", {"request": request})
 
-    from fastapi import UploadFile, File, HTTPException
-
+    from fastapi import UploadFile, File
 
     def calc_mov_avgs(self,moving_avg):
         # ✅ Compute moving average if requested by user

@@ -8,7 +8,7 @@ import joblib
 from joblib import load
 from sklearn.ensemble import RandomForestClassifier
 from typing import Tuple, Union
-from common.util.light_logger import LightLogger
+from common.util.logging.light_logger import LightLogger
 
 _OUTPUT_DATE_FORMAT = '%m/%d/%Y %H:%M:%S'
 _OUTPUT_PATH = "./output/"

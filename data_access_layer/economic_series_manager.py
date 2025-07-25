@@ -3,7 +3,7 @@ import math
 import pyodbc
 
 from business_entities.economic_value import EconomicValue
-from common.util.date_handler import DateHandler
+from common.util.financial_calculations.date_handler import DateHandler
 
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 _SYMBOL_IDX=0

@@ -1,7 +1,4 @@
-from datetime import date, datetime
-
-import pandas as pd
-from fastapi import APIRouter, Request, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -9,16 +6,12 @@ from pathlib import Path
 from starlette.responses import JSONResponse
 
 from business_entities.detailed_MTM import DetailedMTM
-from common.util.csv_reader import CSVReader
-from common.util.date_handler import DateHandler
-from common.util.file_writer import FileWriter
-from common.util.slope_calculator import SlopeCalculator
+from common.util.financial_calculations.date_handler import DateHandler
+from common.util.financial_calculations.slope_calculator import SlopeCalculator
 from controllers.base_controller import BaseController
 from framework.common.logger.message_type import MessageType
-from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
 from logic_layer.algos_orchestation_logic import AlgosOrchestationLogic
 from logic_layer.data_set_builder import DataSetBuilder
-from scipy.stats import linregress
 import numpy as np
 router = APIRouter()
 
@@ -79,8 +72,6 @@ class DisplaySeriesController(BaseController):
     async def display_page(self, request: Request):
         """Renders the custom ETF upload page."""
         return self.templates.TemplateResponse("display_series.html", {"request": request})
-
-    from fastapi import UploadFile, File, HTTPException
 
     async def do_display(
             self,

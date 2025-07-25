@@ -1,18 +1,11 @@
-from datetime import date, datetime
-
-import pandas as pd
-from fastapi import APIRouter, Request, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
-from starlette.responses import JSONResponse
-
-from common.util.csv_reader import CSVReader
-from common.util.file_writer import FileWriter
+from common.util.std_in_out.file_writer import FileWriter
 from controllers.base_controller import BaseController
 from framework.common.logger.message_type import MessageType
-from logic_layer.algos_orchestation_logic import AlgosOrchestationLogic
 from logic_layer.data_set_builder import DataSetBuilder
 
 router = APIRouter()
@@ -38,7 +31,7 @@ class LoadSeriesController(BaseController):
         """Renders the custom ETF upload page."""
         return self.templates.TemplateResponse("load_series.html", {"request": request})
 
-    from fastapi import UploadFile, File, HTTPException
+    from fastapi import UploadFile, File
 
     async def upload_series(self, file: UploadFile = File(...), series_key: str = Form(...), add_days: int = Form(...)):
         """Handles the file upload."""

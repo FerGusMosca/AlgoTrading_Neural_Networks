@@ -6,7 +6,7 @@ from common.enums.indicator_type import IndicatorType
 from common.enums.on_off_indicator_values import OnOffIndicatorValue
 from common.enums.parameters.positive_threshold_parameters import PositiveThresholdParameters
 from common.enums.parameters.sudden_stop_parameters import SuddenStopParameters
-from common.util.slope_calculator import SlopeCalculator
+from common.util.financial_calculations.slope_calculator import SlopeCalculator
 from framework.common.logger.message_type import MessageType
 from logic_layer.ARIMA_models_analyzer import ARIMAModelsAnalyzer
 from logic_layer.indicator_algos.sudden_stop_indicator import SuddenStopIndicator
@@ -175,9 +175,7 @@ class SintheticIndicatorCreator():
                 elif indicator.type == IndicatorType.INV_ARIMA.value:
                     all_on_ind=self.__process_arima_indicator__(indicators_series_df, row, indicator,
                                                                 n_algo_param_dict,inv_ind=True)
-                elif indicator.type == IndicatorType.INV_SARIMA.value:
-                    all_on_ind=self.__process_sarima_indicator__(indicators_series_df, row, indicator,
-                                                                n_algo_param_dict,inv_ind=True)
+
                 elif indicator.type == IndicatorType.SUDDEN_STOP.value:
                     all_on_ind=self.__process_sudden_top__(indicators_series_df, row, indicator,
                                                            n_algo_param_dict,inv_ind=True)

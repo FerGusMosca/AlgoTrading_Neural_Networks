@@ -1,9 +1,7 @@
 import pandas as pd
 
 from common.enums.columns_prefix import ColumnsPrefix
-from common.util.dataframe_filler import DataframeFiller
-from common.util.slope_calculator import SlopeCalculator
-from logic_layer.trading_algos.base_class_daily_trading_backtester import BaseClassDailyTradingBacktester
+from common.util.pandas_dataframes.dataframe_filler import DataframeFiller
 from logic_layer.trading_algos.slope_backtester import SlopeBacktester
 
 

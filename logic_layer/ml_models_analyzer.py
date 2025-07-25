@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from joblib import load
 from sklearn.model_selection import train_test_split
@@ -14,11 +13,9 @@ from sklearn.svm import SVC
 # Decision Tree classification algorithm
 from sklearn.tree import DecisionTreeClassifier
 
-from business_entities.portf_position import PortfolioPosition
 from common.enums.machine_learning_algos import MachineLearningAlgos
-from common.util.dataframe_filler import DataframeFiller
-from common.util.file_writer import FileWriter
-from common.util.light_logger import LightLogger
+from common.util.pandas_dataframes.dataframe_filler import DataframeFiller
+from common.util.std_in_out.file_writer import FileWriter
 from framework.common.logger.message_type import MessageType
 # K Nearest Neighbors classification algorithm
 from sklearn.neighbors import KNeighborsClassifier

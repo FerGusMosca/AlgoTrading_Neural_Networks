@@ -1,16 +1,13 @@
-import pickle
-
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.preprocessing import StandardScaler, LabelEncoder
 import pandas as pd
 import numpy as np
 import joblib
 
-from common.util.dataframe_filler import DataframeFiller
-from common.util.graph_builder import GraphBuilder
-from common.util.light_logger import LightLogger
+from common.util.pandas_dataframes.dataframe_filler import DataframeFiller
+from common.util.graphs.graph_builder import GraphBuilder
+from common.util.logging.light_logger import LightLogger
 from logic_layer.model_creators.base_model_creator import BaseModelCreator
 
 _OUTPUT_DATE_FORMAT = '%m/%d/%Y %H:%M:%S'
@@ -193,7 +190,8 @@ class RandomForestModelCreator(BaseModelCreator):
 
         if draw_statistics:
             GraphBuilder.plot_long_probability_distributions(prob_long,threshold=threshold)
-            GraphBuilder.plot_feature_importances(model, test_series_df.columns)
+            feature_names = [s.strip() for s in series_csv.split(",")]
+            GraphBuilder.plot_feature_importances(model, feature_names)
 
         # Convert numeric predictions back to original labels
         action_series = label_encoder.inverse_transform(actions)

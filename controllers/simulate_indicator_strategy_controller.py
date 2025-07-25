@@ -1,16 +1,13 @@
 from datetime import datetime
 from pathlib import Path
 
-
-import pandas as pd
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse
+from starlette.responses import HTMLResponse
 from starlette.templating import Jinja2Templates
 
 from business_entities.portf_position import PortfolioPosition
-from common.util.csv_reader import CSVReader
-from common.util.file_writer import FileWriter
+from common.util.std_in_out.file_writer import FileWriter
 from controllers.base_controller import BaseController
 from framework.common.logger.message_type import MessageType
 from logic_layer.algos_orchestation_logic import AlgosOrchestationLogic

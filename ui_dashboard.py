@@ -1,7 +1,7 @@
 import time
 
-from common.util.logger import Logger
-from common.util.ml_settings_loader import MLSettingsLoader
+from common.util.logging.logger import Logger
+from common.util.std_in_out.ml_settings_loader import MLSettingsLoader
 from controllers.main_dashboard_controller import MainDashboardController
 
 

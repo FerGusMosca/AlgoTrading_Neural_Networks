@@ -5,7 +5,6 @@ from datetime import timedelta, datetime
 from dateutil.relativedelta import relativedelta
 
 from business_entities.porft_summary import PortfSummary
-from business_entities.portf_position import PortfolioPosition
 from common.dto.indicator_type_dto import IndicatorTypeDTO
 from common.enums.filename_prefix import FilenamePrefix
 from common.enums.folders import Folders
@@ -14,17 +13,19 @@ from common.enums.intervals import Intervals
 from common.enums.parameters.parameters_keys import ParametersKeys
 from common.enums.sliding_window_strategy import SlidingWindowStrategy as sws, SlidingWindowStrategy
 from common.enums.trading_algo_strategy import TradingAlgoStrategy as tas, TradingAlgoStrategy
-from common.util.dataframe_filler import DataframeFiller
-from common.util.dataframe_printer import DataframePrinter
-from common.util.date_handler import DateHandler
-from common.util.etf_logic_manager import ETFLogicManager
-from common.util.financial_calculation_helper import FinancialCalculationsHelper
-from common.util.graph_builder import GraphBuilder
-from common.util.image_handler import ImageHandler
-from common.util.light_logger import LightLogger
-from common.util.portfolio_summary_analyzer import PortfolioSummaryAnalyzer
-from common.util.random_walk_generator import RandomWalkGenerator
-from common.util.slope_calculator import SlopeCalculator
+from common.util.downloaders.FRED_downloader import FredDownloader
+from common.util.downloaders.tradingview_downloader import TradingViewDownloader
+from common.util.pandas_dataframes.dataframe_filler import DataframeFiller
+from common.util.pandas_dataframes.dataframe_printer import DataframePrinter
+from common.util.financial_calculations.date_handler import DateHandler
+from common.util.std_in_out.etf_file_extraction_handler import ETFFileExtractionHandler
+from common.util.financial_calculations.financial_calculation_helper import FinancialCalculationsHelper
+from common.util.graphs.graph_builder import GraphBuilder
+from common.util.graphs.image_handler import ImageHandler
+from common.util.logging.light_logger import LightLogger
+from common.util.financial_calculations.portfolio_summary_analyzer import PortfolioSummaryAnalyzer
+from common.util.financial_calculations.random_walk_generator import RandomWalkGenerator
+from common.util.financial_calculations.slope_calculator import SlopeCalculator
 from data_access_layer.date_range_classification_manager import DateRangeClassificationManager
 from data_access_layer.economic_series_manager import EconomicSeriesManager
 from data_access_layer.timestamp_classification_manager import TimestampClassificationManager
@@ -35,7 +36,6 @@ from logic_layer.convolutional_neural_netowrk import ConvolutionalNeuralNetwork
 from logic_layer.indicator_algos.sintethic_indicator_creator import SintheticIndicatorCreator
 from logic_layer.model_creators.random_forest_model_creator import RandomForestModelCreator
 from logic_layer.trading_algos.buy_and_hold_backtester import BuyAndHoldBacktester
-from logic_layer.trading_algos.direct_prediction_backtester import DirectPredictionBacktester
 from logic_layer.trading_algos.direct_slope_backtester import DirectSlopeBacktester
 from logic_layer.trading_algos.inv_slope_backtester import InvSlopeBacktester
 from logic_layer.trading_algos.n_flip_prediction_backtester import NFlipPredictionBacktester
@@ -62,6 +62,8 @@ class AlgosOrchestationLogic:
         self.date_range_classif_mgr = DateRangeClassificationManager(ml_reports_conn_str)
 
         self.timestamp_range_classif_mgr=TimestampClassificationManager(ml_reports_conn_str)
+
+        self.economic_series_mgr = EconomicSeriesManager(hist_data_conn_str)
 
 
     def __classify_group__(self,classifications, grouping_classif_criteria):
@@ -763,9 +765,9 @@ class AlgosOrchestationLogic:
             if curr_d_to <= curr_d_from:
                 break
 
-        if draw_predictions:
-            symbol_prices_df = symbol_prices_df[symbol_prices_df['date'] >= draw_d_from]
-            GraphBuilder.plot_prices_with_trades(symbol_prices_df,summary_dict_arr,"SLIDING_RF")
+            if draw_predictions:
+                symbol_prices_df = symbol_prices_df[symbol_prices_df['date'] >= draw_d_from]
+                GraphBuilder.plot_prices_with_trades(symbol_prices_df,summary_dict_arr,"SLIDING_RF")
 
 
         return summary_dict_arr
@@ -1498,6 +1500,7 @@ class AlgosOrchestationLogic:
             values = df[var].tolist()
             dates = df["date"].tolist()
 
+
             regime_signals = SlopeCalculator.classify_slope_regime(
                 values=values,
                 dates=dates,
@@ -1601,6 +1604,32 @@ class AlgosOrchestationLogic:
 
         return preds
 
+    def process_download_financial_data(self, symbol: str, d_from: str, d_to: str, algo_params: dict):
+        vendor = algo_params.get("vendor", "").upper()
+        vendor_params = algo_params.get("vendor_params", {})
+
+        if vendor == "TRADINGVIEW":
+            downloader = TradingViewDownloader(vendor_params)
+            df = downloader.download(symbol, from_date=d_from, to_date=d_to)
+            interval_enum=downloader.get_interval_enum_translation()
+
+            for index, row in df.iterrows():
+                date = row.name if "date" not in row else row["date"]  # por si es DataFrame con índice datetime
+                value = row["value"] if "value" in row else row["close"]
+                self.economic_series_mgr.persist_economic_series(symbol, date, interval_enum.value, value)
+
+        elif vendor == "FRED":
+            downloader = FredDownloader(vendor_params)
+            df = downloader.download(symbol, from_date=d_from, to_date=d_to)
+            for index, row in df.iterrows():
+                date = row["date"]
+                value = row["value"]
+                self.economic_series_mgr.persist_economic_series(symbol, date, Intervals.DAY.value, value)
+
+        else:
+            raise Exception(f"❌ Unknown data vendor '{vendor}'. Supported: TRADINGVIEW, FRED")
+
+       #TODO --> Convertir a EconomicValues y persistir
 
     def process_create_sinthetic_indicator_logic(self,comp_path,model_candle,d_from,d_to,algo_params):
         start_of_day = datetime(d_from.year, d_from.month, d_from.day)
@@ -1642,7 +1671,7 @@ class AlgosOrchestationLogic:
 
         #0- We extract the ETF composition info
         symbols_csv=self.data_set_builder.extract_series_csv_from_etf_file(etf_path,1)
-        etf_comp_dto_arr = ETFLogicManager.__extract_etf_composition__(etf_path, 1, 0)
+        etf_comp_dto_arr = ETFFileExtractionHandler.__extract_etf_composition__(etf_path, 1, 0)
 
         #1- The trading symbols DF
         symbols_series_df = self.data_set_builder.build_interval_series(symbols_csv, start_of_day, end_of_day,
@@ -1697,7 +1726,7 @@ class AlgosOrchestationLogic:
     def model_custom_etf(self,weights_csv,symbols_csv,start_of_day, end_of_day):
 
         # 0- We extract the ETF composition info
-        etf_comp_dto_arr=ETFLogicManager.__extract_etf_composition_from_csv__(weights_csv,symbols_csv)
+        etf_comp_dto_arr=ETFFileExtractionHandler.__extract_etf_composition_from_csv__(weights_csv, symbols_csv)
 
         # 1- The trading symbols DF
         symbols_series_df = self.data_set_builder.build_interval_series(symbols_csv, start_of_day, end_of_day,

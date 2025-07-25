@@ -6,7 +6,7 @@ from tensorflow.keras import regularizers
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 
-from common.util.dataframe_filler import DataframeFiller
+from common.util.pandas_dataframes.dataframe_filler import DataframeFiller
 from framework.common.logger.message_type import MessageType
 
 

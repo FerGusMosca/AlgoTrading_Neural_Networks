@@ -1,7 +1,6 @@
 import copy
 import math
 import pandas as pd
-import numpy as np
 
 from business_entities.porf_mult_positions import PortfMultPositions
 from business_entities.portf_position import PortfolioPosition
@@ -9,9 +8,9 @@ from common.dto.etf_position_dto import ETFPositionDTO
 from common.dto.strategy_summary_dto import StrategySummaryDTO
 from common.enums.columns_prefix import ColumnsPrefix
 from common.enums.sliding_window_strategy import SlidingWindowStrategy
-from common.util.date_handler import DateHandler
-from common.util.financial_calculation_helper import FinancialCalculationsHelper
-from common.util.light_logger import LightLogger
+from common.util.financial_calculations.date_handler import DateHandler
+from common.util.financial_calculations.financial_calculation_helper import FinancialCalculationsHelper
+from common.util.logging.light_logger import LightLogger
 
 
 class BaseClassDailyTradingBacktester:

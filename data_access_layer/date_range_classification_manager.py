@@ -1,7 +1,7 @@
 import pyodbc
 
 from business_entities.date_range_classification_value import DateRangeClassificationValue
-from common.util.date_handler import DateHandler
+from common.util.financial_calculations.date_handler import DateHandler
 
 _DATE_FORMAT = "%Y-%m-%d"
 _ID_IDX = 0
