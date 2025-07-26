@@ -39,6 +39,9 @@ class TradingViewDownloader:
         if "session" in self.params and "token" in self.params:
             print("✅ Connected to TradingView via session/token")
             return TvDatafeed(session=self.params["session"], token=self.params["token"])
+        elif "session" in self.params:
+            print("✅ Connected to TradingView via session/token")
+            return TvDatafeed(session=self.params["session"])
         elif "tradingview_user" in self.params and "tradingview_pwd" in self.params:
             print("✅ Connected to TradingView via username/password")
             return TvDatafeed(username=self.params["tradingview_user"], password=self.params["tradingview_pwd"])

@@ -44,7 +44,8 @@ def show_commands():
     print("#20-EvalSlidingRandomForest [symbol] [series_csv] [from] [to] [classif_key] [init_portf_size] [trade_comm] [classif_threshold] [sliding_window_years] [sliding_window_months]")
     print("#21-CustomRegimeSwitchDetector [variables] [from] [to] [regime_switch_filter] [regime_candle] [regime_window]")
     print("#22-DownloadFinancialData [symbol] [from*] [to*] [vendor_params*]")
-    print("#33-CreateLightweightIndicator [csv_indicators] [from*] [to*] [benchmark*] [plot_result*]")
+    print("#23-CreateLightweightIndicator [csv_indicators] [from*] [to*] [benchmark*] [plot_result*]")
+    print("#24-CreateSpreadVariable [diff_indicators] [from*] [to*] [output_symbol]")
     print("======================== UI ========================")
     print("#30-BiasMainLandingPage")
     print("#31-DisplayOrderRoutingScreen")
@@ -240,6 +241,22 @@ def process_download_financial_data(cmd):
                                           d_from=d_from,
                                           d_to=d_to,
                                           algo_params=cmd_param_dict)
+
+
+#
+def process_create_spread_variable(cmd):
+    # Required
+    diff_indicators = __get_param__(cmd, "diff_indicators")
+    output_symbol = __get_param__(cmd, "output_symbol", True, "LIGHTWEIGHT_INDICATOR")
+
+    # Optional
+    d_from = __get_param__(cmd, "from", True, None)
+    d_to = __get_param__(cmd, "to", True, None)
+
+
+    # Run core logic
+    process_create_spread_variable_logic(diff_indicators=diff_indicators, d_from=d_from, d_to=d_to,output_symbol=output_symbol)
+
 
 
 def process_create_lightweight_indicator(cmd):
@@ -1279,14 +1296,41 @@ def process_create_lightweight_indicator_logic(csv_indicators, d_from, d_to,outp
         )
 
         trd_algos.process_create_lightweight_indicator(csv_indicators=csv_indicators, d_from=d_from, d_to=d_to,
-                                                       benchmark=benchmark, plot_result=plot_result,
-                                                       output_symbol=output_symbol)
+                                                       output_symbol=output_symbol,
+                                                       benchmark=benchmark,plot_result=plot_result
+                                                       )
 
         logger.print("✅ Lightweight indicator successfully created and persisted", MessageType.INFO)
 
     except Exception as e:
         print(traceback.format_exc())
         logger.print(f"CRITICAL ERROR running process_create_lightweight_indicator_logic: {str(e)}", MessageType.ERROR)
+
+
+def process_create_spread_variable_logic(diff_indicators, d_from, d_to,output_symbol):
+    loader = MLSettingsLoader()
+    logger = Logger()
+
+    try:
+        logger.print(f"🧪 Starting spread variable creation with {len(diff_indicators.split(','))} input variables", MessageType.INFO)
+
+        config_settings = loader.load_settings("./configs/commands_mgr.ini")
+
+        trd_algos = AlgosOrchestationLogic(
+            config_settings["hist_data_conn_str"],
+            config_settings["ml_reports_conn_str"],
+            None,
+            logger
+        )
+
+        trd_algos.process_create_spread_varaible(diff_indicators=diff_indicators, d_from=d_from, d_to=d_to,output_symbol=output_symbol)
+
+        logger.print("✅ Spread Variable successfully created and persisted", MessageType.INFO)
+
+    except Exception as e:
+        print(traceback.format_exc())
+        logger.print(f"CRITICAL ERROR running process_create_spread_variable_logic: {str(e)}", MessageType.ERROR)
+
 
 
 def process_download_financial_data_logic(symbol, d_from, d_to, algo_params):
@@ -1477,6 +1521,8 @@ def process_commands(cmd):
         run_custom_regime_switch_detector(cmd)
     elif cmd_param_list[0] == "CreateLightweightIndicator":
         process_create_lightweight_indicator(cmd)
+    elif cmd_param_list[0] == "CreateSpreadVariable":
+        process_create_spread_variable(cmd)
 
     #TestDailyLSTM
 

@@ -1643,6 +1643,7 @@ class AlgosOrchestationLogic:
 
        #TODO --> Convertir a EconomicValues y persistir
 
+
     def process_create_lightweight_indicator(self, csv_indicators, d_from, d_to,output_symbol, benchmark=None, plot_result=True):
         print(f"🧩 Building DataFrame with indicators: {csv_indicators}")
 
@@ -1691,6 +1692,43 @@ class AlgosOrchestationLogic:
         # Plot result (optional) --> Take to graph
         if plot_result:
             GraphBuilder.plot_2_series_overlapped(pivot_df,benchmark_df,benchmark,output_symbol)
+
+
+    def process_create_spread_varaible(self, diff_indicators, d_from, d_to,output_symbol):
+        print(f"🧩 Building DataFrame with indicators: {diff_indicators}")
+
+        variables_csv= ",".join(diff_indicators.split("-"))
+
+        indicators_series_df = self.data_set_builder.build_interval_series(
+            series_csv=variables_csv,
+            d_from=d_from,
+            d_to=d_to,
+            interval=DataSetBuilder._1_DAY_INTERVAL,
+            output_col=["symbol", "date", "close"]
+        )
+
+        if indicators_series_df.empty:
+            raise Exception("❌ No data returned for selected indicators")
+
+        # Pivot to wide format
+        pivot_df=self.data_set_builder.pivot_and_merge_indicators(indicators_series_df)
+        pivot_df = DataframeFiller.fill_missing_values(pivot_df)
+        pivot_df.dropna(inplace=True)
+
+        pivot_df[output_symbol] = pivot_df[f"close_{diff_indicators.split('-')[0]}"] - pivot_df[f"close_{diff_indicators.split('-')[1]}"]
+
+        # Persist each row
+        for _, row in pivot_df.iterrows():
+            date = row["date"]
+            value = row[output_symbol]
+            self.economic_series_mgr.persist_economic_series(
+                output_symbol,
+                date if isinstance(date, datetime) else pd.to_datetime(date),
+                Intervals.DAY.value,
+                value
+            )
+
+        print(f"✅ Persisted {len(pivot_df)} values for {output_symbol}")
 
 
 

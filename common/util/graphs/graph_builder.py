@@ -163,7 +163,7 @@ class GraphBuilder:
             ax1.legend(loc="upper left")
 
         # Improve X-axis date formatting
-        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d %b %Y'))
         fig.autofmt_xdate()
 
         # Final tweaks
