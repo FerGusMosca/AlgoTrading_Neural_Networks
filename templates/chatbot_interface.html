@@ -1,0 +1,211 @@
+<!-- Botón flotante -->
+<button class="chat-toggle" onclick="toggleChat()">💬 </button>
+
+<!-- Chat popup -->
+<div class="chat-popup" id="chat-popup">
+  <div class="chat-header">
+    <strong>Asistente</strong>
+    <button class="close-btn" onclick="toggleChat()">✕</button>
+  </div>
+
+  <div id="chat-history" class="chat-history"></div>
+
+  <form id="chat-form" class="chat-form">
+    <textarea id="user-input" placeholder="Escribí tu pregunta..." rows="2"></textarea>
+    <button type="submit" id="send-btn">Enviar</button>
+  </form>
+</div>
+
+<!-- Estilos -->
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif;
+    background-color: #1e1e1e;
+    color: white;
+  }
+
+.chat-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background-color: #6a72f2;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+  .chat-popup {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 340px;
+    height: 500px;
+    background: #1e1e1e;
+    color: white;
+    border-radius: 12px;
+    border: 1px solid #444;
+    display: none;
+    flex-direction: column;
+    z-index: 1001;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
+
+  .chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #2c2c2c;
+    padding: 10px 15px;
+    border-bottom: 1px solid #444;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  .chat-history {
+    padding: 10px;
+    flex: 1;
+    overflow-y: auto;
+    font-size: 14px;
+  }
+
+  .chat-entry {
+    margin-bottom: 12px;
+  }
+
+  .chat-entry .user {
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+
+  .chat-entry .bot {
+    font-weight: bold;
+    margin-top: 6px;
+  }
+
+  .chat-entry .text {
+    margin-left: 8px;
+    white-space: pre-wrap;
+  }
+
+  .chat-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    border-top: 1px solid #444;
+  }
+
+  .chat-form textarea {
+    resize: none;
+    padding: 8px;
+    font-size: 14px;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background-color: #2a2a2a;
+    color: white;
+  }
+
+  .chat-form button {
+    padding: 8px;
+    background-color: #6a72f2;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .chat-form button:disabled {
+    background-color: #999;
+    cursor: wait;
+  }
+</style>
+
+<!-- Script -->
+<script>
+  function toggleChat() {
+    const popup = document.getElementById("chat-popup");
+
+    if (popup.style.display === "flex") {
+      popup.style.display = "none";
+    } else {
+      popup.style.display = "flex";
+      // Forzamos un pequeño retraso para asegurar el render
+      requestAnimationFrame(() => {
+        popup.scrollTop = popup.scrollHeight;
+        document.getElementById("user-input").focus();
+      });
+    }
+  }
+
+   const form = document.getElementById("chat-form");
+  const inputField = document.getElementById("user-input");
+  const historyDiv = document.getElementById("chat-history");
+  const sendBtn = document.getElementById("send-btn");
+
+  inputField.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      form.dispatchEvent(new Event("submit"));
+    }
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const question = inputField.value.trim();
+    if (!question) return;
+
+    sendBtn.disabled = true;
+    inputField.disabled = true;
+    sendBtn.innerText = "⏳";
+
+    const entryDiv = document.createElement("div");
+    entryDiv.classList.add("chat-entry");
+    entryDiv.innerHTML = `
+      <div class="user">Tú:</div>
+      <div class="text">${question}</div>
+      <div class="bot">Bot:</div>
+      <div class="text loading">Escribiendo respuesta...</div>
+    `;
+    historyDiv.appendChild(entryDiv);
+    historyDiv.scrollTop = historyDiv.scrollHeight;
+
+    try {
+      const res = await fetch("/chatbot/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+      const data = await res.json();
+      entryDiv.querySelector(".loading").textContent = data.answer;
+    } catch (err) {
+      entryDiv.querySelector(".loading").textContent = "❌ Error al enviar la pregunta.";
+    }
+
+    inputField.value = "";
+    inputField.disabled = false;
+    sendBtn.disabled = false;
+    sendBtn.innerText = "Enviar";
+    inputField.focus();
+  });
+</script>

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from itsdangerous import TimestampSigner
 from starlette.responses import RedirectResponse
-
+from controllers.chatbot_controller import router as chatbot_router
 from controllers.account_controller import AccountController
 from controllers.auth_middleware import AuthMiddleware
 from controllers.display_custom_etf_controller import DisplayCustomETFController
@@ -104,6 +104,10 @@ class MainDashboardController:
             exempt_paths=["/login", "/login/", "/static", "/static/", "/favicon.ico"]
         )
 
+        self.app.get("/chatbot_interface", response_class=HTMLResponse)(self.chatbot_page)
+        self.app.include_router(chatbot_router)
+
+
     async def startup_event(self):
         await self.routing_dashboard.initialize()
         self.app.include_router(self.routing_dashboard.router)
@@ -144,5 +148,13 @@ class MainDashboardController:
         response = RedirectResponse(url="/login", status_code=302)
         response.delete_cookie("session")
         return response
+
+    async def chatbot_page(self, request: Request):
+        return self.templates.TemplateResponse("chatbot_interface.html", {"request": request})
+
+    async def chatbot_ui(self, request: Request):
+        return self.templates.TemplateResponse("chatbot_interface.html", {"request": request})
+
+
 
 

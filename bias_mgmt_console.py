@@ -1,6 +1,7 @@
 import traceback
 
 from business_entities.portf_position import PortfolioPosition
+from common.enums.market_regimes import MarketRegimes
 from common.util.financial_calculations.date_handler import DateHandler
 from common.util.logging.logger import Logger
 from common.util.std_in_out.ml_settings_loader import MLSettingsLoader
@@ -640,7 +641,10 @@ def run_custom_regime_switch_detector(cmd):
     regime_candle = __get_param__(cmd, "regime_candle")
     regime_window = int(__get_param__(cmd, "regime_window", optional=True, def_value=20))
     slope_threshold = float(__get_param__(cmd, "slope_threshold", optional=True, def_value=0.3))
-    abs_value_threshold = float(__get_param__(cmd, "abs_value_threshold", optional=True, def_value=None))
+
+    abs_value_threshold=None
+    if regime_filter==MarketRegimes.ABS_VALUE.value:
+        abs_value_threshold = float(__get_param__(cmd, "abs_value_threshold", optional=True, def_value=None))
 
     process_custom_regime_switch_detector(
         variables, d_from, d_to, regime_filter, regime_candle, regime_window, slope_threshold,abs_value_threshold
