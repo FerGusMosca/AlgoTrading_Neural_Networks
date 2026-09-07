@@ -584,6 +584,8 @@ class MLModelAnalyzer():
         features_df=self.__apply_feature_renaming_if_needed(features_df,model_filename)
 
         lower_percentile_limit = float(n_algo_param_dict.get("lower_percentile_limit", 0.6))
+        lower_prob_limit_raw = n_algo_param_dict.get("lower_prob_limit", None)
+        lower_prob_limit = float(lower_prob_limit_raw) if lower_prob_limit_raw is not None else None
         make_stationary = n_algo_param_dict.get("make_stationary", True)
 
         # Merge symbol prices with feature variables
@@ -601,6 +603,7 @@ class MLModelAnalyzer():
                                                          model_filename=model_filename, bias=bias,
                                                          draw_statistics=draw_statistics,
                                                          lower_percentile_limit=lower_percentile_limit,
+                                                         lower_prob_limit=lower_prob_limit,
                                                          make_stationary=make_stationary)
 
         if "cut_value" in result_df.attrs:

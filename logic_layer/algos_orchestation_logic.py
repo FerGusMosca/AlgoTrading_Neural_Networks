@@ -312,8 +312,13 @@ class AlgosOrchestationLogic:
         summary.calculate_profit_stats(eval_d_from,eval_d_to)
 
         cut_value_used = n_algo_param_dict.get("cut_value_used", None)
+        cut_origin_txt = (
+            "lower_prob_limit" if n_algo_param_dict.get("lower_prob_limit", None) is not None
+            else f"lower_percentile_limit={n_algo_param_dict.get('lower_percentile_limit', None)}"
+        )
         cut_value_txt = (
-            f"Prob. de corte={cut_value_used:.6f} ({cut_value_used * 100:.2f}%) | "
+            f"Prob. de corte={cut_value_used:.6f} ({cut_value_used * 100:.2f}%) "
+            f"[{cut_origin_txt}] | "
             if cut_value_used is not None else ""
         )
 
@@ -484,11 +489,15 @@ class AlgosOrchestationLogic:
             bias=n_algo_param_dict.get("bias", "LONG"), last_trading_dict=None, n_algo_param_dict=n_algo_param_dict,
             draw_statistics=draw_predictions)
 
-        if "cut_value_used" not in n_algo_param_dict and "prob_long" in preds_df.columns:
-            n_algo_param_dict["cut_value_used"] = float(
-                np.quantile(preds_df["prob_long"].to_numpy(dtype=float),
-                            float(n_algo_param_dict.get("lower_percentile_limit", 0.5)))
-            )
+        if "cut_value_used" not in n_algo_param_dict:
+            lower_prob_limit = n_algo_param_dict.get("lower_prob_limit", None)
+            if lower_prob_limit is not None:
+                n_algo_param_dict["cut_value_used"] = float(lower_prob_limit)
+            elif "prob_long" in preds_df.columns:
+                n_algo_param_dict["cut_value_used"] = float(
+                    np.quantile(preds_df["prob_long"].to_numpy(dtype=float),
+                                float(n_algo_param_dict.get("lower_percentile_limit", 0.5)))
+                )
 
         backtester = NFlipPredictionBacktester()
         portf_pos_dict = backtester.backtest(

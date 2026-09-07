@@ -500,6 +500,8 @@ def process_test_XGBoost_cmd(cmd):
     group_as_mov_avg = ParamReader.get_bool_param(cmd, "group_as_mov_avg", True, def_value=False)
     grouping_mov_avg_unit = ParamReader.get_param(cmd, "grouping_mov_avg_unit", True, def_value=100)
     lower_percentile_limit = float(ParamReader.get_param(cmd, "lower_percentile_limit", True, def_value=0.5))
+    lower_prob_limit_raw = ParamReader.get_param(cmd, "lower_prob_limit", True, def_value=None)
+    lower_prob_limit = float(lower_prob_limit_raw) if lower_prob_limit_raw is not None else None
     make_stationary = ParamReader.get_bool_param(cmd, "make_stationary", True, def_value=False)
     n_flip = int(ParamReader.get_param(cmd, "n_flip", True, def_value=3))
     bias = ParamReader.get_param(cmd, "bias", True, def_value=None)
@@ -519,6 +521,7 @@ def process_test_XGBoost_cmd(cmd):
         "make_stationary": make_stationary,
         "n_flip": n_flip,
         "lower_percentile_limit": lower_percentile_limit,
+        "lower_prob_limit": lower_prob_limit,
         "bias": bias,
         "draw_predictions": draw_predictions,
         "pos_regime_filters_csv": pos_regime_filters_csv,

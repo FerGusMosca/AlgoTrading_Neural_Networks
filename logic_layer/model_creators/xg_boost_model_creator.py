@@ -187,6 +187,7 @@ class XGBoostModelCreator(BaseModelCreator):
             draw_statistics=False,
             make_stationary=True,
             lower_percentile_limit=0.4,
+            lower_prob_limit=None,
             debug=False,
     ):
         """
@@ -230,9 +231,15 @@ class XGBoostModelCreator(BaseModelCreator):
 
         prob_long = y_probs[:, long_idx]
 
-        # percentile-based cut
-        cut_value = np.quantile(prob_long, lower_percentile_limit)
-        print(f"[CUT] lower_percentile_limit={lower_percentile_limit:.4f} -> probabilidad de corte={cut_value:.6f} "
+        # cut: fixed probability if provided, otherwise percentile-based
+        if lower_prob_limit is not None:
+            cut_value = float(lower_prob_limit)
+            cut_origin = f"lower_prob_limit={cut_value:.4f}"
+        else:
+            cut_value = float(np.quantile(prob_long, lower_percentile_limit))
+            cut_origin = f"lower_percentile_limit={lower_percentile_limit:.4f}"
+
+        print(f"[CUT] {cut_origin} -> probabilidad de corte={cut_value:.6f} "
               f"({cut_value * 100:.2f}%) | casos totales={len(prob_long)} | "
               f"casos LONG={int((prob_long >= cut_value).sum())} "
               f"({(prob_long >= cut_value).mean() * 100:.2f}%)")
@@ -253,6 +260,7 @@ class XGBoostModelCreator(BaseModelCreator):
 
         result_df.attrs["cut_value"] = float(cut_value)
         result_df.attrs["lower_percentile_limit"] = float(lower_percentile_limit)
+        result_df.attrs["lower_prob_limit"] = float(lower_prob_limit) if lower_prob_limit is not None else None
 
         if draw_statistics:
             GraphBuilder.plot_long_probability_distributions(prob_long, threshold=cut_value)
