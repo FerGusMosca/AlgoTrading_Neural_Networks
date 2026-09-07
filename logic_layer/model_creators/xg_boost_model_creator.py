@@ -232,8 +232,10 @@ class XGBoostModelCreator(BaseModelCreator):
 
         # percentile-based cut
         cut_value = np.quantile(prob_long, lower_percentile_limit)
-        if debug:
-            print(f"[DEBUG] percentile={lower_percentile_limit:.2f} → cut_value={cut_value:.5f}")
+        print(f"[CUT] lower_percentile_limit={lower_percentile_limit:.4f} -> probabilidad de corte={cut_value:.6f} "
+              f"({cut_value * 100:.2f}%) | casos totales={len(prob_long)} | "
+              f"casos LONG={int((prob_long >= cut_value).sum())} "
+              f"({(prob_long >= cut_value).mean() * 100:.2f}%)")
 
         y_pred_ids = np.where(prob_long >= cut_value, long_idx, short_idx)
         y_class = label_encoder.inverse_transform(y_pred_ids)
@@ -248,6 +250,9 @@ class XGBoostModelCreator(BaseModelCreator):
             "Prediction": y_class,
             "bias": bias,
         })
+
+        result_df.attrs["cut_value"] = float(cut_value)
+        result_df.attrs["lower_percentile_limit"] = float(lower_percentile_limit)
 
         if draw_statistics:
             GraphBuilder.plot_long_probability_distributions(prob_long, threshold=cut_value)

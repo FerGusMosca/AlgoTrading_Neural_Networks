@@ -603,6 +603,9 @@ class MLModelAnalyzer():
                                                          lower_percentile_limit=lower_percentile_limit,
                                                          make_stationary=make_stationary)
 
+        if "cut_value" in result_df.attrs:
+            n_algo_param_dict["cut_value_used"] = float(result_df.attrs["cut_value"])
+
         result_df[symbol] = result_df["close"]
 
         last_date = result_df["date"].max()

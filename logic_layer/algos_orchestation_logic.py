@@ -1,5 +1,7 @@
 import os
 import traceback
+
+import numpy as np
 from datetime import timedelta, datetime
 
 from dateutil.relativedelta import relativedelta
@@ -309,8 +311,15 @@ class AlgosOrchestationLogic:
         self.last_known_portf_value = summary.portf_final_MTM
         summary.calculate_profit_stats(eval_d_from,eval_d_to)
 
+        cut_value_used = n_algo_param_dict.get("cut_value_used", None)
+        cut_value_txt = (
+            f"Prob. de corte={cut_value_used:.6f} ({cut_value_used * 100:.2f}%) | "
+            if cut_value_used is not None else ""
+        )
+
         LightLogger.do_log(
             f"[SUMMARY] Portfolio Positions Breakdown: "
+            f"{cut_value_txt}"
             f"Init={summary.portf_init_MTM:.2f} | "
             f"Final={summary.portf_final_MTM:.2f} | "
             f"Profit={summary.profit_pct:.2f}% | "
@@ -475,6 +484,11 @@ class AlgosOrchestationLogic:
             bias=n_algo_param_dict.get("bias", "LONG"), last_trading_dict=None, n_algo_param_dict=n_algo_param_dict,
             draw_statistics=draw_predictions)
 
+        if "cut_value_used" not in n_algo_param_dict and "prob_long" in preds_df.columns:
+            n_algo_param_dict["cut_value_used"] = float(
+                np.quantile(preds_df["prob_long"].to_numpy(dtype=float),
+                            float(n_algo_param_dict.get("lower_percentile_limit", 0.5)))
+            )
 
         backtester = NFlipPredictionBacktester()
         portf_pos_dict = backtester.backtest(
